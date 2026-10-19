@@ -266,7 +266,7 @@ When an AI coding agent begins a task in this repository:
    - Official endpoints (`/api/v2/...`) **must** use `shopeeAuthGuard` and envelope `createShopeeSuccessResponse` / `createShopeeErrorResponse`.
    - Simulator UI helper endpoints (`/api/v2/simulator/...`) belong in `src/modules/simulator/simulator.router.ts`.
 4. **Preserve Documentation Integrity**: Do not remove existing comments, docstrings, or test assertions.
-5. **Update UI**: When adding customer-facing features, update `public/index.html` adhering to the standard Shopee Orange `#ee4d2d` palette.
+5. **Update UI & Vietnamese Localization (`vi-VN`)**: When updating or adding features, update `public/index.html` adhering to the standard Shopee Orange `#ee4d2d` palette. All user-facing UI text, buttons, modals, badges, form labels, and toasts MUST be in **Vietnamese (`vi-VN`)** matching official Shopee Vietnam terminology. All assistant responses, commit messages, and developer communication remain in **English**.
 6. **Compile & Re-verify**:
    ```bash
    npm run build
