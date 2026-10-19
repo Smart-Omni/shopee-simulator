@@ -303,7 +303,8 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
     include: {
       shop: true,
       items: true,
-      packages: true
+      packages: true,
+      comments: true
     },
     orderBy: { createdAt: "desc" },
     take: 100
@@ -331,8 +332,13 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
       recipient_address: `${o.recipientAddress}, ${o.recipientDistrict}, ${o.recipientCity}`,
       cancel_by: o.cancelBy,
       cancel_reason: o.cancelReason,
+      ship_by_date: o.shipByDate ? Math.floor(o.shipByDate.getTime() / 1000) : null,
+      pay_time: o.payTime ? Math.floor(o.payTime.getTime() / 1000) : null,
+      create_time: Math.floor(o.createdAt.getTime() / 1000),
       created_at: o.createdAt.toISOString(),
       updated_at: o.updatedAt.toISOString(),
+      has_reviewed: (o.comments || []).length > 0,
+      reviewed_item_ids: (o.comments || []).map((c: any) => Number(c.itemId)),
       items: (o.items || []).map((i: any) => ({
         order_item_id: Number(i.orderItemId),
         item_id: Number(i.itemId),
@@ -1583,6 +1589,19 @@ simulatorRouter.post("/api/v2/simulator/review/create", async (req: Request, res
 
     if (order.orderStatus !== "COMPLETED") {
       res.json(createShopeeErrorResponse("error_param", "Can only review COMPLETED orders"));
+      return;
+    }
+
+    // Check if item in this order has already been reviewed
+    const existingComment = await prisma.productComment.findFirst({
+      where: {
+        orderSn: String(order_sn),
+        itemId: BigInt(item_id)
+      }
+    });
+
+    if (existingComment) {
+      res.json(createShopeeErrorResponse("product.duplicate_request", "This item in this order has already been reviewed"));
       return;
     }
 

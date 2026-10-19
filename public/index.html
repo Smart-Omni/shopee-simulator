@@ -1749,7 +1749,9 @@
 
         let slaPill = '';
         if (o.order_status === 'READY_TO_SHIP') {
-          const shipByTs = o.ship_by_date ? Number(o.ship_by_date) * 1000 : (new Date(o.create_time * 1000).getTime() + 172800000);
+          const rawShipBy = o.ship_by_date ? Number(o.ship_by_date) * 1000 : null;
+          const rawCreate = o.create_time ? Number(o.create_time) * 1000 : (o.created_at ? new Date(o.created_at).getTime() : Date.now());
+          const shipByTs = (rawShipBy && !isNaN(rawShipBy)) ? rawShipBy : ((!isNaN(rawCreate) ? rawCreate : Date.now()) + 172800000);
           const diffHours = (shipByTs - Date.now()) / (1000 * 3600);
           if (diffHours < 0) {
             slaPill = `<div class="mt-1"><span class="bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded text-[10px] border border-red-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Overdue</span></div>`;
@@ -3561,11 +3563,19 @@
               </button>
             `;
           } else if (o.order_status === 'COMPLETED') {
-            buyerBtns += `
-              <button onclick="openReviewModalForOrder('${o.order_sn}')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition flex items-center shadow-sm">
-                <i class="fa-solid fa-star mr-1 text-[11px]"></i> Review
-              </button>
-            `;
+            if (o.has_reviewed) {
+              buyerBtns += `
+                <button disabled class="px-3 py-1 bg-gray-200 text-gray-500 rounded text-xs font-bold cursor-not-allowed flex items-center shadow-none">
+                  <i class="fa-solid fa-star mr-1 text-[11px] text-amber-400"></i> Reviewed
+                </button>
+              `;
+            } else {
+              buyerBtns += `
+                <button onclick="openReviewModalForOrder('${o.order_sn}')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition flex items-center shadow-sm">
+                  <i class="fa-solid fa-star mr-1 text-[11px]"></i> Review
+                </button>
+              `;
+            }
           }
 
           html += `
@@ -3922,12 +3932,18 @@
         showToast('Order details not found', true);
         return;
       }
+      const reviewedItemIds = order.reviewed_item_ids || [];
+      const unreviewedItems = (order.items || []).filter(i => !reviewedItemIds.includes(Number(i.item_id)));
+      if (unreviewedItems.length === 0) {
+        showToast('All items in this order have already been reviewed!', true);
+        return;
+      }
       currentReviewOrder = order;
       document.getElementById('review-order-sn').value = orderSn;
       document.getElementById('review-modal-order-sn').textContent = `${orderSn} (${order.shop_name || 'Store'})`;
 
       const itemSelect = document.getElementById('review-item-select');
-      itemSelect.innerHTML = (order.items || []).map(i => `
+      itemSelect.innerHTML = unreviewedItems.map(i => `
         <option value="${i.item_id}" data-model="${i.model_id || 0}">${escapeHtml(i.item_name)} ${i.model_name ? `(${escapeHtml(i.model_name)})` : ''}</option>
       `).join('');
 
@@ -4103,6 +4119,7 @@
     // ------------------------------------------------------------------------
     let buyerChatActiveShopId = null;
     let sellerChatActiveBuyerId = null;
+    let sellerChatActiveBuyerName = '';
 
     async function openBuyerChat() {
       const select = document.getElementById('buyer-chat-shop-select');
@@ -4241,6 +4258,7 @@
 
     async function selectSellerChatThread(buyerUserId, buyerUsername) {
       sellerChatActiveBuyerId = buyerUserId;
+      sellerChatActiveBuyerName = buyerUsername;
       document.getElementById('seller-chat-buyer-title').textContent = `Chatting with ${buyerUsername} (ID: ${buyerUserId})`;
       document.getElementById('seller-chat-mark-read-btn')?.classList.remove('hidden');
       document.getElementById('seller-chat-input-bar')?.classList.remove('hidden');
@@ -4311,6 +4329,7 @@
           body: JSON.stringify({
             shop_id: activeShopId,
             buyer_user_id: sellerChatActiveBuyerId,
+            buyer_username: sellerChatActiveBuyerName,
             sender_type: 'SELLER',
             message: text
           })

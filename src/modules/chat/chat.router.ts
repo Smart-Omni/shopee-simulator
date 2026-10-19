@@ -4,6 +4,12 @@ import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../co
 
 export const chatRouter = Router();
 
+const SEEDED_BUYER_NAMES: Record<number, string> = {
+  1001: "Nguyen Van A",
+  1002: "Tran Thi B",
+  1003: "Le Van C"
+};
+
 // ============================================================================
 // 1. SEND CHAT MESSAGE: POST /api/v2/simulator/chat/send
 // ============================================================================
@@ -12,7 +18,7 @@ chatRouter.post("/api/v2/simulator/chat/send", async (req: Request, res: Respons
     const {
       shop_id,
       buyer_user_id = 1001,
-      buyer_username = "shopee_buyer_test",
+      buyer_username,
       sender_type,
       message,
       order_sn
@@ -34,11 +40,34 @@ chatRouter.post("/api/v2/simulator/chat/send", async (req: Request, res: Respons
       return;
     }
 
+    let resolvedBuyerUsername = String(buyer_username || "").trim();
+    const buyerIdNum = Number(buyer_user_id);
+
+    // If buyer_username wasn't supplied or is generic default
+    if (!resolvedBuyerUsername || resolvedBuyerUsername === "shopee_buyer_test") {
+      const prevBuyerMsg = await prisma.chatMessage.findFirst({
+        where: {
+          shopId: BigInt(shop_id),
+          buyerUserId: BigInt(buyer_user_id),
+          senderType: "BUYER"
+        },
+        orderBy: { messageId: "desc" }
+      });
+
+      if (prevBuyerMsg && prevBuyerMsg.buyerUsername && prevBuyerMsg.buyerUsername !== "shopee_buyer_test") {
+        resolvedBuyerUsername = prevBuyerMsg.buyerUsername;
+      } else if (SEEDED_BUYER_NAMES[buyerIdNum]) {
+        resolvedBuyerUsername = SEEDED_BUYER_NAMES[buyerIdNum];
+      } else {
+        resolvedBuyerUsername = "Shopee Buyer";
+      }
+    }
+
     const chatMsg = await prisma.chatMessage.create({
       data: {
         shopId: BigInt(shop_id),
         buyerUserId: BigInt(buyer_user_id),
-        buyerUsername: String(buyer_username),
+        buyerUsername: resolvedBuyerUsername,
         senderType: sender_type,
         orderSn: order_sn ? String(order_sn) : null,
         message: msgText

@@ -104,7 +104,9 @@ async function runPhase11Tests() {
         buyerUserId: BigInt(1001),
         buyerUsername: "audiophile_buyer",
         recipientName: "Tran Van Audio",
-        recipientCity: "Ho Chi Minh City"
+        recipientCity: "Ho Chi Minh City",
+        payTime: new Date(),
+        shipByDate: new Date(Date.now() + 172800000)
       }
     });
 
@@ -163,6 +165,11 @@ async function runPhase11Tests() {
     const chatHistoryRes = await request(`/api/v2/simulator/chat/messages?shop_id=${SHOP_ID}&buyer_user_id=1001`);
     assert(chatHistoryRes.json.response.messages.length === 2, "Conversation history has exactly 2 messages");
 
+    // Verify buyer name is preserved in thread listing after seller reply
+    const convAfterReplyRes = await request(`/api/v2/simulator/chat/conversations?shop_id=${SHOP_ID}`);
+    const threadAfterReply = convAfterReplyRes.json.response.conversations.find((c: any) => c.buyer_user_id === 1001);
+    assert(threadAfterReply.buyer_username === "audiophile_buyer", "Preserves authentic buyer username in thread list after seller reply");
+
     // -------------------------------------------------------------
     // Part 2: Post-Order Rating & Reviews
     // -------------------------------------------------------------
@@ -184,6 +191,27 @@ async function runPhase11Tests() {
     assert(testCommentId !== null && testCommentId > 0, "Returns valid comment_id");
     assert(reviewRes.json.response.rating_star === 5, "Rating star is 5");
     assert(reviewRes.json.response.rating_count >= 1, "Shop rating count incremented");
+
+    // Test duplicate review rejection
+    const duplicateReviewRes = await request("/api/v2/simulator/review/create", {
+      method: "POST",
+      body: {
+        order_sn: testOrderSn,
+        item_id: Number(testProduct.itemId),
+        rating_star: 4,
+        comment: "Trying to submit second review",
+        buyer_username: "audiophile_buyer",
+        buyer_user_id: 1001
+      }
+    });
+    assert(duplicateReviewRes.json.error === "product.duplicate_request", "Rejects duplicate review submission with 'product.duplicate_request'");
+
+    // Verify simulator orders query returns SLA ship_by_date and has_reviewed
+    const ordersRes = await request(`/api/v2/simulator/orders?shop_id=${SHOP_ID}`);
+    const targetOrder = ordersRes.json.response.orders.find((o: any) => o.order_sn === testOrderSn);
+    assert(typeof targetOrder.ship_by_date === "number", "Order includes numeric ship_by_date timestamp");
+    assert(targetOrder.has_reviewed === true, "Order indicates has_reviewed = true after review submission");
+    assert(targetOrder.reviewed_item_ids.includes(Number(testProduct.itemId)), "reviewed_item_ids includes reviewed item");
 
     console.log("\n[Test 5] Query Review via Official v2.product.get_comment (HMAC Guarded)");
     const getCommentPath = makeSignedUrl("/api/v2/product/get_comment", {
@@ -236,7 +264,7 @@ async function runPhase11Tests() {
     assert(updatedComment.comment_reply !== null, "comment_reply is populated");
     assert(updatedComment.comment_reply.reply.includes("wonderful review"), "Reply text verified");
 
-    console.log("\n✅ ALL 20 PHASE 11 ASSERTIONS PASSED!\n");
+    console.log("\n✅ ALL 25 PHASE 11 ASSERTIONS PASSED!\n");
   } finally {
     if (testCommentId) {
       await prisma.productComment.deleteMany({ where: { commentId: BigInt(testCommentId) } }).catch(() => {});
