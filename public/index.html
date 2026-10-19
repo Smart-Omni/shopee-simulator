@@ -1482,6 +1482,72 @@
     let currentTab = 'shop';
     let activeShopId = localStorage.getItem('activeShopId') || '727720655';
     let activeBuyerId = localStorage.getItem('activeBuyerId') || '1001';
+    let buyerFilterShopId = 'ALL';
+
+    let shopsList = [];
+    let buyersList = [];
+    let productsList = [];
+    let ordersList = [];
+    let cart = []; // Array of { item_id, item_name, model_id, model_name, price, orig_price, quantity, shop_id, selected, weight, dimensions }
+
+    // Promotions State
+    let promotionsData = { discounts: [], vouchers: [] };
+    let promoCurrentSubTab = 'discounts';
+    let appliedVoucher = null; 
+    let appliedVouchers = {}; // { [shopId]: voucherObj }
+    let activeShopVouchers = [];
+
+    // Global Order Status Localization Map (vi-VN)
+    const statusTextMap = {
+      'UNPAID': 'Chờ thanh toán',
+      'READY_TO_SHIP': 'Chờ lấy hàng',
+      'PROCESSED': 'Đang xử lý',
+      'SHIPPED': 'Đang giao hàng',
+      'COMPLETED': 'Đã giao (Hoàn thành)',
+      'IN_CANCEL': 'Chờ duyệt hủy',
+      'CANCELLED': 'Đã hủy'
+    };
+
+    // Helper to format Date for <input type="datetime-local">
+    function formatDateTimeLocal(d) {
+      const pad = (n) => String(n).padStart(2, '0');
+      const y = d.getFullYear();
+      const m = pad(d.getMonth() + 1);
+      const day = pad(d.getDate());
+      const h = pad(d.getHours());
+      const min = pad(d.getMinutes());
+      return `${y}-${m}-${day}T${h}:${min}`;
+    }
+
+    // Toast Notification helper
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      const toastIcon = document.getElementById('toast-icon');
+
+      if (!toast || !toastMsg) return;
+      toastMsg.textContent = msg;
+      if (toastIcon) {
+        toastIcon.className = isError ? 'fa-solid fa-circle-xmark text-red-400' : 'fa-solid fa-circle-check text-green-400';
+      }
+      toast.classList.remove('translate-y-20', 'opacity-0');
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    // Switch Top Tabs (backward compatibility bridge)
+    function switchTab(tab) {
+      currentTab = tab;
+      if (tab === 'shop') {
+        quickLogin('SELLER', activeShopId || '727720655');
+      } else if (tab === 'buyer') {
+        quickLogin('BUYER', activeBuyerId || '1001');
+      } else if (tab === 'console') {
+        openConsoleDrawer();
+      }
+    }
 
     // ------------------------------------------------------------------------
     // PERSONA & DRAWER STATE MANAGEMENT
@@ -1995,7 +2061,7 @@
           'IN_CANCEL': 'bg-orange-100 text-orange-800',
           'CANCELLED': 'bg-red-100 text-red-800'
         };
-        const statusBadge = `<span class="px-2 py-0.5 rounded-full text-xs font-bold ${statusColors[o.order_status] || 'bg-gray-100 text-gray-800'}">${o.order_status}</span>`;
+        const statusBadge = `<span class="px-2 py-0.5 rounded-full text-xs font-bold ${statusColors[o.order_status] || 'bg-gray-100 text-gray-800'}">${(statusTextMap && statusTextMap[o.order_status]) || o.order_status}</span>`;
 
         let slaPill = '';
         if (o.order_status === 'READY_TO_SHIP') {
