@@ -1,0 +1,1726 @@
+import { Router, Request, Response } from "express";
+import { prisma } from "../../common/prisma";
+import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../common/utils/envelope";
+import { WebhookService } from "../webhook/webhook.service";
+import { generateShopeeAwbPdf } from "../../common/utils/pdf";
+import { OrderStatus, PromotionStatus } from "@prisma/client";
+import * as crypto from "crypto";
+
+export const simulatorRouter = Router();
+
+// ============================================================================
+// 1. SHOP OVERVIEW & TOKEN STATUS
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/shop/overview", async (req: Request, res: Response): Promise<void> => {
+  const shopIdStr = (req.query.shop_id as string) || "727720655";
+  const shopId = BigInt(shopIdStr);
+
+  const shop = await prisma.shop.findUnique({
+    where: { shopId },
+    include: { partner: true }
+  });
+
+  if (!shop) {
+    res.json(createShopeeErrorResponse("error_param", "Shop not found"));
+    return;
+  }
+
+  const now = new Date();
+  let tokenRemainingSec = 0;
+  let tokenStatus = "EXPIRED";
+
+  if (shop.accessToken && shop.accessTokenExpiresAt) {
+    const diff = Math.floor((shop.accessTokenExpiresAt.getTime() - now.getTime()) / 1000);
+    if (diff > 0) {
+      tokenRemainingSec = diff;
+      tokenStatus = "VALID";
+    } else if (shop.oldAccessToken && shop.oldTokenExpiresAt && shop.oldTokenExpiresAt > now) {
+      tokenRemainingSec = Math.floor((shop.oldTokenExpiresAt.getTime() - now.getTime()) / 1000);
+      tokenStatus = "GRACE_PERIOD";
+    }
+  }
+
+  res.json(createShopeeSuccessResponse({
+    shop_id: Number(shop.shopId),
+    shop_name: shop.shopName,
+    region: shop.region,
+    status: shop.status,
+    is_vacation: shop.isVacation,
+    rating: Number(shop.rating || 5.0),
+    rating_count: shop.ratingCount || 0,
+    partner_id: Number(shop.partnerId),
+    partner_name: shop.partner.appName,
+    partner_key: shop.partner.partnerKey,
+    webhook_url: shop.partner.webhookUrl || "",
+    access_token: shop.accessToken || "",
+    refresh_token: shop.refreshToken || "",
+    token_status: tokenStatus,
+    token_remaining_sec: tokenRemainingSec
+  }));
+});
+
+// ============================================================================
+// 2. TOGGLE VACATION MODE
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/shop/vacation", async (req: Request, res: Response): Promise<void> => {
+  const { shop_id = 727720655, is_vacation } = req.body || {};
+  const shopId = BigInt(shop_id);
+
+  const updated = await prisma.shop.update({
+    where: { shopId },
+    data: { isVacation: Boolean(is_vacation) }
+  });
+
+  res.json(createShopeeSuccessResponse({
+    shop_id: Number(shopId),
+    is_vacation: updated.isVacation
+  }));
+});
+
+// ============================================================================
+// 3. FORCE REFRESH TOKEN / GENERATE FRESH TOKEN
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/shop/refresh_token", async (req: Request, res: Response): Promise<void> => {
+  const { shop_id = 727720655 } = req.body || {};
+  const shopId = BigInt(shop_id);
+
+  const shop = await prisma.shop.findUnique({ where: { shopId } });
+  if (!shop) {
+    res.json(createShopeeErrorResponse("error_param", "Shop not found"));
+    return;
+  }
+
+  const newAccessToken = crypto.randomBytes(16).toString("hex");
+  const newRefreshToken = crypto.randomBytes(16).toString("hex");
+  const expireIn = 14400; // 4 hours
+  const now = new Date();
+
+  await prisma.shop.update({
+    where: { shopId },
+    data: {
+      oldAccessToken: shop.accessToken,
+      oldTokenExpiresAt: new Date(now.getTime() + 300 * 1000), // 5 min grace
+      accessToken: newAccessToken,
+      accessTokenExpiresAt: new Date(now.getTime() + expireIn * 1000),
+      refreshToken: newRefreshToken,
+      refreshTokenExpiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  res.json(createShopeeSuccessResponse({
+    access_token: newAccessToken,
+    refresh_token: newRefreshToken,
+    expire_in: expireIn
+  }));
+});
+
+// ============================================================================
+// 4. GET ALL PRODUCTS FOR SIMULATOR UI
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Response): Promise<void> => {
+  const shopIdStr = req.query.shop_id as string | undefined;
+  const viewMode = req.query.view_mode as string | undefined;
+
+  const whereClause: any = { itemStatus: { not: "DELETED" } };
+  if (viewMode === "buyer") {
+    whereClause.itemStatus = "NORMAL";
+  }
+  if (shopIdStr && shopIdStr.toUpperCase() !== "ALL") {
+    whereClause.shopId = BigInt(shopIdStr);
+  }
+
+  const now = new Date();
+  const [products, activeDiscounts] = await Promise.all([
+    prisma.product.findMany({
+      where: whereClause,
+      include: {
+        shop: true,
+        category: true,
+        models: true
+      },
+      orderBy: { itemId: "desc" }
+    }),
+    prisma.discount.findMany({
+      where: {
+        ...(shopIdStr && shopIdStr.toUpperCase() !== "ALL" ? { shopId: BigInt(shopIdStr) } : {}),
+        status: { not: "DELETED" as any },
+        startTime: { lte: now },
+        endTime: { gte: now }
+      },
+      include: {
+        items: {
+          include: {
+            models: true
+          }
+        }
+      }
+    })
+  ]);
+
+  // Map itemId -> active discount item
+  const discountItemMap = new Map<string, any>();
+  for (const disc of activeDiscounts) {
+    for (const it of disc.items) {
+      discountItemMap.set(it.itemId.toString(), it);
+    }
+  }
+
+  res.json(createShopeeSuccessResponse({
+    products: products.map((p: any) => {
+      const discItem = discountItemMap.get(p.itemId.toString());
+      let hasDiscount = false;
+      let promoPrice: number | null = null;
+      let discountPct: number | null = null;
+
+      if (discItem) {
+        if (p.hasModel && discItem.models && discItem.models.length > 0) {
+          const mPromoPrices = discItem.models.map((m: any) => Number(m.modelPromotionPrice));
+          if (mPromoPrices.length > 0) {
+            hasDiscount = true;
+            promoPrice = Math.min(...mPromoPrices);
+          }
+        } else if (discItem.itemPromotionPrice !== null) {
+          hasDiscount = true;
+          promoPrice = Number(discItem.itemPromotionPrice);
+        }
+
+        if (hasDiscount && promoPrice !== null && Number(p.originalPrice) > 0) {
+          discountPct = Math.round((1 - (promoPrice / Number(p.originalPrice))) * 100);
+        }
+      }
+
+      return {
+        item_id: Number(p.itemId),
+        shop_id: Number(p.shopId),
+        shop_name: p.shop?.shopName || `Shop ${p.shopId}`,
+        shop_rating: p.shop?.rating ? Number(p.shop.rating) : 5.0,
+        is_vacation: Boolean(p.shop?.isVacation),
+        item_name: p.itemName,
+        item_status: p.itemStatus,
+        description: p.description,
+        category_name: p.category?.categoryName || "General",
+        original_price: Number(p.originalPrice),
+        current_price: promoPrice !== null ? promoPrice : Number(p.originalPrice),
+        has_discount: hasDiscount,
+        promotion_price: promoPrice,
+        discount_percentage: discountPct,
+        currency: p.currency,
+        weight: Number(p.weight || 0.5),
+        dimensions: p.dimensionsJson,
+        has_model: p.hasModel,
+        images: p.imagesJson,
+        tier_variation: p.tierVariationJson,
+        models: (p.models || []).map((m: any) => {
+          let mPromoPrice: number | null = null;
+          if (discItem && discItem.models) {
+            const mPromo = discItem.models.find((dim: any) => dim.modelId.toString() === m.modelId.toString());
+            if (mPromo) {
+              mPromoPrice = Number(mPromo.modelPromotionPrice);
+            }
+          }
+          const mCurrentPrice = mPromoPrice !== null ? mPromoPrice : Number(m.originalPrice);
+          return {
+            model_id: Number(m.modelId),
+            model_name: m.modelName,
+            model_sku: m.modelSku,
+            tier_index: m.tierIndex,
+            original_price: Number(m.originalPrice),
+            current_price: mCurrentPrice,
+            promotion_price: mPromoPrice,
+            seller_stock: m.sellerStock
+          };
+        })
+      };
+    })
+  }));
+});
+
+// ============================================================================
+// 5. QUICK UPDATE STOCK
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/product/quick_update_stock", async (req: Request, res: Response): Promise<void> => {
+  const { model_id, item_id, stock } = req.body || {};
+
+  if (!model_id || stock === undefined) {
+    res.json(createShopeeErrorResponse("error_param", "model_id and stock are required"));
+    return;
+  }
+
+  const modelId = BigInt(model_id);
+  const updatedModel = await prisma.productModel.update({
+    where: { modelId },
+    data: { sellerStock: Number(stock) },
+    include: { product: true }
+  });
+
+  // Asynchronously dispatch reserved_stock_change_push (Code 8)
+  const shop = await prisma.shop.findUnique({ where: { shopId: updatedModel.product.shopId } });
+  if (shop) {
+    WebhookService.dispatch({
+      partnerId: shop.partnerId,
+      pushCode: 8,
+      shopId: shop.shopId,
+      payload: {
+        shop_id: Number(shop.shopId),
+        code: 8,
+        timestamp: Math.floor(Date.now() / 1000),
+        data: {
+          item_id: Number(updatedModel.itemId),
+          model_id: Number(updatedModel.modelId),
+          stock: Number(stock)
+        }
+      }
+    }).catch(err => console.warn("[Simulator] Stock push failed:", err.message));
+  }
+
+  res.json(createShopeeSuccessResponse({
+    model_id: Number(updatedModel.modelId),
+    seller_stock: updatedModel.sellerStock
+  }));
+});
+
+// ============================================================================
+// 6. GET ALL ORDERS FOR SIMULATOR UI
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Response): Promise<void> => {
+  const shopIdStr = req.query.shop_id as string | undefined;
+  const buyerIdStr = req.query.buyer_id as string | undefined;
+  const statusFilter = req.query.status as string | undefined;
+
+  const whereClause: any = {};
+  if (shopIdStr && shopIdStr.toUpperCase() !== "ALL") {
+    whereClause.shopId = BigInt(shopIdStr);
+  }
+  if (buyerIdStr && buyerIdStr.toUpperCase() !== "ALL") {
+    whereClause.buyerUserId = BigInt(buyerIdStr);
+  }
+  if (statusFilter && statusFilter.toUpperCase() !== "ALL") {
+    whereClause.orderStatus = statusFilter as OrderStatus;
+  }
+
+  const orders = await prisma.order.findMany({
+    where: whereClause,
+    include: {
+      shop: true,
+      items: true,
+      packages: true
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100
+  });
+
+  res.json(createShopeeSuccessResponse({
+    orders: orders.map((o: any) => ({
+      order_sn: o.orderSn,
+      shop_id: Number(o.shopId),
+      shop_name: o.shop?.shopName || `Shop ${o.shopId}`,
+      buyer_user_id: Number(o.buyerUserId),
+      buyer_username: o.buyerUsername,
+      order_status: o.orderStatus,
+      total_amount: Number(o.totalAmount),
+      voucher_from_seller: Number(o.voucherFromSeller || 0),
+      voucher_from_shopee: Number(o.voucherFromShopee || 0),
+      buyer_paid_shipping_fee: Number(o.buyerPaidShippingFee || 0),
+      actual_shipping_fee: Number(o.actualShippingFee || 0),
+      channel_id: Number(o.channelId),
+      currency: o.currency,
+      shipping_carrier: o.shippingCarrier,
+      payment_method: o.paymentMethod,
+      recipient_name: o.recipientName,
+      recipient_phone: o.recipientPhone,
+      recipient_address: `${o.recipientAddress}, ${o.recipientDistrict}, ${o.recipientCity}`,
+      cancel_by: o.cancelBy,
+      cancel_reason: o.cancelReason,
+      created_at: o.createdAt.toISOString(),
+      updated_at: o.updatedAt.toISOString(),
+      items: (o.items || []).map((i: any) => ({
+        order_item_id: Number(i.orderItemId),
+        item_id: Number(i.itemId),
+        item_name: i.itemName,
+        model_name: i.modelName,
+        item_price: Number(i.itemPrice),
+        quantity: i.quantityPurchased
+      })),
+      packages: (o.packages || []).map((p: any) => ({
+        package_number: p.packageNumber,
+        tracking_number: p.trackingNumber,
+        logistics_status: p.logisticsStatus,
+        document_status: p.documentStatus
+      }))
+    }))
+  }));
+});
+
+// ============================================================================
+// 7. BUYER PAY ORDER (UNPAID -> READY_TO_SHIP)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/pay", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn } = req.body || {};
+
+  if (!order_sn) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { shop: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  const now = new Date();
+  const updated = await prisma.order.update({
+    where: { orderSn: order_sn },
+    data: {
+      orderStatus: OrderStatus.READY_TO_SHIP,
+      updatedAt: now
+    }
+  });
+
+  // Dispatches order_status_push (Code 3)
+  WebhookService.dispatch({
+    partnerId: order.shop.partnerId,
+    pushCode: 3,
+    shopId: order.shopId,
+    ordersn: order_sn,
+    payload: {
+      shop_id: Number(order.shopId),
+      code: 3,
+      timestamp: Math.floor(now.getTime() / 1000),
+      data: {
+        ordersn: order_sn,
+        status: "READY_TO_SHIP",
+        update_time: Math.floor(now.getTime() / 1000)
+      }
+    }
+  }).catch(err => console.warn("[Simulator] Pay order push failed:", err.message));
+
+  res.json(createShopeeSuccessResponse({
+    order_sn,
+    order_status: updated.orderStatus
+  }));
+});
+
+// ============================================================================
+// 8. SIMULATOR SHIP ORDER (READY_TO_SHIP -> PROCESSED + TRACKING NO)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/ship", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn } = req.body || {};
+
+  if (!order_sn) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { shop: true, packages: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  const randomSuffix = Math.floor(100000000 + Math.random() * 900000000);
+  const trackingNumber = `SPXVN${randomSuffix}`;
+  const now = new Date();
+
+  // Update order status
+  await prisma.order.update({
+    where: { orderSn: order_sn },
+    data: { orderStatus: OrderStatus.PROCESSED, updatedAt: now }
+  });
+
+  // Update packages
+  if (order.packages.length > 0) {
+    for (const pkg of order.packages) {
+      await prisma.orderPackage.update({
+        where: { packageNumber: pkg.packageNumber },
+        data: {
+          trackingNumber,
+          logisticsStatus: "LOGISTICS_REQUEST_CREATED",
+          shippingType: "pickup"
+        }
+      });
+    }
+  }
+
+  // Dispatches Code 3 (order_status_push) and Code 4 (order_trackingno_push)
+  WebhookService.dispatch({
+    partnerId: order.shop.partnerId,
+    pushCode: 3,
+    shopId: order.shopId,
+    ordersn: order_sn,
+    payload: {
+      shop_id: Number(order.shopId),
+      code: 3,
+      timestamp: Math.floor(now.getTime() / 1000),
+      data: {
+        ordersn: order_sn,
+        status: "PROCESSED",
+        update_time: Math.floor(now.getTime() / 1000)
+      }
+    }
+  }).catch(err => console.warn("[Simulator] Ship status push failed:", err.message));
+
+  WebhookService.dispatch({
+    partnerId: order.shop.partnerId,
+    pushCode: 4,
+    shopId: order.shopId,
+    ordersn: order_sn,
+    payload: {
+      shop_id: Number(order.shopId),
+      code: 4,
+      timestamp: Math.floor(now.getTime() / 1000),
+      data: {
+        ordersn: order_sn,
+        tracking_no: trackingNumber
+      }
+    }
+  }).catch(err => console.warn("[Simulator] Tracking push failed:", err.message));
+
+  res.json(createShopeeSuccessResponse({
+    order_sn,
+    order_status: "PROCESSED",
+    tracking_number: trackingNumber
+  }));
+});
+
+// ============================================================================
+// 9. SIMULATOR GENERATE AWB DOCUMENT
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/generate_awb", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn } = req.body || {};
+
+  if (!order_sn) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { shop: true, packages: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  for (const pkg of order.packages) {
+    await prisma.orderPackage.update({
+      where: { packageNumber: pkg.packageNumber },
+      data: { documentStatus: "READY" }
+    });
+  }
+
+  // Dispatch Code 15
+  WebhookService.dispatch({
+    partnerId: order.shop.partnerId,
+    pushCode: 15,
+    shopId: order.shopId,
+    ordersn: order_sn,
+    payload: {
+      shop_id: Number(order.shopId),
+      code: 15,
+      timestamp: Math.floor(Date.now() / 1000),
+      data: {
+        ordersn: order_sn,
+        status: "READY"
+      }
+    }
+  }).catch(err => console.warn("[Simulator] AWB push failed:", err.message));
+
+  res.json(createShopeeSuccessResponse({
+    order_sn,
+    document_status: "READY"
+  }));
+});
+
+// ============================================================================
+// 10. SIMULATOR DIRECT AWB PDF DOWNLOAD
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/order/download_awb", async (req: Request, res: Response): Promise<void> => {
+  const orderSn = req.query.order_sn as string;
+
+  if (!orderSn) {
+    res.status(400).send("order_sn is required");
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn },
+    include: {
+      items: true,
+      packages: true,
+      shop: true
+    }
+  });
+
+  if (!order) {
+    res.status(404).send("Order not found");
+    return;
+  }
+
+  const trackingNumber = order.packages[0]?.trackingNumber || `SPXVN${Date.now()}`;
+
+  const pdfBuffer = generateShopeeAwbPdf({
+    orderSn: order.orderSn,
+    trackingNumber,
+    shippingCarrier: order.shippingCarrier || "Shopee Xpress",
+    recipientName: order.recipientName,
+    recipientAddress: `${order.recipientAddress}, ${order.recipientDistrict}, ${order.recipientCity}`
+  });
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="AWB_${orderSn}.pdf"`);
+  res.setHeader("Content-Length", pdfBuffer.length);
+  res.send(pdfBuffer);
+});
+
+// ============================================================================
+// 11. LIST ALL REGISTERED SHOPS
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/shops", async (_req: Request, res: Response): Promise<void> => {
+  const shops = await prisma.shop.findMany({
+    include: {
+      _count: {
+        select: { products: true, orders: true }
+      }
+    },
+    orderBy: { shopId: "asc" }
+  });
+
+  res.json(createShopeeSuccessResponse({
+    shops: shops.map(s => ({
+      shop_id: Number(s.shopId),
+      shop_name: s.shopName,
+      region: s.region,
+      status: s.status,
+      is_vacation: s.isVacation,
+      products_count: s._count.products,
+      orders_count: s._count.orders
+    }))
+  }));
+});
+
+// ============================================================================
+// 12. LIST MOCK BUYER PROFILES
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/buyers", (_req: Request, res: Response): void => {
+  const buyers = [
+    {
+      buyer_id: 1001,
+      name: "Nguyen Van A",
+      phone: "+84901234567",
+      region: "VN",
+      city: "Ho Chi Minh City",
+      district: "District 1",
+      address: "123 Le Duan Street"
+    },
+    {
+      buyer_id: 1002,
+      name: "Tran Thi B",
+      phone: "+84988776655",
+      region: "VN",
+      city: "Hanoi",
+      district: "Hoan Kiem District",
+      address: "456 Trang Tien Street"
+    },
+    {
+      buyer_id: 1003,
+      name: "Le Van C",
+      phone: "+84912345678",
+      region: "VN",
+      city: "Da Nang",
+      district: "Hai Chau District",
+      address: "789 Tran Phu Street"
+    }
+  ];
+
+  res.json(createShopeeSuccessResponse({ buyers }));
+});
+
+// ============================================================================
+// 13. SELLER ADDS PRODUCT (SHOP INVENTORY MANAGEMENT)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/product/create", async (req: Request, res: Response): Promise<void> => {
+  const {
+    shop_id = 727720655,
+    category_id = 100001,
+    item_name,
+    description = "",
+    original_price = 100000,
+    weight = 0.5,
+    item_sku,
+    tier_variation,
+    models = []
+  } = req.body || {};
+
+  if (!item_name) {
+    res.json(createShopeeErrorResponse("error_param", "item_name is required"));
+    return;
+  }
+
+  const shopId = BigInt(shop_id);
+  const catId = BigInt(category_id);
+  const hasModel = Array.isArray(models) && models.length > 0;
+
+  const product = await prisma.product.create({
+    data: {
+      shopId,
+      categoryId: catId,
+      itemName: item_name,
+      description,
+      originalPrice: Number(original_price),
+      currency: "VND",
+      weight: Number(weight),
+      itemSku: item_sku || `SKU-${Date.now()}`,
+      hasModel,
+      tierVariationJson: tier_variation || undefined,
+      imagesJson: {
+        image_id_list: ["img_custom_1"],
+        image_url_list: ["https://cf.shopee.vn/file/custom_product_image"]
+      }
+    }
+  });
+
+  if (hasModel) {
+    for (const m of models) {
+      await prisma.productModel.create({
+        data: {
+          itemId: product.itemId,
+          modelName: m.model_name || "Standard",
+          modelSku: m.model_sku || `${product.itemSku}-VAR`,
+          tierIndex: m.tier_index || [0],
+          originalPrice: Number(m.original_price || original_price),
+          sellerStock: Number(m.seller_stock || 100)
+        }
+      });
+    }
+  } else {
+    await prisma.productModel.create({
+      data: {
+        itemId: product.itemId,
+        modelName: "Standard",
+        modelSku: product.itemSku,
+        tierIndex: [0],
+        originalPrice: Number(original_price),
+        sellerStock: 100
+      }
+    });
+  }
+
+  res.json(createShopeeSuccessResponse({
+    item_id: Number(product.itemId),
+    item_name: product.itemName,
+    has_model: product.hasModel
+  }));
+});
+
+// ============================================================================
+// 14. GET ORDER DETAIL (FOR BUYER & SELLER INSPECTION)
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/order/detail", async (req: Request, res: Response): Promise<void> => {
+  const orderSn = req.query.order_sn as string;
+
+  if (!orderSn) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn },
+    include: {
+      items: true,
+      packages: true,
+      shop: true
+    }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  const pkg = order.packages[0];
+
+  // Visual tracking timeline state
+  const timeline = [
+    {
+      title: "Order Placed",
+      status: "DONE",
+      time: order.createdAt.toISOString()
+    },
+    {
+      title: "Payment Confirmed",
+      status: order.orderStatus !== OrderStatus.UNPAID ? "DONE" : "PENDING",
+      time: order.orderStatus !== OrderStatus.UNPAID ? order.updatedAt.toISOString() : null
+    },
+    {
+      title: "Logistics Arranged",
+      status: ["PROCESSED", "SHIPPED", "TO_CONFIRM_RECEIVE", "COMPLETED"].includes(order.orderStatus) ? "DONE" : "PENDING",
+      tracking: pkg?.trackingNumber || null
+    },
+    {
+      title: "Courier Picked Up (In Transit)",
+      status: ["SHIPPED", "TO_CONFIRM_RECEIVE", "COMPLETED"].includes(order.orderStatus) ? "DONE" : "PENDING"
+    },
+    {
+      title: "Delivered & Completed",
+      status: order.orderStatus === OrderStatus.COMPLETED ? "DONE" : "PENDING"
+    }
+  ];
+
+  res.json(createShopeeSuccessResponse({
+    order_sn: order.orderSn,
+    order_status: order.orderStatus,
+    shop_id: Number(order.shopId),
+    shop_name: order.shop.shopName,
+    shipping_carrier: order.shippingCarrier,
+    payment_method: order.paymentMethod,
+    total_amount: Number(order.totalAmount),
+    voucher_from_seller: Number(order.voucherFromSeller || 0),
+    voucher_from_shopee: Number(order.voucherFromShopee || 0),
+    buyer_paid_shipping_fee: Number(order.buyerPaidShippingFee || 0),
+    actual_shipping_fee: Number(order.actualShippingFee || 0),
+    channel_id: Number(order.channelId),
+    currency: order.currency,
+    created_at: order.createdAt.toISOString(),
+    updated_at: order.updatedAt.toISOString(),
+    recipient: {
+      name: order.recipientName,
+      phone: order.recipientPhone,
+      address: `${order.recipientAddress}, ${order.recipientDistrict}, ${order.recipientCity}`
+    },
+    package: pkg ? {
+      package_number: pkg.packageNumber,
+      tracking_number: pkg.trackingNumber,
+      logistics_status: pkg.logisticsStatus,
+      document_status: pkg.documentStatus
+    } : null,
+    items: order.items.map(i => ({
+      order_item_id: Number(i.orderItemId),
+      item_id: Number(i.itemId),
+      item_name: i.itemName,
+      model_name: i.modelName,
+      unit_price: Number(i.itemPrice),
+      quantity: i.quantityPurchased,
+      subtotal: Number(i.itemPrice) * i.quantityPurchased
+    })),
+    timeline
+  }));
+});
+
+// ============================================================================
+// 15. SIMULATE COURIER PICKUP: PROCESSED -> SHIPPED
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/carrier_pickup", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn } = req.body || {};
+
+  if (!order_sn) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { shop: true, packages: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  const now = new Date();
+  await prisma.order.update({
+    where: { orderSn: order_sn },
+    data: { orderStatus: OrderStatus.SHIPPED, updatedAt: now }
+  });
+
+  for (const pkg of order.packages) {
+    await prisma.orderPackage.update({
+      where: { packageNumber: pkg.packageNumber },
+      data: { logisticsStatus: "LOGISTICS_PICKUP_DONE" }
+    });
+  }
+
+  // Push Code 3 (order_status_push: SHIPPED)
+  WebhookService.dispatch({
+    partnerId: order.shop.partnerId,
+    pushCode: 3,
+    shopId: order.shopId,
+    ordersn: order_sn,
+    payload: {
+      shop_id: Number(order.shopId),
+      code: 3,
+      timestamp: Math.floor(now.getTime() / 1000),
+      data: {
+        ordersn: order_sn,
+        status: "SHIPPED",
+        update_time: Math.floor(now.getTime() / 1000)
+      }
+    }
+  }).catch(err => console.warn("[Simulator] Pickup push failed:", err.message));
+
+  res.json(createShopeeSuccessResponse({
+    order_sn,
+    order_status: "SHIPPED",
+    logistics_status: "LOGISTICS_PICKUP_DONE"
+  }));
+});
+
+// ============================================================================
+// 16. SIMULATE COURIER DELIVERY / COMPLETION: SHIPPED -> COMPLETED
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/deliver", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn } = req.body || {};
+
+  if (!order_sn) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { shop: true, packages: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  const now = new Date();
+  await prisma.order.update({
+    where: { orderSn: order_sn },
+    data: { orderStatus: OrderStatus.COMPLETED, updatedAt: now }
+  });
+
+  for (const pkg of order.packages) {
+    await prisma.orderPackage.update({
+      where: { packageNumber: pkg.packageNumber },
+      data: { logisticsStatus: "LOGISTICS_DELIVERED" }
+    });
+  }
+
+  // Push Code 3 (order_status_push: COMPLETED)
+  WebhookService.dispatch({
+    partnerId: order.shop.partnerId,
+    pushCode: 3,
+    shopId: order.shopId,
+    ordersn: order_sn,
+    payload: {
+      shop_id: Number(order.shopId),
+      code: 3,
+      timestamp: Math.floor(now.getTime() / 1000),
+      data: {
+        ordersn: order_sn,
+        status: "COMPLETED",
+        update_time: Math.floor(now.getTime() / 1000)
+      }
+    }
+  }).catch(err => console.warn("[Simulator] Deliver push failed:", err.message));
+
+  res.json(createShopeeSuccessResponse({
+    order_sn,
+    order_status: "COMPLETED",
+    logistics_status: "LOGISTICS_DELIVERED"
+  }));
+});
+
+// ============================================================================
+// 17. BUYER INSTANT CANCEL (IOC: UNPAID or READY_TO_SHIP -> CANCELLED)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/buyer_cancel", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn, reason = "Buyer cancelled order (Instant Cancellation)" } = req.body || {};
+
+  if (!order_sn) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { shop: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  // Instant cancellation is valid only for UNPAID or READY_TO_SHIP
+  if (order.orderStatus !== OrderStatus.UNPAID && order.orderStatus !== OrderStatus.READY_TO_SHIP) {
+    res.json(createShopeeErrorResponse("error_business", "Order is already being processed or shipped; instant cancellation is not allowed."));
+    return;
+  }
+
+  const now = new Date();
+  await prisma.order.update({
+    where: { orderSn: order_sn },
+    data: {
+      orderStatus: OrderStatus.CANCELLED,
+      cancelBy: "BUYER",
+      cancelReason: reason,
+      updatedAt: now
+    }
+  });
+
+  // Push Code 3 (CANCELLED)
+  WebhookService.dispatch({
+    partnerId: order.shop.partnerId,
+    pushCode: 3,
+    shopId: order.shopId,
+    ordersn: order_sn,
+    payload: {
+      shop_id: Number(order.shopId),
+      code: 3,
+      timestamp: Math.floor(now.getTime() / 1000),
+      data: {
+        ordersn: order_sn,
+        status: "CANCELLED",
+        update_time: Math.floor(now.getTime() / 1000)
+      }
+    }
+  }).catch(err => console.warn("[Simulator] Buyer cancel push failed:", err.message));
+
+  res.json(createShopeeSuccessResponse({
+    order_sn,
+    order_status: "CANCELLED",
+    cancel_by: "BUYER"
+  }));
+});
+
+// ============================================================================
+// 18. BUYER REQUESTS CANCELLATION: PROCESSED -> IN_CANCEL
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/buyer_request_cancel", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn, reason = "Changed mind / wrong address" } = req.body || {};
+
+  if (!order_sn) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { shop: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  if (order.orderStatus !== OrderStatus.PROCESSED) {
+    res.json(createShopeeErrorResponse("error_business", "Cancellation request requires seller approval and can only be submitted for PROCESSED orders."));
+    return;
+  }
+
+  const now = new Date();
+  await prisma.order.update({
+    where: { orderSn: order_sn },
+    data: {
+      orderStatus: OrderStatus.IN_CANCEL,
+      buyerCancelReason: reason,
+      updatedAt: now
+    }
+  });
+
+  // Push Code 3 (IN_CANCEL)
+  WebhookService.dispatch({
+    partnerId: order.shop.partnerId,
+    pushCode: 3,
+    shopId: order.shopId,
+    ordersn: order_sn,
+    payload: {
+      shop_id: Number(order.shopId),
+      code: 3,
+      timestamp: Math.floor(now.getTime() / 1000),
+      data: {
+        ordersn: order_sn,
+        status: "IN_CANCEL",
+        update_time: Math.floor(now.getTime() / 1000)
+      }
+    }
+  }).catch(err => console.warn("[Simulator] Cancel request push failed:", err.message));
+
+  res.json(createShopeeSuccessResponse({
+    order_sn,
+    order_status: "IN_CANCEL"
+  }));
+});
+
+// ============================================================================
+// 19. SELLER RESPONDS TO CANCELLATION REQUEST (IN_CANCEL -> CANCELLED or PROCESSED)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/handle_cancellation", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn, operation } = req.body || {};
+
+  if (!order_sn || !operation) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn and operation ('ACCEPT' | 'REJECT') are required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { shop: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  if (order.orderStatus !== OrderStatus.IN_CANCEL) {
+    res.json(createShopeeErrorResponse("error_business", "Order is not in IN_CANCEL status"));
+    return;
+  }
+
+  const op = String(operation).toUpperCase();
+  const now = new Date();
+
+  if (op === "ACCEPT") {
+    await prisma.order.update({
+      where: { orderSn: order_sn },
+      data: {
+        orderStatus: OrderStatus.CANCELLED,
+        cancelBy: "BUYER",
+        cancelReason: order.buyerCancelReason || "Seller accepted buyer cancellation request",
+        updatedAt: now
+      }
+    });
+
+    WebhookService.dispatch({
+      partnerId: order.shop.partnerId,
+      pushCode: 3,
+      shopId: order.shopId,
+      ordersn: order_sn,
+      payload: {
+        shop_id: Number(order.shopId),
+        code: 3,
+        timestamp: Math.floor(now.getTime() / 1000),
+        data: {
+          ordersn: order_sn,
+          status: "CANCELLED",
+          update_time: Math.floor(now.getTime() / 1000)
+        }
+      }
+    }).catch(err => console.warn("[Simulator] Seller accept cancel push failed:", err.message));
+
+    res.json(createShopeeSuccessResponse({
+      order_sn,
+      order_status: "CANCELLED",
+      operation: "ACCEPT"
+    }));
+  } else if (op === "REJECT") {
+    await prisma.order.update({
+      where: { orderSn: order_sn },
+      data: {
+        orderStatus: OrderStatus.PROCESSED,
+        updatedAt: now
+      }
+    });
+
+    WebhookService.dispatch({
+      partnerId: order.shop.partnerId,
+      pushCode: 3,
+      shopId: order.shopId,
+      ordersn: order_sn,
+      payload: {
+        shop_id: Number(order.shopId),
+        code: 3,
+        timestamp: Math.floor(now.getTime() / 1000),
+        data: {
+          ordersn: order_sn,
+          status: "PROCESSED",
+          update_time: Math.floor(now.getTime() / 1000)
+        }
+      }
+    }).catch(err => console.warn("[Simulator] Seller reject cancel push failed:", err.message));
+
+    res.json(createShopeeSuccessResponse({
+      order_sn,
+      order_status: "PROCESSED",
+      operation: "REJECT"
+    }));
+  } else {
+    res.json(createShopeeErrorResponse("error_param", "Invalid operation. Must be ACCEPT or REJECT"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: GET /api/v2/simulator/promotions
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/promotions", async (req: Request, res: Response): Promise<void> => {
+  const shopIdStr = (req.query.shop_id as string) || "727720655";
+  const shopId = BigInt(shopIdStr);
+  const now = new Date();
+
+  function getDynamicPromoStatus(status: PromotionStatus, startTime: Date, endTime: Date): string {
+    if (status === PromotionStatus.DELETED) return "deleted";
+    if (status === PromotionStatus.EXPIRED) return "expired";
+    if (now < startTime) return "upcoming";
+    if (now > endTime) return "expired";
+    return "ongoing";
+  }
+
+  // Find non-deleted discounts
+  const discounts = await prisma.discount.findMany({
+    where: {
+      shopId,
+      status: { not: PromotionStatus.DELETED }
+    },
+    include: {
+      items: {
+        include: {
+          product: true,
+          models: {
+            include: { productModel: true }
+          }
+        }
+      }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50
+  });
+
+  // Find non-deleted vouchers
+  const vouchers = await prisma.voucher.findMany({
+    where: {
+      shopId,
+      status: { not: PromotionStatus.DELETED }
+    },
+    include: {
+      items: {
+        include: { product: true }
+      }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50
+  });
+
+  res.json(createShopeeSuccessResponse({
+    shop_id: Number(shopId),
+    discounts: discounts.map(d => ({
+      discount_id: Number(d.discountId),
+      discount_name: d.discountName,
+      start_time: Math.floor(d.startTime.getTime() / 1000),
+      end_time: Math.floor(d.endTime.getTime() / 1000),
+      status: getDynamicPromoStatus(d.status, d.startTime, d.endTime),
+      items: d.items.map(it => ({
+        item_id: Number(it.itemId),
+        item_name: it.product?.itemName || `Item ${it.itemId}`,
+        purchase_limit: it.purchaseLimit,
+        item_promotion_price: it.itemPromotionPrice ? Number(it.itemPromotionPrice) : null,
+        models: it.models.map(m => ({
+          model_id: Number(m.modelId),
+          model_name: m.productModel?.modelName || `Model ${m.modelId}`,
+          model_promotion_price: Number(m.modelPromotionPrice)
+        }))
+      }))
+    })),
+    vouchers: vouchers.map(v => ({
+      voucher_id: Number(v.voucherId),
+      voucher_code: v.voucherCode,
+      voucher_name: v.voucherName,
+      voucher_type: v.voucherType,
+      reward_type: v.rewardType,
+      min_basket_price: Number(v.minBasketPrice),
+      discount_amount: v.discountAmount ? Number(v.discountAmount) : 0,
+      percentage: v.percentage || 0,
+      max_price: v.maxPrice ? Number(v.maxPrice) : 0,
+      usage_quantity: v.usageQuantity,
+      current_usage: v.currentUsage,
+      start_time: Math.floor(v.startTime.getTime() / 1000),
+      end_time: Math.floor(v.endTime.getTime() / 1000),
+      status: getDynamicPromoStatus(v.status, v.startTime, v.endTime),
+      items: v.items.map(it => ({
+        item_id: Number(it.itemId),
+        item_name: it.product?.itemName || `Item ${it.itemId}`
+      }))
+    }))
+  }));
+});
+
+// ============================================================================
+// SIMULATOR HELPER: CREATE DISCOUNT
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/discount/create", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      shop_id = 727720655,
+      discount_name,
+      start_time,
+      end_time,
+      items = []
+    } = req.body || {};
+
+    if (!discount_name || typeof discount_name !== "string" || discount_name.trim().length === 0) {
+      res.json(createShopeeErrorResponse("error_param", "discount_name is required"));
+      return;
+    }
+
+    const shopId = BigInt(shop_id);
+    const startDate = typeof start_time === "number" ? new Date(start_time * 1000) : new Date(start_time);
+    const endDate = typeof end_time === "number" ? new Date(end_time * 1000) : new Date(end_time);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      res.json(createShopeeErrorResponse("error_param", "Invalid start_time or end_time"));
+      return;
+    }
+
+    if (endDate <= startDate) {
+      res.json(createShopeeErrorResponse("error_param", "End time must be after start time"));
+      return;
+    }
+
+    const now = new Date();
+    const initialStatus = now < startDate ? PromotionStatus.UPCOMING : (now > endDate ? PromotionStatus.EXPIRED : PromotionStatus.ONGOING);
+
+    const discount = await prisma.discount.create({
+      data: {
+        shopId,
+        discountName: discount_name.trim(),
+        startTime: startDate,
+        endTime: endDate,
+        status: initialStatus
+      }
+    });
+
+    if (Array.isArray(items) && items.length > 0) {
+      for (const it of items) {
+        if (!it.item_id) continue;
+        const itemId = BigInt(it.item_id);
+        const promoPrice = it.item_promotion_price !== undefined && it.item_promotion_price !== null && it.item_promotion_price !== ""
+          ? Number(it.item_promotion_price)
+          : null;
+        const purchaseLimit = Number(it.purchase_limit || 0);
+
+        const createdItem = await prisma.discountItem.create({
+          data: {
+            discountId: discount.discountId,
+            itemId,
+            itemPromotionPrice: promoPrice,
+            purchaseLimit,
+            status: initialStatus
+          }
+        });
+
+        // Check if item has models
+        const product = await prisma.product.findUnique({
+          where: { itemId },
+          include: { models: true }
+        });
+
+        if (product && product.hasModel && product.models.length > 0) {
+          for (const m of product.models) {
+            const mPromo = it.models?.find((im: any) => String(im.model_id) === String(m.modelId));
+            const modelPrice = mPromo && mPromo.model_promotion_price !== undefined
+              ? Number(mPromo.model_promotion_price)
+              : (promoPrice !== null ? promoPrice : Number(m.originalPrice));
+
+            await prisma.discountItemModel.create({
+              data: {
+                discountItemId: createdItem.id,
+                modelId: m.modelId,
+                modelPromotionPrice: modelPrice
+              }
+            });
+          }
+        }
+      }
+    }
+
+    res.json(createShopeeSuccessResponse({
+      discount_id: Number(discount.discountId),
+      discount_name: discount.discountName,
+      status: discount.status.toLowerCase()
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to create discount"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: END DISCOUNT
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/discount/end", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { discount_id } = req.body || {};
+    if (!discount_id) {
+      res.json(createShopeeErrorResponse("error_param", "discount_id is required"));
+      return;
+    }
+    const now = new Date();
+    await prisma.discount.update({
+      where: { discountId: BigInt(discount_id) },
+      data: {
+        status: PromotionStatus.EXPIRED,
+        endTime: now
+      }
+    });
+    res.json(createShopeeSuccessResponse({ discount_id: Number(discount_id), status: "expired" }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to end discount"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: DELETE DISCOUNT
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/discount/delete", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { discount_id } = req.body || {};
+    if (!discount_id) {
+      res.json(createShopeeErrorResponse("error_param", "discount_id is required"));
+      return;
+    }
+    await prisma.discount.update({
+      where: { discountId: BigInt(discount_id) },
+      data: { status: PromotionStatus.DELETED }
+    });
+    res.json(createShopeeSuccessResponse({ discount_id: Number(discount_id), status: "deleted" }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to delete discount"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: CREATE VOUCHER
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/voucher/create", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      shop_id = 727720655,
+      voucher_name,
+      voucher_code,
+      voucher_type = 1,
+      reward_type = 1,
+      discount_amount,
+      percentage,
+      max_price,
+      min_basket_price = 0,
+      usage_quantity = 100,
+      start_time,
+      end_time
+    } = req.body || {};
+
+    if (!voucher_name || !voucher_code) {
+      res.json(createShopeeErrorResponse("error_param", "voucher_name and voucher_code are required"));
+      return;
+    }
+
+    const codeStr = String(voucher_code).toUpperCase().trim();
+    if (!/^[A-Za-z0-9]{1,5}$/.test(codeStr)) {
+      res.json(createShopeeErrorResponse("voucher.voucher_code_error", "Voucher code must be 1 to 5 alphanumeric characters"));
+      return;
+    }
+
+    const shopId = BigInt(shop_id);
+    const startDate = typeof start_time === "number" ? new Date(start_time * 1000) : new Date(start_time);
+    const endDate = typeof end_time === "number" ? new Date(end_time * 1000) : new Date(end_time);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      res.json(createShopeeErrorResponse("error_param", "Invalid start_time or end_time"));
+      return;
+    }
+
+    if (endDate <= startDate) {
+      res.json(createShopeeErrorResponse("error_param", "End time must be after start time"));
+      return;
+    }
+
+    const now = new Date();
+    const initialStatus = now < startDate ? PromotionStatus.UPCOMING : (now > endDate ? PromotionStatus.EXPIRED : PromotionStatus.ONGOING);
+
+    // Check duplicate voucher code for same shop
+    const existing = await prisma.voucher.findFirst({
+      where: {
+        shopId,
+        voucherCode: codeStr,
+        status: { not: PromotionStatus.DELETED }
+      }
+    });
+
+    if (existing) {
+      res.json(createShopeeErrorResponse("voucher.voucher_code_duplicate_error", `Voucher code "${codeStr}" already exists for this store`));
+      return;
+    }
+
+    const voucher = await prisma.voucher.create({
+      data: {
+        shopId,
+        voucherCode: codeStr,
+        voucherName: voucher_name.trim(),
+        voucherType: Number(voucher_type),
+        rewardType: Number(reward_type),
+        discountAmount: discount_amount !== undefined && discount_amount !== null && discount_amount !== "" ? Number(discount_amount) : null,
+        percentage: percentage !== undefined && percentage !== null && percentage !== "" ? Number(percentage) : null,
+        maxPrice: max_price !== undefined && max_price !== null && max_price !== "" ? Number(max_price) : null,
+        minBasketPrice: Number(min_basket_price || 0),
+        usageQuantity: Number(usage_quantity || 100),
+        currentUsage: 0,
+        startTime: startDate,
+        endTime: endDate,
+        status: initialStatus
+      }
+    });
+
+    res.json(createShopeeSuccessResponse({
+      voucher_id: Number(voucher.voucherId),
+      voucher_code: voucher.voucherCode,
+      voucher_name: voucher.voucherName,
+      status: voucher.status.toLowerCase()
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to create voucher"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: END VOUCHER
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/voucher/end", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { voucher_id } = req.body || {};
+    if (!voucher_id) {
+      res.json(createShopeeErrorResponse("error_param", "voucher_id is required"));
+      return;
+    }
+    const now = new Date();
+    await prisma.voucher.update({
+      where: { voucherId: BigInt(voucher_id) },
+      data: {
+        status: PromotionStatus.EXPIRED,
+        endTime: now
+      }
+    });
+    res.json(createShopeeSuccessResponse({ voucher_id: Number(voucher_id), status: "expired" }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to end voucher"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: DELETE VOUCHER
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/voucher/delete", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { voucher_id } = req.body || {};
+    if (!voucher_id) {
+      res.json(createShopeeErrorResponse("error_param", "voucher_id is required"));
+      return;
+    }
+    await prisma.voucher.update({
+      where: { voucherId: BigInt(voucher_id) },
+      data: { status: PromotionStatus.DELETED }
+    });
+    res.json(createShopeeSuccessResponse({ voucher_id: Number(voucher_id), status: "deleted" }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to delete voucher"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: TOGGLE UNLIST PRODUCT
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/product/toggle_unlist", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { item_id } = req.body || {};
+    if (!item_id) {
+      res.json(createShopeeErrorResponse("error_param", "item_id is required"));
+      return;
+    }
+    const product = await prisma.product.findUnique({
+      where: { itemId: BigInt(item_id) }
+    });
+    if (!product) {
+      res.json(createShopeeErrorResponse("error_param", "Product not found"));
+      return;
+    }
+    const newStatus = product.itemStatus === "UNLIST" ? "NORMAL" : "UNLIST";
+    await prisma.product.update({
+      where: { itemId: product.itemId },
+      data: { itemStatus: newStatus }
+    });
+    res.json(createShopeeSuccessResponse({
+      item_id: Number(item_id),
+      item_status: newStatus
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to toggle unlist"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: CREATE REVIEW (POST-ORDER RATING)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/review/create", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { order_sn, item_id, model_id, rating_star = 5, comment = "", buyer_username = "shopee_buyer_test", buyer_user_id = 1001 } = req.body || {};
+
+    if (!order_sn || !item_id) {
+      res.json(createShopeeErrorResponse("error_param", "order_sn and item_id are required"));
+      return;
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { orderSn: String(order_sn) }
+    });
+
+    if (!order) {
+      res.json(createShopeeErrorResponse("error_param", "Order not found"));
+      return;
+    }
+
+    if (order.orderStatus !== "COMPLETED") {
+      res.json(createShopeeErrorResponse("error_param", "Can only review COMPLETED orders"));
+      return;
+    }
+
+    const star = Math.min(5, Math.max(1, Number(rating_star)));
+
+    const createdComment = await prisma.productComment.create({
+      data: {
+        orderSn: String(order_sn),
+        itemId: BigInt(item_id),
+        modelId: model_id ? BigInt(model_id) : null,
+        shopId: order.shopId,
+        buyerUserId: BigInt(buyer_user_id),
+        buyerUsername: String(buyer_username),
+        ratingStar: star,
+        comment: String(comment)
+      }
+    });
+
+    // Recalculate Shop rating
+    const allShopComments = await prisma.productComment.findMany({
+      where: { shopId: order.shopId },
+      select: { ratingStar: true }
+    });
+
+    const totalStars = allShopComments.reduce((acc, c) => acc + c.ratingStar, 0);
+    const avgRating = allShopComments.length > 0 ? (totalStars / allShopComments.length) : 5.0;
+
+    await prisma.shop.update({
+      where: { shopId: order.shopId },
+      data: {
+        rating: avgRating,
+        ratingCount: allShopComments.length
+      }
+    });
+
+    res.json(createShopeeSuccessResponse({
+      comment_id: Number(createdComment.commentId),
+      order_sn: createdComment.orderSn,
+      rating_star: createdComment.ratingStar,
+      comment: createdComment.comment,
+      shop_rating: avgRating,
+      rating_count: allShopComments.length
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to create review"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: GET REVIEWS LIST
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/reviews", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const shopIdStr = req.query.shop_id as string | undefined;
+    const itemIdStr = req.query.item_id as string | undefined;
+
+    const whereClause: any = {};
+    if (shopIdStr && shopIdStr.toUpperCase() !== "ALL") {
+      whereClause.shopId = BigInt(shopIdStr);
+    }
+    if (itemIdStr) {
+      whereClause.itemId = BigInt(itemIdStr);
+    }
+
+    const reviews = await prisma.productComment.findMany({
+      where: whereClause,
+      include: {
+        product: true
+      },
+      orderBy: { commentId: "desc" }
+    });
+
+    res.json(createShopeeSuccessResponse({
+      reviews: reviews.map(r => ({
+        comment_id: Number(r.commentId),
+        order_sn: r.orderSn,
+        item_id: Number(r.itemId),
+        item_name: r.product?.itemName || `Item ${r.itemId}`,
+        model_id: r.modelId ? Number(r.modelId) : 0,
+        buyer_username: r.buyerUsername,
+        rating_star: r.ratingStar,
+        comment: r.comment,
+        reply: r.reply,
+        reply_time: r.replyTime ? Math.floor(r.replyTime.getTime() / 1000) : null,
+        create_time: Math.floor(r.createdAt.getTime() / 1000)
+      }))
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to fetch reviews"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: REPLY TO REVIEW
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/review/reply", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { comment_id, reply } = req.body || {};
+
+    if (!comment_id) {
+      res.json(createShopeeErrorResponse("error_param", "comment_id is required"));
+      return;
+    }
+
+    const replyText = String(reply || "").trim();
+    if (!replyText) {
+      res.json(createShopeeErrorResponse("error_param", "reply text is required"));
+      return;
+    }
+
+    const comment = await prisma.productComment.findUnique({
+      where: { commentId: BigInt(comment_id) }
+    });
+
+    if (!comment) {
+      res.json(createShopeeErrorResponse("error_param", "Comment not found"));
+      return;
+    }
+
+    if (comment.reply) {
+      res.json(createShopeeErrorResponse("product.duplicate_request", "Comment has already been replied to"));
+      return;
+    }
+
+    const updated = await prisma.productComment.update({
+      where: { commentId: BigInt(comment_id) },
+      data: {
+        reply: replyText,
+        replyTime: new Date()
+      }
+    });
+
+    res.json(createShopeeSuccessResponse({
+      comment_id: Number(updated.commentId),
+      reply: updated.reply,
+      reply_time: updated.replyTime ? Math.floor(updated.replyTime.getTime() / 1000) : null
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to reply to review"));
+  }
+});

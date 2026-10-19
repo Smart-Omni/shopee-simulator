@@ -1,0 +1,47 @@
+{
+  "name": "shopee-simulator",
+  "version": "1.0.0",
+  "description": "Shopee Open API v2 Mock Simulator Server & Webhook Dispatcher",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "test:phase1": "ts-node test/phase1_auth.spec.ts",
+    "test:phase2": "ts-node test/phase2_shop.spec.ts",
+    "test:phase3": "ts-node test/phase3_product.spec.ts",
+    "test:phase4": "ts-node test/phase4_order.spec.ts",
+    "test:phase5": "ts-node test/phase5_webhook.spec.ts",
+    "test:phase6": "ts-node test/phase6_frontend.spec.ts",
+    "test:phase7": "ts-node test/phase7_promotions.spec.ts",
+    "test:phase8": "ts-node test/phase8_shipping_fee.spec.ts",
+    "test:phase9": "ts-node test/phase9_variations.spec.ts",
+    "test:phase10": "ts-node test/phase10_lifecycle_deadline.spec.ts",
+    "test:phase11": "ts-node test/phase11_chat_reviews.spec.ts",
+    "test": "ts-node test/phase1_auth.spec.ts && ts-node test/phase2_shop.spec.ts && ts-node test/phase3_product.spec.ts && ts-node test/phase4_order.spec.ts && ts-node test/phase5_webhook.spec.ts && ts-node test/phase6_frontend.spec.ts && ts-node test/phase7_promotions.spec.ts && ts-node test/phase8_shipping_fee.spec.ts && ts-node test/phase9_variations.spec.ts && ts-node test/phase10_lifecycle_deadline.spec.ts && ts-node test/phase11_chat_reviews.spec.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^2.4.0",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^22.13.4",
+    "@types/swagger-ui-express": "^4.1.7",
+    "@types/uuid": "^10.0.0",
+    "prisma": "^6.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}

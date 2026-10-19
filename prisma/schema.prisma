@@ -1,0 +1,522 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// 1. PARTNERS & DEVELOPER APPLICATIONS
+// ----------------------------------------------------
+model Partner {
+  partnerId       BigInt   @id // e.g. 1001141
+  partnerKey      String   // HMAC secret key
+  appName         String
+  testRedirectUrl String   // Registered callback domain
+  liveRedirectUrl String
+  webhookUrl      String?  // Registered push notification URL
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shops           Shop[]
+  webhooks        WebhookLog[]
+
+  @@map("partners")
+}
+
+// ----------------------------------------------------
+// 2. SHOPS & TOKEN STORE
+// ----------------------------------------------------
+model Shop {
+  shopId                BigInt   @id // e.g. 727720655
+  partnerId             BigInt
+  shopName              String
+  region                String   @default("VN") // VN, SG, MY, TH, PH, ID, BR
+  status                String   @default("NORMAL") // NORMAL, BANNED, FROZEN
+  isVacation            Boolean  @default(false)
+  authCode              String?  // One-time OAuth code (10 min TTL)
+  authCodeExpiresAt     DateTime?
+  accessToken           String?  // Dynamic token (4h TTL)
+  accessTokenExpiresAt   DateTime?
+  oldAccessToken        String?  // 5-minute dual-token grace period
+  oldTokenExpiresAt     DateTime?
+  refreshToken          String?  // 30-day TTL
+  refreshTokenExpiresAt DateTime?
+  authExpiresAt         DateTime? // Annual shop authorization expiry (up to 365 days)
+  rating                Decimal  @default(5.0) @db.Decimal(3, 2)
+  ratingCount           Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  partner               Partner  @relation(fields: [partnerId], references: [partnerId], onDelete: Cascade)
+  products              Product[]
+  orders                Order[]
+  returns               ReturnRequest[]
+  addresses             ShopAddress[]
+  discounts             Discount[]
+  vouchers              Voucher[]
+  comments              ProductComment[]
+  chatMessages          ChatMessage[]
+
+  @@map("shops")
+}
+
+// ----------------------------------------------------
+// 2.1 SHOP ADDRESSES (For get_address_list & get_shipping_parameter)
+// ----------------------------------------------------
+model ShopAddress {
+  addressId           BigInt   @id @default(autoincrement())
+  shopId              BigInt
+  addressType         String   @default("PICKUP") // DEFAULT, PICKUP, RETURN
+  name                String   @default("SmartOmni Fulfillment Hub")
+  phone               String   @default("+84901234567")
+  address             String   @default("123 Le Duan Street")
+  district            String   @default("District 1")
+  city                String   @default("Ho Chi Minh City")
+  state               String   @default("Ho Chi Minh")
+  region              String   @default("VN")
+  zipcode             String   @default("700000")
+  createdAt           DateTime @default(now())
+
+  shop                Shop     @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+
+  @@map("shop_addresses")
+}
+
+// ----------------------------------------------------
+// 2.2 LOGISTICS CHANNELS (For get_channel_list & fee calculations)
+// ----------------------------------------------------
+model LogisticsChannel {
+  channelId           BigInt   @id // e.g. 30001 (Shopee Xpress), 30002 (GHTK)
+  channelName         String   // "Shopee Xpress", "Giao Hang Tiet Kiem"
+  region              String   @default("VN")
+  enabled             Boolean  @default(true)
+  codEnabled          Boolean  @default(true)
+  feeType             String   @default("SIZE_TIER")
+  weightLimitMin      Decimal? @default(0.01) @db.Decimal(10, 2)
+  weightLimitMax      Decimal? @default(30.0) @db.Decimal(10, 2)
+
+  @@map("logistics_channels")
+}
+
+// ----------------------------------------------------
+// 3. PRODUCT CATALOG, CATEGORIES & ATTRIBUTES
+// ----------------------------------------------------
+model Category {
+  categoryId       BigInt   @id
+  parentId         BigInt   @default(0)
+  categoryName     String
+  hasChildren      Boolean  @default(false)
+  
+  attributes       CategoryAttribute[]
+  products         Product[]
+
+  @@map("categories")
+}
+
+model CategoryAttribute {
+  attributeId      BigInt   @id
+  categoryId       BigInt
+  name             String
+  isMandatory      Boolean  @default(false)
+  inputType        String   @default("DROP_DOWN") // DROP_DOWN, TEXT_FILED, MULTI_SELECT
+  valueListJson    Json     // Array of allowed { value_id, original_value_name }
+
+  category         Category @relation(fields: [categoryId], references: [categoryId], onDelete: Cascade)
+
+  @@map("category_attributes")
+}
+
+model Product {
+  itemId            BigInt   @id @default(autoincrement())
+  shopId            BigInt
+  categoryId        BigInt
+  itemName          String
+  description       String   @db.Text
+  itemSku           String?
+  itemStatus        String   @default("NORMAL") // NORMAL, UNLIST, BANNED, DELETED
+  originalPrice     Decimal  @db.Decimal(15, 2)
+  currency          String   @default("VND")
+  weight            Decimal  @default(0.5) @db.Decimal(10, 2)
+  dimensionsJson    Json?    // { package_length, package_width, package_height }
+  imagesJson        Json     // { image_id_list: string[], image_url_list: string[] }
+  attributesJson    Json?    // [{ attribute_id, attribute_value_list: [{ value_id }] }]
+  hasModel          Boolean  @default(false)
+  tierVariationJson Json?   // [{ name: "Color", option_list: [{ option: "Red" }] }]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  shop              Shop     @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+  category          Category @relation(fields: [categoryId], references: [categoryId])
+  models            ProductModel[]
+  orderItems        OrderItem[]
+  discountItems     DiscountItem[]
+  voucherItems      VoucherItem[]
+  comments          ProductComment[]
+
+  @@index([shopId, itemStatus, updatedAt])
+  @@map("products")
+}
+
+model ProductModel {
+  modelId          BigInt   @id @default(autoincrement())
+  itemId           BigInt
+  modelName        String   // e.g. "Red, XL"
+  modelSku         String?
+  tierIndex        Json     // e.g. [0, 1] mapping to variation tiers
+  originalPrice    Decimal  @db.Decimal(15, 2)
+  sellerStock      Int      @default(100)
+  shopeeStock      Int      @default(0)
+  reservedStock    Int      @default(0) // Locked during active promotions
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product          Product  @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+  orderItems       OrderItem[]
+  discountItemModels DiscountItemModel[]
+
+  @@map("product_models")
+}
+
+// ----------------------------------------------------
+// 4. ORDERS & PACKAGE FULFILLMENT
+// ----------------------------------------------------
+enum OrderStatus {
+  UNPAID
+  READY_TO_SHIP
+  PROCESSED
+  SHIPPED
+  TO_CONFIRM_RECEIVE
+  COMPLETED
+  IN_CANCEL
+  CANCELLED
+  TO_RETURN
+}
+
+model Order {
+  orderSn              String      @id // e.g. "261019A1B2C3D4"
+  shopId               BigInt
+  orderStatus          OrderStatus @default(UNPAID)
+  isSplitUp            Boolean     @default(false)
+  cancelReason         String?
+  cancelBy             String?     // BUYER, SELLER, SYSTEM
+  buyerCancelReason    String?
+  buyerUserId          BigInt      @default(1001)
+  buyerUsername        String      @default("shopee_buyer_test")
+  recipientName        String      @default("Nguyen Van A")
+  recipientPhone       String      @default("+84901234567")
+  recipientAddress     String      @default("123 Le Loi, District 1, Ho Chi Minh City")
+  recipientDistrict    String      @default("District 1")
+  recipientCity        String      @default("Ho Chi Minh City")
+  recipientState       String      @default("Ho Chi Minh")
+  recipientZipcode     String      @default("700000")
+  shippingCarrier      String      @default("Shopee Xpress")
+  channelId            BigInt      @default(30001)
+  totalAmount          Decimal     @db.Decimal(15, 2)
+  buyerPaidShippingFee Decimal     @default(0) @db.Decimal(15, 2)
+  actualShippingFee    Decimal     @default(0) @db.Decimal(15, 2)
+  escrowAmount         Decimal?    @db.Decimal(15, 2) // Net payout to seller
+  commissionFee        Decimal?    @default(0) @db.Decimal(15, 2)
+  serviceFee           Decimal?    @default(0) @db.Decimal(15, 2)
+  sellerTransactionFee Decimal?    @default(0) @db.Decimal(15, 2)
+  voucherFromSeller    Decimal?    @default(0) @db.Decimal(15, 2)
+  voucherFromShopee    Decimal?    @default(0) @db.Decimal(15, 2)
+  currency             String      @default("VND")
+  paymentMethod        String      @default("ShopeePay")
+  messageToSeller      String?
+  note                 String?
+  payTime              DateTime?
+  shipByDate           DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  shop                 Shop        @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+  items                OrderItem[]
+  packages             OrderPackage[]
+  returns              ReturnRequest[]
+  comments             ProductComment[]
+
+  @@index([shopId, orderStatus, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  orderItemId          BigInt   @id @default(autoincrement())
+  orderSn              String
+  itemId               BigInt
+  modelId              BigInt?  // Nullable when product has no variations (Shopee model_id=0)
+  itemName             String
+  modelName            String?
+  modelSku             String?
+  itemPrice            Decimal  @db.Decimal(15, 2)
+  quantityPurchased    Int
+
+  order                Order    @relation(fields: [orderSn], references: [orderSn], onDelete: Cascade)
+  product              Product  @relation(fields: [itemId], references: [itemId])
+  productModel         ProductModel? @relation(fields: [modelId], references: [modelId])
+  packageItems         PackageItem[]
+
+  @@map("order_items")
+}
+
+model OrderPackage {
+  packageNumber        String   @id // e.g. "PKG261019001"
+  orderSn              String
+  logisticsStatus      String   @default("LOGISTICS_NOT_START")
+  shippingCarrier      String   @default("Shopee Xpress")
+  channelId            BigInt   @default(30001)
+  trackingNumber       String?
+  shippingDocumentUrl  String? // Mock PDF URL or base64 storage
+  documentStatus       String   @default("NOT_CREATED") // NOT_CREATED, PROCESSING, READY, FAILED
+  shippingType         String?  // dropoff, pickup
+  pickupTime           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  order                Order    @relation(fields: [orderSn], references: [orderSn], onDelete: Cascade)
+  packageItems         PackageItem[]
+
+  @@map("order_packages")
+}
+
+// ----------------------------------------------------
+// 4.1 PACKAGE ITEMS (Join table for M:N split order fulfillment)
+// ----------------------------------------------------
+model PackageItem {
+  id                   BigInt       @id @default(autoincrement())
+  packageNumber        String
+  orderItemId          BigInt
+  modelQuantity        Int
+  createdAt            DateTime     @default(now())
+
+  package              OrderPackage @relation(fields: [packageNumber], references: [packageNumber], onDelete: Cascade)
+  orderItem            OrderItem    @relation(fields: [orderItemId], references: [orderItemId], onDelete: Cascade)
+
+  @@map("package_items")
+}
+
+// ----------------------------------------------------
+// 5. RETURNS & DISPUTES
+// ----------------------------------------------------
+model ReturnRequest {
+  returnSn             String   @id // e.g. "RET261019001"
+  orderSn              String
+  shopId               BigInt
+  returnReason         String
+  status               String   @default("REQUESTED") // REQUESTED, ACCEPTED, DISPUTED, REFUND_PAID, CANCELLED
+  refundAmount         Decimal  @db.Decimal(15, 2)
+  buyerImagesJson      Json?
+  sellerProofJson      Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  order                Order    @relation(fields: [orderSn], references: [orderSn], onDelete: Cascade)
+  shop                 Shop     @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+
+  @@map("return_requests")
+}
+
+// ----------------------------------------------------
+// 6. OUTBOUND WEBHOOK LOGS & QUEUE
+// ----------------------------------------------------
+model WebhookLog {
+  id                   BigInt   @id @default(autoincrement())
+  partnerId            BigInt
+  pushCode             Int      // e.g. 3 (Order Status), 4 (Tracking), 8 (Stock)
+  shopId               BigInt?
+  ordersn              String?
+  targetUrl            String
+  payloadJson          Json
+  authHeader           String
+  responseStatus       Int?
+  responseBody         String?  @db.Text
+  attemptCount         Int      @default(0)
+  status               String   @default("PENDING") // PENDING, SUCCESS, FAILED
+  nextRetryAt          DateTime?
+  createdAt            DateTime @default(now())
+
+  partner              Partner  @relation(fields: [partnerId], references: [partnerId], onDelete: Cascade)
+
+  @@index([status, nextRetryAt])
+  @@map("webhook_logs")
+}
+
+// ----------------------------------------------------
+// 7. SIMULATOR FAULT INJECTION CONFIGURATION
+// ----------------------------------------------------
+model SimulatorConfig {
+  id                   Int      @id @default(1)
+  rateLimitEnabled     Boolean  @default(false)
+  rateLimitPerMin      Int      @default(100)
+  forceExpiredToken    Boolean  @default(false)
+  forceInvalidSign     Boolean  @default(false)
+  artificialDelayMs    Int      @default(0)
+  strictTimestamp      Boolean  @default(true) // Whether to reject timestamps > 5m drift
+
+  @@map("simulator_config")
+}
+
+// ----------------------------------------------------
+// 8. PROMOTIONS & MARKETING: DISCOUNTS & VOUCHERS
+// ----------------------------------------------------
+enum PromotionStatus {
+  UPCOMING
+  ONGOING
+  EXPIRED
+  DELETED
+}
+
+model Discount {
+  discountId          BigInt          @id @default(autoincrement())
+  shopId              BigInt
+  discountName        String
+  startTime           DateTime
+  endTime             DateTime
+  status              PromotionStatus @default(UPCOMING)
+  source              Int             @default(0) // 7: live stream, 1: admin, 0: others
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  shop                Shop            @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+  items               DiscountItem[]
+
+  @@index([shopId, status, updatedAt])
+  @@map("discounts")
+}
+
+model DiscountItem {
+  id                  BigInt              @id @default(autoincrement())
+  discountId          BigInt
+  itemId              BigInt
+  purchaseLimit       Int                 @default(0) // 0 means no limit
+  itemPromotionPrice  Decimal?            @db.Decimal(15, 2)
+  itemPromotionStock  Int?                @default(0)
+  normalStock         Int?                @default(0)
+  status              PromotionStatus     @default(UPCOMING)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  discount            Discount            @relation(fields: [discountId], references: [discountId], onDelete: Cascade)
+  product             Product             @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+  models              DiscountItemModel[]
+
+  @@unique([discountId, itemId])
+  @@index([discountId, itemId])
+  @@map("discount_items")
+}
+
+model DiscountItemModel {
+  id                  BigInt       @id @default(autoincrement())
+  discountItemId      BigInt
+  modelId             BigInt
+  modelPromotionPrice Decimal      @db.Decimal(15, 2)
+  modelPromotionStock Int?         @default(0)
+  modelNormalStock    Int?         @default(0)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  discountItem        DiscountItem @relation(fields: [discountItemId], references: [id], onDelete: Cascade)
+  productModel        ProductModel @relation(fields: [modelId], references: [modelId], onDelete: Cascade)
+
+  @@unique([discountItemId, modelId])
+  @@index([discountItemId, modelId])
+  @@map("discount_item_models")
+}
+
+model Voucher {
+  voucherId           BigInt          @id @default(autoincrement())
+  shopId              BigInt
+  voucherCode         String          // 1-5 chars [A-Za-z0-9]
+  voucherName         String
+  voucherType         Int             @default(1) // 1: shop voucher, 2: product voucher
+  rewardType          Int             @default(1) // 1: fix_amount, 2: discount_percentage, 3: coin_cashback
+  usageQuantity       Int             @default(1)
+  currentUsage        Int             @default(0)
+  minBasketPrice      Decimal         @default(0) @db.Decimal(15, 2)
+  discountAmount      Decimal?        @db.Decimal(15, 2)
+  percentage          Int?
+  maxPrice            Decimal?        @db.Decimal(15, 2)
+  displayChannelList  Json?           // e.g. [1]
+  displayStartTime    DateTime?
+  startTime           DateTime
+  endTime             DateTime
+  status              PromotionStatus @default(UPCOMING)
+  isAdmin             Boolean         @default(false)
+  voucherPurpose      Int             @default(0) // 0: normal
+  cmtVoucherStatus    Int?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  shop                Shop            @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+  items               VoucherItem[]
+
+  @@unique([shopId, voucherCode])
+  @@index([shopId, status, updatedAt])
+  @@map("vouchers")
+}
+
+model VoucherItem {
+  id                  BigInt   @id @default(autoincrement())
+  voucherId           BigInt
+  itemId              BigInt
+  createdAt           DateTime @default(now())
+
+  voucher             Voucher  @relation(fields: [voucherId], references: [voucherId], onDelete: Cascade)
+  product             Product  @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+
+  @@unique([voucherId, itemId])
+  @@index([voucherId, itemId])
+  @@map("voucher_items")
+}
+
+// ----------------------------------------------------
+// 7. RATINGS, REVIEWS & COMMENTS (For get_comment & reply_comment)
+// ----------------------------------------------------
+model ProductComment {
+  commentId           BigInt   @id @default(autoincrement())
+  shopId              BigInt
+  itemId              BigInt
+  modelId             BigInt?
+  orderSn             String
+  buyerUserId         BigInt   @default(1001)
+  buyerUsername       String   @default("shopee_buyer_test")
+  ratingStar          Int      @default(5) // 1 to 5
+  comment             String   @db.Text
+  reply               String?  @db.Text
+  replyTime           DateTime?
+  imagesJson          Json?    // Optional image URL list
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  shop                Shop     @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+  product             Product  @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+  order               Order    @relation(fields: [orderSn], references: [orderSn], onDelete: Cascade)
+
+  @@index([shopId, createdAt])
+  @@index([itemId, ratingStar])
+  @@map("product_comments")
+}
+
+// ----------------------------------------------------
+// 8. BUYER-SELLER LIVE CHAT
+// ----------------------------------------------------
+model ChatMessage {
+  messageId           BigInt   @id @default(autoincrement())
+  shopId              BigInt
+  buyerUserId         BigInt   @default(1001)
+  buyerUsername       String   @default("shopee_buyer_test")
+  senderType          String   // "BUYER" | "SELLER"
+  orderSn             String?
+  message             String   @db.Text
+  isRead              Boolean  @default(false)
+  readAt              DateTime?
+  createdAt           DateTime @default(now())
+
+  shop                Shop     @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+
+  @@index([shopId, buyerUserId, createdAt])
+  @@map("chat_messages")
+}
+

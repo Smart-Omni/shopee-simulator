@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Compiled Output
+dist/
+
+# Environment Variables (Keep .env.example tracked)
+.env
+.env.local
+
+# Database / SQLite
+*.sqlite
+*.sqlite3
+
+# Operating System Files
+.DS_Store
+*/.DS_Store
+Thumbs.db
+
+# Generated Documents
+*.pdf
+
+# Logs
+logs/
+*.log

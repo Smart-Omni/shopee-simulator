@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shopee-mock-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shopee
+      POSTGRES_PASSWORD: shopee_mock_password
+      POSTGRES_DB: shopee_mock_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shopee -d shopee_mock_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  shopee-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shopee-mock-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      DATABASE_URL: "postgresql://shopee:shopee_mock_password@postgres:5432/shopee_mock_db?schema=public"
+      NODE_ENV: production
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
