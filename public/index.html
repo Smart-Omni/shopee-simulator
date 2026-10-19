@@ -360,6 +360,7 @@
             </tbody>
           </table>
         </div>
+        <div id="inventory-pagination"></div>
       </div>
 
       <!-- Orders Section with Complete Lifecycle Actions -->
@@ -417,6 +418,7 @@
             </tbody>
           </table>
         </div>
+        <div id="orders-pagination"></div>
       </div>
 
       <!-- Promotions & Marketing Section -->
@@ -568,6 +570,7 @@
             </tbody>
           </table>
         </div>
+        <div id="ledger-pagination"></div>
       </div>
 
       <!-- Customer Reviews & Ratings Section -->
@@ -721,6 +724,7 @@
         <div id="buyer-orders-list" class="space-y-4">
           <!-- Populated by JS -->
         </div>
+        <div id="buyer-orders-pagination" class="mt-4"></div>
       </div>
 
     </div>
@@ -1671,6 +1675,75 @@
       return Number(val || 0).toLocaleString('vi-VN') + ' ₫';
     }
 
+    // ------------------------------------------------------------------------
+    // PAGINATION ENGINE & CONTROLS
+    // ------------------------------------------------------------------------
+    const PAGE_SIZES = {
+      orders: 7,
+      inventory: 5,
+      ledger: 6,
+      buyerOrders: 5
+    };
+    let ordersPage = 1;
+    let inventoryPage = 1;
+    let ledgerPage = 1;
+    let buyerOrdersPage = 1;
+
+    function renderPaginationControls({ containerId, currentPage, totalItems, pageSize, onPageChange }) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      if (!totalItems || totalItems <= pageSize) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const totalPages = Math.ceil(totalItems / pageSize) || 1;
+      const startIdx = (currentPage - 1) * pageSize + 1;
+      const endIdx = Math.min(currentPage * pageSize, totalItems);
+
+      container.innerHTML = `
+        <div class="px-6 py-3.5 bg-gray-50/80 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-600">
+          <div class="flex items-center space-x-1.5">
+            <span>Hiển thị</span>
+            <span class="font-bold text-gray-900">${startIdx}–${endIdx}</span>
+            <span>trên tổng số</span>
+            <span class="font-bold text-gray-900">${totalItems}</span>
+            <span>mục</span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <button onclick="${onPageChange}(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white font-medium hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center shadow-xs">
+              <i class="fa-solid fa-chevron-left mr-1 text-[10px]"></i> Trước
+            </button>
+            <span class="px-3 py-1 font-semibold text-gray-700 bg-white rounded-lg border border-gray-200 shadow-xs">Trang ${currentPage} / ${totalPages}</span>
+            <button onclick="${onPageChange}(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white font-medium hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center shadow-xs">
+              Sau <i class="fa-solid fa-chevron-right ml-1 text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function changeOrdersPage(p) {
+      ordersPage = p;
+      renderOrdersTable();
+    }
+
+    function changeInventoryPage(p) {
+      inventoryPage = p;
+      renderInventoryTable();
+    }
+
+    function changeLedgerPage(p) {
+      ledgerPage = p;
+      renderLedgerTable();
+    }
+
+    function changeBuyerOrdersPage(p) {
+      buyerOrdersPage = p;
+      renderBuyerOrdersList();
+    }
+
     // Helper to format Date for <input type="datetime-local">
     function formatDateTimeLocal(d) {
       const pad = (n) => String(n).padStart(2, '0');
@@ -1872,6 +1945,9 @@
     function onShopChange(shopId) {
       activeShopId = shopId;
       localStorage.setItem('activeShopId', shopId);
+      ordersPage = 1;
+      inventoryPage = 1;
+      ledgerPage = 1;
       showToast(`Switched active seller store`);
       loadShopOverview();
       loadProducts();
@@ -1885,6 +1961,7 @@
     function onBuyerChange(buyerId) {
       activeBuyerId = buyerId;
       localStorage.setItem('activeBuyerId', buyerId);
+      buyerOrdersPage = 1;
       updateActiveBuyerFields();
       showToast(`Switched active buyer session`);
       loadBuyerOrders();
@@ -1996,13 +2073,28 @@
 
     function renderInventoryTable() {
       const tbody = document.getElementById('inventory-table-body');
+      if (!tbody) return;
       if (productsList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-gray-400">No products found in this store. Click "+ Add New Product" to list one.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-gray-400">Không tìm thấy sản phẩm nào trong cửa hàng này. Nhấn "+ Thêm Sản Phẩm Mới" để tạo.</td></tr>';
+        renderPaginationControls({
+          containerId: 'inventory-pagination',
+          currentPage: 1,
+          totalItems: 0,
+          pageSize: PAGE_SIZES.inventory,
+          onPageChange: 'changeInventoryPage'
+        });
         return;
       }
 
+      const totalPages = Math.ceil(productsList.length / PAGE_SIZES.inventory) || 1;
+      if (inventoryPage > totalPages) inventoryPage = totalPages;
+      if (inventoryPage < 1) inventoryPage = 1;
+
+      const startIdx = (inventoryPage - 1) * PAGE_SIZES.inventory;
+      const pagedProducts = productsList.slice(startIdx, startIdx + PAGE_SIZES.inventory);
+
       let html = '';
-      productsList.forEach(p => {
+      pagedProducts.forEach(p => {
         const models = p.models.length > 0 ? p.models : [{
           model_id: 0,
           model_name: 'Standard Model',
@@ -2054,6 +2146,13 @@
         });
       });
       tbody.innerHTML = html;
+      renderPaginationControls({
+        containerId: 'inventory-pagination',
+        currentPage: inventoryPage,
+        totalItems: productsList.length,
+        pageSize: PAGE_SIZES.inventory,
+        onPageChange: 'changeInventoryPage'
+      });
     }
 
     async function toggleProductUnlist(itemId) {
@@ -2198,6 +2297,7 @@
     }
 
     function filterOrders(status) {
+      ordersPage = 1;
       document.querySelectorAll('.order-filter-btn').forEach(btn => {
         if (btn.dataset.status === status) {
           btn.className = 'order-filter-btn px-3 py-1 rounded-full text-xs font-bold bg-[#ee4d2d] text-white';
@@ -2210,13 +2310,28 @@
 
     function renderOrdersTable() {
       const tbody = document.getElementById('orders-table-body');
+      if (!tbody) return;
       if (ordersList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-gray-400">No orders in this status.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-gray-400">Không có đơn hàng nào ở trạng thái này.</td></tr>';
+        renderPaginationControls({
+          containerId: 'orders-pagination',
+          currentPage: 1,
+          totalItems: 0,
+          pageSize: PAGE_SIZES.orders,
+          onPageChange: 'changeOrdersPage'
+        });
         return;
       }
 
+      const totalPages = Math.ceil(ordersList.length / PAGE_SIZES.orders) || 1;
+      if (ordersPage > totalPages) ordersPage = totalPages;
+      if (ordersPage < 1) ordersPage = 1;
+
+      const startIdx = (ordersPage - 1) * PAGE_SIZES.orders;
+      const pagedOrders = ordersList.slice(startIdx, startIdx + PAGE_SIZES.orders);
+
       let html = '';
-      ordersList.forEach(o => {
+      pagedOrders.forEach(o => {
         const statusColors = {
           'UNPAID': 'bg-yellow-100 text-yellow-800',
           'READY_TO_SHIP': 'bg-blue-100 text-blue-800',
@@ -2321,6 +2436,13 @@
         `;
       });
       tbody.innerHTML = html;
+      renderPaginationControls({
+        containerId: 'orders-pagination',
+        currentPage: ordersPage,
+        totalItems: ordersList.length,
+        pageSize: PAGE_SIZES.orders,
+        onPageChange: 'changeOrdersPage'
+      });
     }
 
     async function expireOverdueOrders(simulatedHours = 0) {
@@ -4004,6 +4126,8 @@
       }
     }
 
+    let currentBuyerOrdersList = [];
+
     // Buyer Orders
     async function loadBuyerOrders() {
       try {
@@ -4011,109 +4135,136 @@
         const data = await res.json();
         const orders = data.response?.orders || [];
         window.buyerOrdersList = orders;
+        currentBuyerOrdersList = orders;
         document.getElementById('buyer-orders-count').textContent = `${orders.length} orders`;
-
-        const container = document.getElementById('buyer-orders-list');
-        if (orders.length === 0) {
-          container.innerHTML = '<div class="text-center py-8 text-gray-400 text-xs"><i class="fa-solid fa-bag-shopping text-3xl mb-2 text-gray-300 block"></i>Chưa có đơn hàng nào từ người mua này. Hãy chọn sản phẩm ở trên để đặt hàng!</div>';
-          return;
-        }
-
-        let html = '';
-        orders.slice(0, 20).forEach(o => {
-          let buyerBtns = `
-            <button onclick="viewOrderDetail('${o.order_sn}')" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-xs font-bold transition">
-              <i class="fa-solid fa-eye mr-1"></i> Xem chi tiết
-            </button>
-          `;
-
-          if (o.order_status === 'UNPAID') {
-            buyerBtns += `
-              <button onclick="buyerPayOrder('${o.order_sn}')" class="px-3 py-1 bg-[#ee4d2d] hover:bg-orange-600 text-white rounded text-xs font-bold transition">
-                <i class="fa-solid fa-credit-card mr-1"></i> Thanh toán
-              </button>
-              <button onclick="buyerCancelOrderInstant('${o.order_sn}')" class="px-2.5 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-bold transition">
-                Cancel
-              </button>
-            `;
-          } else if (o.order_status === 'READY_TO_SHIP') {
-            buyerBtns += `
-              <button onclick="buyerCancelOrderInstant('${o.order_sn}')" class="px-2.5 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-bold transition" title="Instant Order Cancellation (no seller approval needed)">
-                Cancel (Instant)
-              </button>
-            `;
-          } else if (o.order_status === 'PROCESSED') {
-            buyerBtns += `
-              <button onclick="buyerRequestCancel('${o.order_sn}')" class="px-2.5 py-1 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded text-xs font-bold transition" title="Shipping already arranged - requires seller approval">
-                Request Cancel
-              </button>
-            `;
-          } else if (o.order_status === 'IN_CANCEL') {
-            buyerBtns += `
-              <span class="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[11px] font-bold">
-                <i class="fa-solid fa-hourglass-half mr-1"></i> Chờ người bán duyệt hủy
-              </span>
-            `;
-          } else if (o.order_status === 'SHIPPED') {
-            buyerBtns += `
-              <button onclick="buyerConfirmReceived('${o.order_sn}')" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition">
-                <i class="fa-solid fa-check mr-1"></i> Đã nhận được hàng
-              </button>
-            `;
-          } else if (o.order_status === 'COMPLETED') {
-            if (o.has_reviewed) {
-              buyerBtns += `
-                <button disabled class="px-3 py-1 bg-gray-200 text-gray-500 rounded text-xs font-bold cursor-not-allowed flex items-center shadow-none">
-                  <i class="fa-solid fa-star mr-1 text-[11px] text-amber-400"></i> Đã đánh giá
-                </button>
-              `;
-            } else {
-              buyerBtns += `
-                <button onclick="openReviewModalForOrder('${o.order_sn}')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition flex items-center shadow-sm">
-                  <i class="fa-solid fa-star mr-1 text-[11px]"></i> Đánh giá
-                </button>
-              `;
-            }
-          }
-
-          html += `
-            <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-              <div>
-                <div class="flex items-center space-x-2">
-                  <span class="font-mono font-bold text-gray-900">${o.order_sn}</span>
-                  <span class="text-[11px] bg-gray-200 px-2 py-0.5 rounded font-bold">${statusTextMap[o.order_status] || o.order_status}</span>
-                  <span class="text-[11px] text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-200 font-medium flex items-center">
-                    <i class="fa-solid fa-store mr-1 text-[#ee4d2d]"></i>${o.shop_name || 'Shopee Store'}
-                  </span>
-                  ${Number(o.voucher_from_seller || 0) > 0 ? `
-                    <span class="text-[11px] bg-orange-100 text-[#ee4d2d] border border-orange-200 px-2 py-0.5 rounded font-bold flex items-center">
-                      <i class="fa-solid fa-ticket mr-1 text-[10px]"></i> Voucher: -${Number(o.voucher_from_seller).toLocaleString()} ₫
-                    </span>
-                  ` : ''}
-                  ${Number(o.voucher_from_shopee || 0) > 0 ? `
-                    <span class="text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded font-bold flex items-center">
-                      <i class="fa-solid fa-gift mr-1 text-[10px]"></i> Freeship: -${Number(o.voucher_from_shopee).toLocaleString()} ₫
-                    </span>
-                  ` : ''}
-                </div>
-                <div class="text-xs text-gray-500 mt-1">
-                  ${o.items.map(i => `${i.item_name} ${i.model_name ? `(${i.model_name})` : ''} x${i.quantity}`).join(' • ')}
-                </div>
-                <div class="text-xs font-extrabold text-gray-900 mt-1 flex items-center space-x-2">
-                  <span>Total: ${Number(o.total_amount).toLocaleString()} ₫</span>
-                  <span class="text-[11px] font-normal text-gray-500">• ${o.shipping_carrier || 'SPX Express'} (${Number(o.buyer_paid_shipping_fee || 0).toLocaleString()} ₫ ship)</span>
-                </div>
-              </div>
-              <div class="flex items-center space-x-2">
-                ${buyerBtns}
-              </div>
-            </div>
-          `;
-        });
-        container.innerHTML = html;
+        renderBuyerOrdersList();
       } catch (err) {
         console.error(err);
       }
+    }
+
+    function renderBuyerOrdersList() {
+      const container = document.getElementById('buyer-orders-list');
+      if (!container) return;
+
+      if (!currentBuyerOrdersList || currentBuyerOrdersList.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-400 text-xs"><i class="fa-solid fa-bag-shopping text-3xl mb-2 text-gray-300 block"></i>Chưa có đơn hàng nào từ người mua này. Hãy chọn sản phẩm ở trên để đặt hàng!</div>';
+        renderPaginationControls({
+          containerId: 'buyer-orders-pagination',
+          currentPage: 1,
+          totalItems: 0,
+          pageSize: PAGE_SIZES.buyerOrders,
+          onPageChange: 'changeBuyerOrdersPage'
+        });
+        return;
+      }
+
+      const totalPages = Math.ceil(currentBuyerOrdersList.length / PAGE_SIZES.buyerOrders) || 1;
+      if (buyerOrdersPage > totalPages) buyerOrdersPage = totalPages;
+      if (buyerOrdersPage < 1) buyerOrdersPage = 1;
+
+      const startIdx = (buyerOrdersPage - 1) * PAGE_SIZES.buyerOrders;
+      const pagedBuyerOrders = currentBuyerOrdersList.slice(startIdx, startIdx + PAGE_SIZES.buyerOrders);
+
+      let html = '';
+      pagedBuyerOrders.forEach(o => {
+        let buyerBtns = `
+          <button onclick="viewOrderDetail('${o.order_sn}')" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-xs font-bold transition">
+            <i class="fa-solid fa-eye mr-1"></i> Xem chi tiết
+          </button>
+        `;
+
+        if (o.order_status === 'UNPAID') {
+          buyerBtns += `
+            <button onclick="buyerPayOrder('${o.order_sn}')" class="px-3 py-1 bg-[#ee4d2d] hover:bg-orange-600 text-white rounded text-xs font-bold transition">
+              <i class="fa-solid fa-credit-card mr-1"></i> Thanh toán
+            </button>
+            <button onclick="buyerCancelOrderInstant('${o.order_sn}')" class="px-2.5 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-bold transition">
+              Cancel
+            </button>
+          `;
+        } else if (o.order_status === 'READY_TO_SHIP') {
+          buyerBtns += `
+            <button onclick="buyerCancelOrderInstant('${o.order_sn}')" class="px-2.5 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-bold transition" title="Instant Order Cancellation (no seller approval needed)">
+              Cancel (Instant)
+            </button>
+          `;
+        } else if (o.order_status === 'PROCESSED') {
+          buyerBtns += `
+            <button onclick="buyerRequestCancel('${o.order_sn}')" class="px-2.5 py-1 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded text-xs font-bold transition" title="Shipping already arranged - requires seller approval">
+              Request Cancel
+            </button>
+          `;
+        } else if (o.order_status === 'IN_CANCEL') {
+          buyerBtns += `
+            <span class="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[11px] font-bold">
+              <i class="fa-solid fa-hourglass-half mr-1"></i> Chờ người bán duyệt hủy
+            </span>
+          `;
+        } else if (o.order_status === 'SHIPPED') {
+          buyerBtns += `
+            <button onclick="buyerConfirmReceived('${o.order_sn}')" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition">
+              <i class="fa-solid fa-check mr-1"></i> Đã nhận được hàng
+            </button>
+          `;
+        } else if (o.order_status === 'COMPLETED') {
+          if (o.has_reviewed) {
+            buyerBtns += `
+              <button disabled class="px-3 py-1 bg-gray-200 text-gray-500 rounded text-xs font-bold cursor-not-allowed flex items-center shadow-none">
+                <i class="fa-solid fa-star mr-1 text-[11px] text-amber-400"></i> Đã đánh giá
+              </button>
+            `;
+          } else {
+            buyerBtns += `
+              <button onclick="openReviewModalForOrder('${o.order_sn}')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition flex items-center shadow-sm">
+                <i class="fa-solid fa-star mr-1 text-[11px]"></i> Đánh giá
+              </button>
+            `;
+          }
+        }
+
+        html += `
+          <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="font-mono font-bold text-gray-900">${o.order_sn}</span>
+                <span class="text-[11px] bg-gray-200 px-2 py-0.5 rounded font-bold">${statusTextMap[o.order_status] || o.order_status}</span>
+                <span class="text-[11px] text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-200 font-medium flex items-center">
+                  <i class="fa-solid fa-store mr-1 text-[#ee4d2d]"></i>${o.shop_name || 'Shopee Store'}
+                </span>
+                ${Number(o.voucher_from_seller || 0) > 0 ? `
+                  <span class="text-[11px] bg-orange-100 text-[#ee4d2d] border border-orange-200 px-2 py-0.5 rounded font-bold flex items-center">
+                    <i class="fa-solid fa-ticket mr-1 text-[10px]"></i> Voucher: -${Number(o.voucher_from_seller).toLocaleString()} ₫
+                  </span>
+                ` : ''}
+                ${Number(o.voucher_from_shopee || 0) > 0 ? `
+                  <span class="text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded font-bold flex items-center">
+                    <i class="fa-solid fa-gift mr-1 text-[10px]"></i> Freeship: -${Number(o.voucher_from_shopee).toLocaleString()} ₫
+                  </span>
+                ` : ''}
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                ${o.items.map(i => `${i.item_name} ${i.model_name ? `(${i.model_name})` : ''} x${i.quantity}`).join(' • ')}
+              </div>
+              <div class="text-xs font-extrabold text-gray-900 mt-1 flex items-center space-x-2">
+                <span>Total: ${Number(o.total_amount).toLocaleString()} ₫</span>
+                <span class="text-[11px] font-normal text-gray-500">• ${o.shipping_carrier || 'SPX Express'} (${Number(o.buyer_paid_shipping_fee || 0).toLocaleString()} ₫ ship)</span>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2">
+              ${buyerBtns}
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+      renderPaginationControls({
+        containerId: 'buyer-orders-pagination',
+        currentPage: buyerOrdersPage,
+        totalItems: currentBuyerOrdersList.length,
+        pageSize: PAGE_SIZES.buyerOrders,
+        onPageChange: 'changeBuyerOrdersPage'
+      });
     }
 
     async function buyerPayOrder(orderSn) {
@@ -4869,6 +5020,8 @@
       }
     }
 
+    let currentLedgerList = [];
+
     // =========================================================================
     // FINANCIAL LEDGER & ESCROW RECONCILIATION
     // =========================================================================
@@ -4882,7 +5035,7 @@
         }
 
         const summary = data.response?.summary || {};
-        const ledger = data.response?.ledger || [];
+        currentLedgerList = data.response?.ledger || [];
 
         const releasedEl = document.getElementById('escrow-released-total');
         if (releasedEl) releasedEl.textContent = formatCurrency(summary.released_amount || 0);
@@ -4896,54 +5049,79 @@
         const countBadge = document.getElementById('escrow-status-badge');
         if (countBadge) countBadge.textContent = `${summary.settled_orders_count || 0} Đã tất toán`;
 
-        const tbody = document.getElementById('financial-ledger-body');
-        if (!tbody) return;
-
-        if (ledger.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-gray-400 text-xs">Chưa có giao dịch hoặc đơn hàng nào.</td></tr>';
-          return;
-        }
-
-        let html = '';
-        ledger.forEach(item => {
-          const isCompleted = item.order_status === 'COMPLETED';
-          const isCancelled = item.order_status === 'CANCELLED';
-
-          let statusBadge = '';
-          if (isCompleted) {
-            statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Đã giải ngân</span>';
-          } else if (isCancelled) {
-            statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">Đã hủy (0 ₫)</span>';
-          } else {
-            statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Đang giữ escrow</span>';
-          }
-
-          const releaseTimeStr = item.escrow_release_time 
-            ? new Date(item.escrow_release_time * 1000).toLocaleString('vi-VN') 
-            : '<span class="text-gray-400 font-normal">Chờ giao hàng</span>';
-
-          html += `
-            <tr class="hover:bg-gray-50 transition text-xs">
-              <td class="py-3 px-4 font-mono font-bold text-gray-900">${item.order_sn}</td>
-              <td class="py-3 px-4 text-gray-700">${escapeHtml(item.buyer_username || 'Khách vãng lai')}</td>
-              <td class="py-3 px-4">${statusBadge}</td>
-              <td class="py-3 px-4 text-right font-semibold text-gray-900">${formatCurrency(item.total_amount)}</td>
-              <td class="py-3 px-4 text-right font-medium text-red-600">-${formatCurrency(item.total_platform_fees)}</td>
-              <td class="py-3 px-4 text-right font-extrabold ${isCompleted ? 'text-emerald-600' : 'text-gray-700'}">${formatCurrency(item.escrow_amount)}</td>
-              <td class="py-3 px-4 text-center text-[11px] text-gray-600">${releaseTimeStr}</td>
-              <td class="py-3 px-4 text-center">
-                <button onclick="viewEscrowDetail('${item.order_sn}')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg border border-emerald-200 transition shadow-xs flex items-center mx-auto space-x-1" title="Xem chi tiết bút toán">
-                  <i class="fa-solid fa-receipt text-[10px]"></i>
-                  <span>Chi tiết</span>
-                </button>
-              </td>
-            </tr>
-          `;
-        });
-        tbody.innerHTML = html;
+        renderLedgerTable();
       } catch (err) {
         console.error("loadFinancialLedger failed:", err);
       }
+    }
+
+    function renderLedgerTable() {
+      const tbody = document.getElementById('financial-ledger-body');
+      if (!tbody) return;
+
+      if (!currentLedgerList || currentLedgerList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-gray-400 text-xs">Chưa có giao dịch hoặc đơn hàng nào.</td></tr>';
+        renderPaginationControls({
+          containerId: 'ledger-pagination',
+          currentPage: 1,
+          totalItems: 0,
+          pageSize: PAGE_SIZES.ledger,
+          onPageChange: 'changeLedgerPage'
+        });
+        return;
+      }
+
+      const totalPages = Math.ceil(currentLedgerList.length / PAGE_SIZES.ledger) || 1;
+      if (ledgerPage > totalPages) ledgerPage = totalPages;
+      if (ledgerPage < 1) ledgerPage = 1;
+
+      const startIdx = (ledgerPage - 1) * PAGE_SIZES.ledger;
+      const pagedLedger = currentLedgerList.slice(startIdx, startIdx + PAGE_SIZES.ledger);
+
+      let html = '';
+      pagedLedger.forEach(item => {
+        const isCompleted = item.order_status === 'COMPLETED';
+        const isCancelled = item.order_status === 'CANCELLED';
+
+        let statusBadge = '';
+        if (isCompleted) {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Đã giải ngân</span>';
+        } else if (isCancelled) {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">Đã hủy (0 ₫)</span>';
+        } else {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Đang giữ escrow</span>';
+        }
+
+        const releaseTimeStr = item.escrow_release_time 
+          ? new Date(item.escrow_release_time * 1000).toLocaleString('vi-VN') 
+          : '<span class="text-gray-400 font-normal">Chờ giao hàng</span>';
+
+        html += `
+          <tr class="hover:bg-gray-50 transition text-xs">
+            <td class="py-3 px-4 font-mono font-bold text-gray-900">${item.order_sn}</td>
+            <td class="py-3 px-4 text-gray-700">${escapeHtml(item.buyer_username || 'Khách vãng lai')}</td>
+            <td class="py-3 px-4">${statusBadge}</td>
+            <td class="py-3 px-4 text-right font-semibold text-gray-900">${formatCurrency(item.total_amount)}</td>
+            <td class="py-3 px-4 text-right font-medium text-red-600">-${formatCurrency(item.total_platform_fees)}</td>
+            <td class="py-3 px-4 text-right font-extrabold ${isCompleted ? 'text-emerald-600' : 'text-gray-700'}">${formatCurrency(item.escrow_amount)}</td>
+            <td class="py-3 px-4 text-center text-[11px] text-gray-600">${releaseTimeStr}</td>
+            <td class="py-3 px-4 text-center">
+              <button onclick="viewEscrowDetail('${item.order_sn}')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg border border-emerald-200 transition shadow-xs flex items-center mx-auto space-x-1" title="Xem chi tiết bút toán">
+                <i class="fa-solid fa-receipt text-[10px]"></i>
+                <span>Chi tiết</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+      renderPaginationControls({
+        containerId: 'ledger-pagination',
+        currentPage: ledgerPage,
+        totalItems: currentLedgerList.length,
+        pageSize: PAGE_SIZES.ledger,
+        onPageChange: 'changeLedgerPage'
+      });
     }
 
     async function viewEscrowDetail(orderSn) {
