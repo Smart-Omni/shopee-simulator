@@ -12,7 +12,7 @@ We are continuing development on the **Shopee Open API v2 Simulator** located in
 ### 1. Context & Baseline
 - **Current Version:** v1.7.0 (Phases 1 through 12 complete, Dual-Persona UI, vi-VN localization).
 - **Test Baseline:** 387 / 387 test assertions passing (100% pass rate across all 12 phases). Run `npm test` immediately (with network socket access enabled for port 5432) to verify baseline health before making any changes.
-- **Git Branch:** Currently on `develop`. Follow the Conventional Commits specification for all commit messages.
+- **Git Branch:** Currently on `feature/payment-and-escrow-reconcilation` (or `develop`). Follow the Conventional Commits specification for all commit messages.
 
 ### 2. Architecture & Rules of Engagement
 - **Two-Layer Architecture:**
