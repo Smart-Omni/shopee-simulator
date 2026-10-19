@@ -4,6 +4,42 @@ All notable changes, bug fixes, architecture evolution, and feature enhancements
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-10-19
+
+### 🎯 Overview
+Implemented a major **Dual-Persona Interface Revamp**, authentic **Vietnamese (`vi-VN`) localization**, and critical **order review & SLA state resiliency fixes**. This release isolates the Seller Center view from the Marketplace Customer view with 1-click fast login, moves the Integration Console to a dedicated slide-out drawer, enforces strict order review deduplication at both item and order levels, eliminates SLA `NaN` display errors, and formalizes container synchronization procedures.
+
+### 🎨 Dual-Persona Interface & Fast Login
+- **1-Click Seeded Persona Login:**
+  - Dedicated welcome screen providing instant one-click login for 3 seeded merchant shops (`Shop 727720655`, `Shop 839910244`, `Shop 910283751`) and 3 seeded buyer profiles (`Nguyen Van A`, `Tran Thi B`, `Le Van C`), bypassing credentials for friction-free testing.
+  - Automatic persona state persistence in `localStorage` (`shopee_persona`).
+  - Persona view isolation: Seller Center header and tabs are completely hidden from buyers, and Marketplace Storefront header and tabs are hidden from sellers.
+- **Integration & Test Console Drawer:**
+  - Converted the developer test console into a top-right slide-out drawer (`🛠️ Bảng Kiểm Thử`), decluttering main business screens.
+  - Controls for HMAC OAuth URL generator, webhook sink URL configuration, network fault injection, and real-time webhook delivery logs.
+- **Vietnamese Localization Standards (`vi-VN`):**
+  - All user-facing UI copy in `public/index.html` localized into authentic Vietnamese matching official Shopee Vietnam terminology (*Kênh Người Bán*, *Sàn Mua Sắm Shopee*, *Chờ lấy hàng*, *Chuẩn bị hàng*, *Tạo vận đơn*, *In phiếu gửi AWB*, *Đã đánh giá*, *Chế độ tạm nghỉ*).
+  - Global `statusTextMap` dictionary ensuring localized order statuses across both Seller and Buyer views.
+
+### 🛡️ Bug Fixes & Resiliency
+- **Order Review Duplicate Submission Prevention:**
+  - Backend (`POST /api/v2/simulator/review/create`): Enforced strict rejection (`product.duplicate_request`) when attempting to submit multiple reviews for the same item or when all items in an order are already reviewed.
+  - Frontend (`public/index.html`): Added in-flight submit button disable guard (`id="review-submit-btn"`) with loading spinner (`Đang gửi...`) preventing duplicate clicks.
+  - Frontend (`loadBuyerOrders`): `has_reviewed` strictly computed, turning the button into a disabled `<button disabled>⭐ Đã đánh giá</button>` immediately upon completion.
+  - Database Cleanup: Purged accumulated duplicate comment records and recalculated shop rating metrics.
+- **SLA Deadline NaN Calculation Fix:**
+  - Replaced strict numeric parsing with fallback timestamp coercion (`rawShipBy` / `rawCreate` timestamp check), eliminating `NaNd` visual artifacts on new orders.
+- **Live Customer Chat Username Preservation:**
+  - Preserved authentic buyer usernames (`buyerUsername`) across conversation thread lookups, preventing display reversion to default placeholder names upon seller replies.
+- **UI Script Declaration Restoration:**
+  - Restored essential global state variables (`cart`, `shopsList`, `buyersList`, `productsList`, `ordersList`, `promotionsData`, `statusTextMap`) and helper functions (`showToast`, `formatDateTimeLocal`, `switchTab`), fixing broken "Add to cart", cart drawer, unlist/relist buttons, and blank order history.
+- **Docker Container Build Synchronization:**
+  - Standardized the workflow to compile TypeScript (`npm run build`) and synchronize `/app/dist` and `/app/public` into running containers, preventing compiled runtime drift.
+
+### 🧪 Verification & Test Suite Metrics
+- Full test suite run (`npm test`): **339 / 339 assertions passing (100%)** across all 11 phases.
+- Zero TypeScript compilation errors (`tsc` exits 0).
+
 ## [1.5.0] - 2026-10-19
 
 ### 🎯 Overview
