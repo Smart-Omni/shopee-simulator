@@ -374,8 +374,11 @@
               <p class="text-xs text-gray-500">Vòng đời xử lý đơn hàng Shopee: Chuẩn bị hàng, in phiếu gửi AWB, mô phỏng đơn vị vận chuyển giao hàng.</p>
             </div>
             <div class="flex items-center space-x-2 self-start sm:self-auto">
-              <button onclick="expireOverdueOrders()" class="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-sm transition flex items-center" title="Cancels orders past ship_by_date deadline with cancel_by=SYSTEM">
-                <i class="fa-solid fa-stopwatch mr-1.5"></i> ⚡ Xử Lý Đơn Quá Hạn
+              <button onclick="expireOverdueOrders(0)" class="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-sm transition flex items-center" title="Quét đơn quá hạn theo thời gian thực tế">
+                <i class="fa-solid fa-stopwatch mr-1.5"></i> ⚡ Quét Đơn Quá Hạn
+              </button>
+              <button onclick="expireOverdueOrders(49)" class="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow-sm transition flex items-center" title="Mô phỏng trôi qua 48 giờ để kiểm tra tính năng tự động hủy đơn quá hạn">
+                <i class="fa-solid fa-forward-fast mr-1.5"></i> ⏩ Tua Nhanh 48h (Test Hủy)
               </button>
               <button onclick="loadOrders()" class="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition flex items-center">
                 <i class="fa-solid fa-arrows-rotate mr-1.5"></i> Làm Mới Danh Sách
@@ -2230,15 +2233,20 @@
           const rawShipBy = o.ship_by_date ? Number(o.ship_by_date) * 1000 : null;
           const rawCreate = o.create_time ? Number(o.create_time) * 1000 : (o.created_at ? new Date(o.created_at).getTime() : Date.now());
           const shipByTs = (rawShipBy && !isNaN(rawShipBy)) ? rawShipBy : ((!isNaN(rawCreate) ? rawCreate : Date.now()) + 172800000);
-          const diffHours = (shipByTs - Date.now()) / (1000 * 3600);
-          if (diffHours < 0) {
-            slaPill = `<div class="mt-1"><span class="bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded text-[10px] border border-red-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Quá hạn</span></div>`;
+          const diffMs = shipByTs - Date.now();
+          const diffHours = diffMs / (1000 * 3600);
+          if (diffMs <= 0) {
+            slaPill = `<div class="mt-1"><span class="bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded text-[10px] border border-red-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Quá hạn chuẩn bị</span></div>`;
           } else if (diffHours < 12) {
-            slaPill = `<div class="mt-1"><span class="bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded text-[10px] border border-amber-300"><i class="fa-solid fa-clock mr-1"></i>Còn < 12h</span></div>`;
+            const h = Math.floor(diffHours);
+            const m = Math.floor((diffMs % (1000 * 3600)) / (1000 * 60));
+            slaPill = `<div class="mt-1"><span class="bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded text-[10px] border border-amber-300"><i class="fa-solid fa-clock mr-1"></i>Gấp: Còn ${h}h ${m}p</span></div>`;
           } else {
             const d = Math.floor(diffHours / 24);
             const h = Math.floor(diffHours % 24);
-            slaPill = `<div class="mt-1"><span class="bg-blue-50 text-blue-700 font-medium px-1.5 py-0.5 rounded text-[10px] border border-blue-200"><i class="fa-solid fa-clock mr-1"></i>${d} ngày ${h} giờ</span></div>`;
+            const m = Math.floor((diffMs % (1000 * 3600)) / (1000 * 60));
+            const timeDesc = d > 0 ? `${d} ngày ${h} giờ ${m} phút` : `${h} giờ ${m} phút`;
+            slaPill = `<div class="mt-1"><span class="bg-blue-50 text-blue-700 font-medium px-1.5 py-0.5 rounded text-[10px] border border-blue-200"><i class="fa-solid fa-clock mr-1"></i>Còn ${timeDesc}</span></div>`;
           }
         }
 
@@ -2315,27 +2323,38 @@
       tbody.innerHTML = html;
     }
 
-    async function expireOverdueOrders() {
+    async function expireOverdueOrders(simulatedHours = 0) {
       try {
+        const bodyPayload = { shop_id: activeShopId };
+        if (simulatedHours > 0) {
+          bodyPayload.simulated_now = new Date(Date.now() + simulatedHours * 3600 * 1000).toISOString();
+        }
         const res = await fetch('/api/v2/simulator/order/expire_overdue', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ shop_id: activeShopId })
+          body: JSON.stringify(bodyPayload)
         });
         const data = await res.json();
         if (data.response) {
           const count = data.response.expired_count;
           if (count > 0) {
-            showToast(`Expired ${count} overdue orders past SLA deadline (Dispatched Code 3 Push)`);
+            showToast(`Đã tự động hủy ${count} đơn hàng quá hạn chuẩn bị (Bắn Webhook Code 3)!`);
           } else {
-            showToast('No overdue orders found for this shop.');
+            showToast('Không có đơn hàng nào bị quá hạn.');
           }
           loadOrders();
         }
       } catch (err) {
-        showToast('Failed to run deadline expiration worker', true);
+        showToast('Lỗi khi chạy quét đơn quá hạn SLA', true);
       }
     }
+
+    // Live SLA countdown ticker: Refresh order table display every 30 seconds
+    setInterval(() => {
+      if (currentTab === 'shop' && currentPersona?.type === 'SELLER' && ordersList.length > 0) {
+        renderOrdersTable();
+      }
+    }, 30000);
 
     async function shipOrder(orderSn) {
       try {
