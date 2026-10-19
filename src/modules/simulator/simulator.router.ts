@@ -336,8 +336,7 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
       pay_time: o.payTime ? Math.floor(o.payTime.getTime() / 1000) : null,
       create_time: Math.floor(o.createdAt.getTime() / 1000),
       created_at: o.createdAt.toISOString(),
-      updated_at: o.updatedAt.toISOString(),
-      has_reviewed: (o.comments || []).length > 0,
+      has_reviewed: (o.comments || []).length > 0 && ((o.items || []).length === 0 || (o.items || []).every((item: any) => (o.comments || []).some((c: any) => c.itemId === item.itemId))),
       reviewed_item_ids: (o.comments || []).map((c: any) => Number(c.itemId)),
       items: (o.items || []).map((i: any) => ({
         order_item_id: Number(i.orderItemId),
@@ -1579,7 +1578,8 @@ simulatorRouter.post("/api/v2/simulator/review/create", async (req: Request, res
     }
 
     const order = await prisma.order.findUnique({
-      where: { orderSn: String(order_sn) }
+      where: { orderSn: String(order_sn) },
+      include: { items: true, comments: true }
     });
 
     if (!order) {
@@ -1592,16 +1592,24 @@ simulatorRouter.post("/api/v2/simulator/review/create", async (req: Request, res
       return;
     }
 
-    // Check if item in this order has already been reviewed
-    const existingComment = await prisma.productComment.findFirst({
-      where: {
-        orderSn: String(order_sn),
-        itemId: BigInt(item_id)
-      }
-    });
+    // Check if this item in this order has already been reviewed
+    const alreadyReviewed = (order.comments || []).some(
+      (c: any) => c.itemId === BigInt(item_id)
+    );
 
-    if (existingComment) {
+    if (alreadyReviewed) {
       res.json(createShopeeErrorResponse("product.duplicate_request", "This item in this order has already been reviewed"));
+      return;
+    }
+
+    // Check if all items in this order are already reviewed
+    if ((order.items || []).length > 0 && (order.items || []).every((i: any) => (order.comments || []).some((c: any) => c.itemId === i.itemId))) {
+      res.json(createShopeeErrorResponse("product.duplicate_request", "All items in this order have already been reviewed"));
+      return;
+    }
+
+    if ((order.items || []).length === 0 && (order.comments || []).length > 0) {
+      res.json(createShopeeErrorResponse("product.duplicate_request", "This order has already been reviewed"));
       return;
     }
 

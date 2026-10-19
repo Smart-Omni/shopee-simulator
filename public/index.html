@@ -1429,7 +1429,7 @@
 
       <div class="flex justify-end space-x-2 pt-3 border-t border-gray-200">
         <button onclick="closeReviewModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100">Hủy</button>
-        <button onclick="submitReview()" class="px-5 py-2 bg-[#ee4d2d] hover:bg-orange-600 text-white rounded-lg text-xs font-bold shadow transition flex items-center">
+        <button id="review-submit-btn" onclick="submitReview()" class="px-5 py-2 bg-[#ee4d2d] hover:bg-orange-600 text-white rounded-lg text-xs font-bold shadow transition flex items-center">
           <i class="fa-solid fa-paper-plane mr-1.5"></i> Gửi Đánh Giá
         </button>
       </div>
@@ -3882,13 +3882,13 @@
             if (o.has_reviewed) {
               buyerBtns += `
                 <button disabled class="px-3 py-1 bg-gray-200 text-gray-500 rounded text-xs font-bold cursor-not-allowed flex items-center shadow-none">
-                  <i class="fa-solid fa-star mr-1 text-[11px] text-amber-400"></i> Reviewed
+                  <i class="fa-solid fa-star mr-1 text-[11px] text-amber-400"></i> Đã đánh giá
                 </button>
               `;
             } else {
               buyerBtns += `
                 <button onclick="openReviewModalForOrder('${o.order_sn}')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition flex items-center shadow-sm">
-                  <i class="fa-solid fa-star mr-1 text-[11px]"></i> Review
+                  <i class="fa-solid fa-star mr-1 text-[11px]"></i> Đánh giá
                 </button>
               `;
             }
@@ -4245,13 +4245,13 @@
     function openReviewModalForOrder(orderSn) {
       const order = (window.buyerOrdersList || []).find(o => o.order_sn === orderSn);
       if (!order) {
-        showToast('Order details not found', true);
+        showToast('Không tìm thấy thông tin đơn hàng!', true);
         return;
       }
       const reviewedItemIds = order.reviewed_item_ids || [];
       const unreviewedItems = (order.items || []).filter(i => !reviewedItemIds.includes(Number(i.item_id)));
-      if (unreviewedItems.length === 0) {
-        showToast('All items in this order have already been reviewed!', true);
+      if (order.has_reviewed || unreviewedItems.length === 0) {
+        showToast('Tất cả sản phẩm trong đơn hàng này đã được đánh giá!', true);
         return;
       }
       currentReviewOrder = order;
@@ -4284,9 +4284,9 @@
           s.className = 'review-star text-gray-300 hover:scale-110 transition';
         }
       });
-      const labels = ['', '1 Star (Very Poor)', '2 Stars (Poor)', '3 Stars (Average)', '4 Stars (Good)', '5 Stars (Excellent)'];
+      const labels = ['', '1 Sao (Rất tệ)', '2 Sao (Chưa hài lòng)', '3 Sao (Bình thường)', '4 Sao (Hài lòng)', '5 Sao (Tuyệt vời)'];
       const lblEl = document.getElementById('review-rating-label');
-      if (lblEl) lblEl.textContent = labels[star] || `${star} Stars`;
+      if (lblEl) lblEl.textContent = labels[star] || `${star} Sao`;
     }
 
     async function submitReview() {
@@ -4297,6 +4297,13 @@
       const modelId = selectedOption?.dataset?.model !== '0' ? selectedOption?.dataset?.model : undefined;
       const comment = (document.getElementById('review-comment-input').value || '').trim();
       const star = currentReviewRating;
+
+      const submitBtn = document.getElementById('review-submit-btn');
+      if (submitBtn) {
+        if (submitBtn.disabled) return;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Đang gửi...';
+      }
 
       const buyer = buyersList.find(b => String(b.buyer_id) === String(activeBuyerId));
       const buyerUsername = buyer?.name || 'shopee_buyer_test';
@@ -4318,16 +4325,32 @@
 
         const data = await res.json();
         if (data.response) {
-          showToast(`Review submitted! ⭐ ${star} stars recorded for order ${orderSn}`);
+          showToast(`Đã gửi đánh giá thành công! ⭐ ${star} sao cho đơn hàng ${orderSn}`);
           closeReviewModal();
+          // Optimistically update order state in current view
+          const target = (window.buyerOrdersList || []).find(o => o.order_sn === orderSn);
+          if (target) {
+            target.reviewed_item_ids = target.reviewed_item_ids || [];
+            if (!target.reviewed_item_ids.includes(Number(itemId))) {
+              target.reviewed_item_ids.push(Number(itemId));
+            }
+            if ((target.items || []).every(i => target.reviewed_item_ids.includes(Number(i.item_id)))) {
+              target.has_reviewed = true;
+            }
+          }
           loadShopOverview();
           loadShopReviews();
           loadBuyerOrders();
         } else {
-          showToast(data.message || 'Failed to submit review', true);
+          showToast(data.message || 'Không thể gửi đánh giá', true);
         }
       } catch (err) {
-        showToast('Error submitting review: ' + (err.message || 'Network error'), true);
+        showToast('Lỗi gửi đánh giá: ' + (err.message || 'Lỗi mạng'), true);
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1.5"></i> Gửi Đánh Giá';
+        }
       }
     }
 
