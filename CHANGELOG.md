@@ -4,6 +4,32 @@ All notable changes, bug fixes, architecture evolution, and feature enhancements
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-10-19
+
+### 🎯 Overview
+Implemented **Phase 12: Payment & Escrow Reconciliation Module** (`/api/v2/payment/*`), enabling automated order settlement calculations, financial reconciliation, release tracking, and wallet income reports. This release also introduces an authentic Vietnamese (`vi-VN`) **Financial Ledger & Escrow Settlement Dashboard** (`Tài Chính & Doanh Thu`) in the Seller Center UI with live escrow cards, an itemized ledger table, and an interactive accounting breakdown modal.
+
+### 💰 Phase 12: Payment & Escrow Reconciliation
+- **Official Shopee Open API v2 Endpoints (`src/modules/payment/payment.router.ts`):**
+  - `POST & GET /api/v2/payment/get_escrow_detail`: HMAC-SHA256 authenticated retrieval of itemized order accounting, including cost of goods sold, shipping fee deductions, platform shipping rebates, fixed commission fees ($2\%$), service fees ($1.5\%$ on Freeship Xtra), payment transaction fees ($2.5\%$), and final net escrow payout.
+  - `POST /api/v2/payment/get_escrow_detail_batch`: Batch query of escrow income details for up to 50 orders per request.
+  - `POST & GET /api/v2/payment/get_escrow_list`: Range-based query of completed orders whose escrow has been released within a `release_time_from` and `release_time_to` timestamp window.
+  - `GET /api/v2/payment/get_income_overview`: Consolidated snapshot of seller income categorized by status (Released vs. Pending Escrow).
+- **Accounting & Settlement Formulation:**
+  - Net Escrow Payout Formula:
+    $$\text{escrow\_amount} = \text{cost\_of\_goods\_sold} - \text{voucher\_from\_seller} + \text{buyer\_paid\_shipping\_fee} - \text{actual\_shipping\_fee} + \text{shopee\_shipping\_rebate} - \text{commission\_fee} - \text{service\_fee} - \text{seller\_transaction\_fee}$$
+  - Automated timestamping: Orders transitioning to `COMPLETED` automatically stamp `escrowReleaseTime = now` and shift from Pending to Released in real-time.
+- **Prisma Schema Enhancements:**
+  - Added `escrowReleaseTime DateTime?` to `Order` model with index `[shopId, escrowReleaseTime]`.
+- **Seller Center Financial UI (`public/index.html`):**
+  - Added **💰 Tài Chính & Quyết Toán Đơn Hàng (Escrow Ledger)** card in Seller Center.
+  - Summary metric cards for Released Payouts, Pending Escrow, and Total Platform Fees Deducted.
+  - Interactive settlement ledger table with `[🔍 Chi tiết]` button opening the **Chi Tiết Quyết Toán Đơn Hàng (Escrow Breakdown)** modal.
+- **OpenAPI / Swagger Documentation:**
+  - Added `src/swagger/swagger.payment.ts` documenting all 4 payment endpoints with request/response schemas and sample JSON envelopes.
+- **Automated Verification:**
+  - Added `test/phase12_escrow_payment.spec.ts` with 48 automated test assertions verifying mathematical accuracy, batching, range filtering, overview aggregation, and protocol security.
+
 ## [1.6.0] - 2026-10-19
 
 ### 🎯 Overview

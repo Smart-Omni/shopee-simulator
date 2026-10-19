@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-teal.svg)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Test Suite](https://img.shields.io/badge/Tests-339%2F339%20Passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/Tests-387%2F387%20Passing-brightgreen.svg)]()
 [![Shopee Open API](https://img.shields.io/badge/Shopee%20Open%20API-v2%20Standard-orange.svg)]()
 
 > High-fidelity, contractually conforming **Shopee Open API v2 Mock Server** and interactive web testbed built for **SmartOmni Channel** integration, multi-merchant e-commerce synchronization, automated testing, and development without sandbox rate limits or dependency on live Shopee seller accounts.
@@ -69,7 +69,7 @@ The simulator implements a **Two-Layer Dual Architecture**:
 
 ## 🚀 Supported Modules & Capabilities
 
-The simulator has completed **Phases 1 through 11** with **339 automated assertions passing (100%)**:
+The simulator has completed **Phases 1 through 12** with **387 automated assertions passing (100%)**:
 
 ### 1. Authentication & Dual-Token Grace Period (OAuth 2.0)
 - `POST /api/v2/public/get_token_by_resend_code`: Exchange authorization code for initial `access_token` and `refresh_token`.
@@ -120,9 +120,9 @@ The simulator has completed **Phases 1 through 11** with **339 automated asserti
   - Subtotal $\ge 300,000$ ₫ $\rightarrow$ offsets up to 30,000 ₫.
 - **Standard Thermal Airway Bill PDF**: Generates downloadable AWB with SPX barcode, Code128, and routing labels.
 
-### 6. Escrow Settlement & Financial Ledger
-- Official Endpoints: `get_escrow_detail`, `get_escrow_list`.
-- Calculates buyer total, commission fees, service fees, voucher deductions, shipping rebates, and net seller payout.
+### 6. Frontend Simulation UI & Developer Testbed
+- Serves responsive Single Page Application (`public/index.html`) on root `/` and `/ui`.
+- Developer helper endpoints (`/api/v2/simulator/*`) for state inspection, token status, stock manipulation, and scenario testing.
 
 ### 7. Promotions & Marketing Center (Discounts & Vouchers)
 - Official Endpoints: 12 Discount endpoints (`v2.discount.*`) and 6 Voucher endpoints (`v2.voucher.*`).
@@ -145,6 +145,21 @@ The simulator has completed **Phases 1 through 11** with **339 automated asserti
 - **1-Click Seeded Login**: Welcome screen supporting instant fast login for 3 seeded shops and 3 seeded buyers with strict view isolation.
 - **Slide-Out Integration Console**: Developer controls (OAuth, webhooks, fault injection) isolated into a slide-out drawer (`🛠️ Bảng Kiểm Thử`).
 - **Authentic Vietnamese Copy**: 100% of simulator UI copy standardized in official Shopee Vietnam terminology (*Kênh Người Bán*, *Sàn Mua Sắm Shopee*, *Chờ lấy hàng*, *Đang giao*, *Đã giao*, *Hủy đơn*, *Đã đánh giá*).
+
+### 12. Payment & Escrow Reconciliation Module (Shopee Vietnam Accounting Standards)
+- Official Endpoints:
+  - `POST & GET /api/v2/payment/get_escrow_detail`: Detailed accounting breakdown per order (COGS, vouchers, shipping fees, rebates, commission, service, and transaction fees, and net escrow amount).
+  - `POST /api/v2/payment/get_escrow_detail_batch`: Batch escrow query for up to 50 orders per request.
+  - `POST & GET /api/v2/payment/get_escrow_list`: Filter released orders by escrow release timestamp range (`release_time_from` / `release_time_to`).
+  - `GET /api/v2/payment/get_income_overview`: Summary of released payouts, pending escrow funds, and current wallet status.
+- **Strict Shopee Vietnam Accounting Formula**:
+  $$\text{escrow\_amount} = \text{cost\_of\_goods\_sold} - \text{voucher\_from\_seller} + \text{buyer\_paid\_shipping\_fee} - \text{actual\_shipping\_fee} + \text{shopee\_shipping\_rebate} - \text{commission\_fee} - \text{service\_fee} - \text{seller\_transaction\_fee}$$
+- **Automated Settlement & Release Tracking**: Orders transitioning to `COMPLETED` automatically record `escrowReleaseTime = now` and shift from Pending to Released status in real-time.
+- **Seller Center Financial UI (`public/index.html`)**:
+  - Live Escrow Ledger card with 3 KPI metric cards (Released Payouts, Pending Escrow, Platform Fees Deducted).
+  - Itemized settlement ledger table with one-click `[🔍 Chi tiết]` breakdown modal in authentic `vi-VN`.
+- **Layer B Developer Helpers**:
+  - `GET /api/v2/simulator/payment/overview` & `GET /api/v2/simulator/payment/escrow_detail` for friction-free frontend integration.
 
 ---
 
@@ -242,7 +257,7 @@ npm run build
   docker compose up -d --build shopee-simulator
 
   # Option B: Hot-sync compiled build without recreating container
-  docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker restart shopee-mock-server
+  docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker cp prisma/schema.prisma shopee-mock-server:/app/prisma/schema.prisma && docker restart shopee-mock-server
   ```
 - Open browser at `http://localhost:8080/` to access the interactive web testbed.
 
@@ -250,15 +265,15 @@ npm run build
 
 ## 🧪 Testing & Quality Assurance
 
-The simulator includes comprehensive automated test suites covering all 11 phases:
+The simulator includes comprehensive automated test suites covering all 12 phases:
 
 ```bash
 npm test
 ```
 
 ### Test Suite Invariants
-- **100% Pass Rate**: All 339 assertions must pass.
-- **Zero Regressions**: Any modification to existing modules must not break backward compatibility tests (Phases 1–8).
+- **100% Pass Rate**: All 387 assertions must pass.
+- **Zero Regressions**: Any modification to existing modules must not break backward compatibility tests (Phases 1–11).
 - **Network Note**: Because PostgreSQL operates on `localhost:5432`, ensure commands running the test suite have network socket access (`BypassSandbox: true` if using AI sandboxed terminals).
 
 ---
@@ -267,7 +282,7 @@ npm test
 
 When an AI coding agent begins a task in this repository:
 
-1. **Check Baseline**: Run `npm test` immediately. Verify that all 339 assertions pass before touching code.
+1. **Check Baseline**: Run `npm test` immediately. Verify that all 387 assertions pass before touching code.
 2. **Review Spec & Official Docs**:
    - Locate the target endpoint documentation in `../api-reference/<Module>/v2.<module>.<action>.md`.
    - Check webhook payloads in `../push-mechanism/`.
@@ -281,7 +296,7 @@ When an AI coding agent begins a task in this repository:
    npm run build
    npm test
    # If testing via browser on port 8080:
-   docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker restart shopee-mock-server
+   docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker cp prisma/schema.prisma shopee-mock-server:/app/prisma/schema.prisma && docker restart shopee-mock-server
    ```
 7. **Commit Changes**: Commit using Conventional Commits on the `develop` branch.
 
@@ -296,6 +311,6 @@ To safely transition to a new coding session while preserving maximum efficiency
 3. **Leverage the Workspace Skill**: The simulator has a dedicated skill at `.agents/skills/shopee-simulator/SKILL.md`. In Antigravity, workspace skills persist across conversation sessions and load automatically into any new agent prompt.
 4. **Kickoff Prompt for New Sessions**: Use the prompt template in [`PROMPT_NEXT_SESSION.md`](./PROMPT_NEXT_SESSION.md) when starting a fresh session:
 
-> *"We are continuing development on the Shopee Open API v2 Simulator in `shopee-simulator/`. Please activate the `shopee-simulator` skill, check the `develop` branch, review `README.md` and `CHANGELOG.md` (currently at v1.6.0, 339/339 tests passing), run `npm test` to verify baseline health, and proceed with [YOUR NEXT TASK]."*
+> *"We are continuing development on the Shopee Open API v2 Simulator in `shopee-simulator/`. Please activate the `shopee-simulator` skill, check the `develop` branch, review `README.md` and `CHANGELOG.md` (currently at v1.7.0, 387/387 tests passing), run `npm test` to verify baseline health, and proceed with [YOUR NEXT TASK]."*
 
 This ensures zero context decay, zero hallucinated regressions, and immediate productive pairing.

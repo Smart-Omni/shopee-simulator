@@ -2,6 +2,7 @@ import { discountSwaggerPaths } from "./swagger.discounts";
 import { voucherSwaggerPaths } from "./swagger.vouchers";
 import { reviewAndLogisticsSwaggerPaths } from "./swagger.reviews";
 import { simulatorSwaggerPaths } from "./swagger.simulator";
+import { paymentSwaggerPaths } from "./swagger.payment";
 
 export const swaggerDocument = {
   openapi: "3.0.0",
@@ -24,6 +25,7 @@ export const swaggerDocument = {
     { name: "Logistics", description: "Shipping channels, parameters, airway bills, and tracking" },
     { name: "Discount", description: "Official Shopee marketing discount campaigns and line items" },
     { name: "Voucher", description: "Official Shopee shop and product vouchers" },
+    { name: "Payment & Escrow", description: "Official Shopee order escrow detail, accounting breakdowns, and income reports" },
     { name: "Reviews", description: "Customer ratings, comments, and seller replies" },
     { name: "Live Chat", description: "Real-time Buyer-Seller messaging and conversation threads" },
     { name: "Webhook & Push", description: "Outbound push webhooks, event delivery logs, and retry" },
@@ -978,6 +980,7 @@ export const swaggerDocument = {
     },
     ...discountSwaggerPaths,
     ...voucherSwaggerPaths,
+    ...paymentSwaggerPaths,
     ...reviewAndLogisticsSwaggerPaths,
     ...simulatorSwaggerPaths
   },

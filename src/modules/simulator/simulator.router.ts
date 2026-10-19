@@ -905,7 +905,7 @@ simulatorRouter.post("/api/v2/simulator/order/deliver", async (req: Request, res
   const now = new Date();
   await prisma.order.update({
     where: { orderSn: order_sn },
-    data: { orderStatus: OrderStatus.COMPLETED, updatedAt: now }
+    data: { orderStatus: OrderStatus.COMPLETED, updatedAt: now, escrowReleaseTime: now }
   });
 
   for (const pkg of order.packages) {
