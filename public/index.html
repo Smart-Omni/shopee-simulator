@@ -1663,6 +1663,11 @@
       'CANCELLED': 'Đã hủy'
     };
 
+    // Helper to format currency in Vietnamese Dong (vi-VN)
+    function formatCurrency(val) {
+      return Number(val || 0).toLocaleString('vi-VN') + ' ₫';
+    }
+
     // Helper to format Date for <input type="datetime-local">
     function formatDateTimeLocal(d) {
       const pad = (n) => String(n).padStart(2, '0');

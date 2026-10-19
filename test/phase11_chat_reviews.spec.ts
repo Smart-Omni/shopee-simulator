@@ -113,12 +113,13 @@ async function runPhase11Tests() {
     // -------------------------------------------------------------
     // Part 1: Buyer-Seller Live Chat Module
     // -------------------------------------------------------------
+    const testChatBuyerId = 9999;
     console.log("\n[Test 1] Send Live Chat Message (Buyer -> Seller)");
     const sendBuyerMsgRes = await request("/api/v2/simulator/chat/send", {
       method: "POST",
       body: {
         shop_id: SHOP_ID,
-        buyer_user_id: 1001,
+        buyer_user_id: testChatBuyerId,
         buyer_username: "audiophile_buyer",
         sender_type: "BUYER",
         message: "Hi seller, is this earbuds waterproof?",
@@ -133,7 +134,7 @@ async function runPhase11Tests() {
     console.log("\n[Test 2] Query Shop Conversations & Unread Count");
     const convRes = await request(`/api/v2/simulator/chat/conversations?shop_id=${SHOP_ID}`);
     assert(convRes.json.error === "", "Conversations endpoint succeeds");
-    const thread = convRes.json.response.conversations.find((c: any) => c.buyer_user_id === 1001);
+    const thread = convRes.json.response.conversations.find((c: any) => c.buyer_user_id === testChatBuyerId);
     assert(thread !== undefined, "Found buyer thread in conversations");
     assert(thread.unread_count === 1, "Unread count for seller is 1");
     assert(thread.last_message.includes("waterproof"), "Last message matches buyer inquiry");
@@ -143,7 +144,7 @@ async function runPhase11Tests() {
       method: "POST",
       body: {
         shop_id: SHOP_ID,
-        buyer_user_id: 1001,
+        buyer_user_id: testChatBuyerId,
         reader_type: "SELLER"
       }
     });
@@ -154,7 +155,7 @@ async function runPhase11Tests() {
       method: "POST",
       body: {
         shop_id: SHOP_ID,
-        buyer_user_id: 1001,
+        buyer_user_id: testChatBuyerId,
         sender_type: "SELLER",
         message: "Yes! It has IPX7 water resistance rating."
       }
@@ -162,12 +163,12 @@ async function runPhase11Tests() {
     assert(sendSellerReplyRes.json.error === "", "Seller reply sent successfully");
     assert(sendSellerReplyRes.json.response.sender_type === "SELLER", "Sender type is SELLER");
 
-    const chatHistoryRes = await request(`/api/v2/simulator/chat/messages?shop_id=${SHOP_ID}&buyer_user_id=1001`);
+    const chatHistoryRes = await request(`/api/v2/simulator/chat/messages?shop_id=${SHOP_ID}&buyer_user_id=${testChatBuyerId}`);
     assert(chatHistoryRes.json.response.messages.length === 2, "Conversation history has exactly 2 messages");
 
     // Verify buyer name is preserved in thread listing after seller reply
     const convAfterReplyRes = await request(`/api/v2/simulator/chat/conversations?shop_id=${SHOP_ID}`);
-    const threadAfterReply = convAfterReplyRes.json.response.conversations.find((c: any) => c.buyer_user_id === 1001);
+    const threadAfterReply = convAfterReplyRes.json.response.conversations.find((c: any) => c.buyer_user_id === testChatBuyerId);
     assert(threadAfterReply.buyer_username === "audiophile_buyer", "Preserves authentic buyer username in thread list after seller reply");
 
     // -------------------------------------------------------------
@@ -269,7 +270,7 @@ async function runPhase11Tests() {
     if (testCommentId) {
       await prisma.productComment.deleteMany({ where: { commentId: BigInt(testCommentId) } }).catch(() => {});
     }
-    await prisma.chatMessage.deleteMany({ where: { shopId: BigInt(SHOP_ID) } }).catch(() => {});
+    await prisma.chatMessage.deleteMany({ where: { buyerUserId: BigInt(9999) } }).catch(() => {});
     if (testOrderSn) {
       await prisma.orderItem.deleteMany({ where: { orderSn: testOrderSn } }).catch(() => {});
       await prisma.order.delete({ where: { orderSn: testOrderSn } }).catch(() => {});
