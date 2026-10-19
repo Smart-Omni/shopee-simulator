@@ -1,3 +1,8 @@
+import { discountSwaggerPaths } from "./swagger.discounts";
+import { voucherSwaggerPaths } from "./swagger.vouchers";
+import { reviewAndLogisticsSwaggerPaths } from "./swagger.reviews";
+import { simulatorSwaggerPaths } from "./swagger.simulator";
+
 export const swaggerDocument = {
   openapi: "3.0.0",
   info: {
@@ -17,6 +22,10 @@ export const swaggerDocument = {
     { name: "Product", description: "Product catalog, categories, attributes, and stock/price" },
     { name: "Order", description: "Order queries, cancellations, and package splitting" },
     { name: "Logistics", description: "Shipping channels, parameters, airway bills, and tracking" },
+    { name: "Discount", description: "Official Shopee marketing discount campaigns and line items" },
+    { name: "Voucher", description: "Official Shopee shop and product vouchers" },
+    { name: "Reviews", description: "Customer ratings, comments, and seller replies" },
+    { name: "Live Chat", description: "Real-time Buyer-Seller messaging and conversation threads" },
     { name: "Webhook & Push", description: "Outbound push webhooks, event delivery logs, and retry" },
     { name: "Simulator Control", description: "Direct endpoints for tests to trigger buyer actions and inject faults" }
   ],
@@ -966,7 +975,11 @@ export const swaggerDocument = {
           "200": { description: "Updated simulator configuration" }
         }
       }
-    }
+    },
+    ...discountSwaggerPaths,
+    ...voucherSwaggerPaths,
+    ...reviewAndLogisticsSwaggerPaths,
+    ...simulatorSwaggerPaths
   },
   components: {
     schemas: {
