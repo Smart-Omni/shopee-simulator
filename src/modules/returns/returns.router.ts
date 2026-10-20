@@ -103,7 +103,9 @@ async function handleGetReturnList(req: Request, res: Response): Promise<void> {
 
   res.json(createShopeeSuccessResponse({
     more,
-    return: returnList
+    return: returnList,
+    return_list: returnList,
+    total: totalCount
   }));
 }
 
@@ -181,9 +183,12 @@ async function handleGetReturnDetail(req: Request, res: Response): Promise<void>
     return_refund_request_type: r.returnRefundType,
     seller_proof_status: r.sellerProofStatus,
     seller_compensation_status: r.compensationStatus,
+    compensation_status: r.compensationStatus,
     amount_before_discount: Number(r.order.totalAmount),
     user,
     item: items,
+    proof_images: r.proofImages || [],
+    seller_proof_images: r.proofs.filter(p => p.uploaderType === "SELLER").map(p => p.imageUrl),
     ruling_notes: r.rulingNotes || ""
   }));
 }
@@ -404,7 +409,7 @@ returnsRouter.post("/api/v2/returns/dispute", shopeeAuthGuard, async (req: Reque
   const email = req.body?.email;
   const disputeReasonId = parseInt(String(req.body?.dispute_reason_id), 10);
   const disputeTextReason = req.body?.dispute_text_reason || "";
-  const imageList = req.body?.image_list || [];
+  const imageList = req.body?.image_list || req.body?.image || [];
 
   if (!returnSn || !email || isNaN(disputeReasonId)) {
     res.json(createShopeeErrorResponse("error_param", "return_sn, email, and dispute_reason_id are required"));
@@ -453,17 +458,26 @@ returnsRouter.post("/api/v2/returns/dispute", shopeeAuthGuard, async (req: Reque
     }
   });
 
-  // Store uploaded image proofs if provided
+  // Store uploaded image proofs if provided (supports strings or Shopee nested { image_url: [] })
   if (Array.isArray(imageList) && imageList.length > 0) {
-    for (const mod of imageList) {
-      if (Array.isArray(mod.image_url)) {
-        for (const url of mod.image_url) {
+    for (const item of imageList) {
+      if (typeof item === "string") {
+        await prisma.returnProof.create({
+          data: {
+            returnSn,
+            uploaderType: "SELLER",
+            imageUrl: item,
+            comment: disputeTextReason || ""
+          }
+        });
+      } else if (item && Array.isArray(item.image_url)) {
+        for (const url of item.image_url) {
           await prisma.returnProof.create({
             data: {
               returnSn,
               uploaderType: "SELLER",
               imageUrl: url,
-              comment: mod.requirement || ""
+              comment: item.requirement || ""
             }
           });
         }
@@ -500,8 +514,8 @@ returnsRouter.post("/api/v2/returns/cancel_dispute", shopeeAuthGuard, async (req
   const returnSn = req.body?.return_sn;
   const email = req.body?.email;
 
-  if (!returnSn || !email) {
-    res.json(createShopeeErrorResponse("error_param", "return_sn and email are required"));
+  if (!returnSn) {
+    res.json(createShopeeErrorResponse("error_param", "return_sn is required"));
     return;
   }
 
@@ -514,16 +528,40 @@ returnsRouter.post("/api/v2/returns/cancel_dispute", shopeeAuthGuard, async (req
     return;
   }
 
-  // Official Shopee Rule: sellers can only cancel compensation disputes (when return_status is ACCEPTED and compensation_status is COMPENSATION_REQUESTED)
-  if (r.status !== "ACCEPTED" || r.compensationStatus !== "COMPENSATION_REQUESTED") {
-    res.json(createShopeeErrorResponse("return.invalid_status", "Sellers can only cancel disputes when return_status is ACCEPTED and compensation_status is COMPENSATION_REQUESTED"));
+  // Can cancel:
+  // 1. Pre-arbitration seller dispute (status === SELLER_DISPUTE -> reverts to REQUESTED)
+  // 2. Post-acceptance compensation dispute (status === ACCEPTED && compensationStatus === COMPENSATION_REQUESTED)
+  const isCompensationDispute = r.status === "ACCEPTED" && r.compensationStatus === "COMPENSATION_REQUESTED";
+  const isSellerDispute = r.status === "SELLER_DISPUTE";
+
+  if (!isCompensationDispute && !isSellerDispute) {
+    res.json(createShopeeErrorResponse("return.invalid_status", "Can only cancel active dispute in SELLER_DISPUTE or COMPENSATION_REQUESTED"));
     return;
+  }
+
+  let newStatus = r.status;
+  let newCompStatus = r.compensationStatus;
+  let updateField = "return_status";
+  let oldValue = r.status;
+  let newValue = r.status;
+
+  if (isSellerDispute) {
+    newStatus = "REQUESTED";
+    updateField = "return_status";
+    oldValue = "SELLER_DISPUTE";
+    newValue = "REQUESTED";
+  } else if (isCompensationDispute) {
+    newCompStatus = "COMPENSATION_CANCELLED";
+    updateField = "seller_compensation_status";
+    oldValue = "COMPENSATION_REQUESTED";
+    newValue = "COMPENSATION_CANCELLED";
   }
 
   await prisma.return.update({
     where: { returnSn },
     data: {
-      compensationStatus: "COMPENSATION_CANCELLED"
+      status: newStatus,
+      compensationStatus: newCompStatus
     }
   });
 
@@ -532,9 +570,9 @@ returnsRouter.post("/api/v2/returns/cancel_dispute", shopeeAuthGuard, async (req
     shopId,
     orderSn: r.orderSn,
     returnSn: r.returnSn,
-    updateField: "seller_compensation_status",
-    oldValue: "COMPENSATION_REQUESTED",
-    newValue: "COMPENSATION_CANCELLED"
+    updateField,
+    oldValue,
+    newValue
   });
 
   res.json(createShopeeSuccessResponse({
@@ -555,7 +593,11 @@ async function handleGetReturnDisputeReason(req: Request, res: Response): Promis
   }
 
   res.json(createShopeeSuccessResponse({
-    dispute_reason_list: SHOPEE_DISPUTE_REASONS
+    dispute_reason_list: SHOPEE_DISPUTE_REASONS,
+    dispute_reason: SHOPEE_DISPUTE_REASONS.map(d => ({
+      dispute_reason_id: d.dispute_reason,
+      dispute_reason_name: d.dispute_name
+    }))
   }));
 }
 
@@ -573,11 +615,14 @@ async function handleGetAvailableSolutions(req: Request, res: Response): Promise
     return;
   }
 
+  const solutions = [
+    { solution: "REFUND", solution_name: "Refund Only" },
+    { solution: "RETURN_REFUND", solution_name: "Return and Refund" }
+  ];
+
   res.json(createShopeeSuccessResponse({
-    solution_list: [
-      { solution: "REFUND", solution_name: "Refund Only" },
-      { solution: "RETURN_REFUND", solution_name: "Return and Refund" }
-    ]
+    solution_list: solutions,
+    solutions
   }));
 }
 
@@ -592,11 +637,12 @@ returnsRouter.post("/api/v2/returns/upload_proof", shopeeAuthGuard, async (req: 
   const shopId = BigInt(shopIdStr);
 
   const returnSn = req.body?.return_sn;
-  const imageUrlList = req.body?.image_url_list || [];
-  const comment = req.body?.comment || "";
+  const rawUrlList = req.body?.image_url_list || (req.body?.url ? [req.body.url] : []);
+  const imageUrlList = Array.isArray(rawUrlList) ? rawUrlList : [rawUrlList];
+  const comment = req.body?.comment || req.body?.description || "";
 
-  if (!returnSn || !Array.isArray(imageUrlList) || imageUrlList.length === 0) {
-    res.json(createShopeeErrorResponse("error_param", "return_sn and image_url_list are required"));
+  if (!returnSn || imageUrlList.length === 0) {
+    res.json(createShopeeErrorResponse("error_param", "return_sn and image_url_list (or url) are required"));
     return;
   }
 
@@ -609,8 +655,9 @@ returnsRouter.post("/api/v2/returns/upload_proof", shopeeAuthGuard, async (req: 
     return;
   }
 
+  let lastProofId = 0;
   for (const url of imageUrlList) {
-    await prisma.returnProof.create({
+    const createdProof = await prisma.returnProof.create({
       data: {
         returnSn,
         uploaderType: "SELLER",
@@ -618,6 +665,7 @@ returnsRouter.post("/api/v2/returns/upload_proof", shopeeAuthGuard, async (req: 
         comment
       }
     });
+    lastProofId = Number(createdProof.id);
   }
 
   await prisma.return.update({
@@ -629,6 +677,7 @@ returnsRouter.post("/api/v2/returns/upload_proof", shopeeAuthGuard, async (req: 
 
   res.json(createShopeeSuccessResponse({
     return_sn: returnSn,
+    proof_id: lastProofId,
     proof_count: imageUrlList.length
   }));
 });
