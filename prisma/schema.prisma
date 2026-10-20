@@ -327,6 +327,7 @@ model Return {
   // Dispute & Proof
   sellerProofStatus     String       @default("PENDING") @map("seller_proof_status") // PENDING, UPLOADED, OVERDUE
   disputeReasonId       Int?         @map("dispute_reason_id")
+  disputeReason         String?      @map("dispute_reason")
   disputeTextReason     String?      @map("dispute_text_reason")
   disputeEmail          String?      @map("dispute_email")
   compensationStatus    String       @default("COMPENSATION_NOT_APPLICABLE") @map("compensation_status") // COMPENSATION_NOT_APPLICABLE, COMPENSATION_REQUESTED, COMPENSATION_APPROVED, COMPENSATION_REJECTED
