@@ -179,4 +179,44 @@ export class WebhookService {
 
     return successCount;
   }
+
+  /**
+   * Helper to dispatch Return Update Push (Code 29) to partner webhook.
+   */
+  static async dispatchReturnUpdate(params: {
+    partnerId: bigint | number;
+    shopId: bigint | number;
+    orderSn: string;
+    returnSn: string;
+    updateField: string;
+    oldValue: string;
+    newValue: string;
+  }): Promise<any> {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const payload: PushPayload = {
+      code: 29,
+      shop_id: Number(params.shopId),
+      timestamp,
+      data: {
+        order_sn: params.orderSn,
+        return_sn: params.returnSn,
+        updated_values: [
+          {
+            update_field: params.updateField,
+            old_value: params.oldValue,
+            new_value: params.newValue,
+            update_time: timestamp
+          }
+        ]
+      }
+    };
+
+    return this.dispatch({
+      partnerId: params.partnerId,
+      pushCode: 29,
+      shopId: params.shopId,
+      ordersn: params.orderSn,
+      payload
+    });
+  }
 }
