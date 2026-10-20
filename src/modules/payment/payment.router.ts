@@ -127,7 +127,8 @@ async function handleGetEscrowDetail(req: Request, res: Response): Promise<void>
           productModel: true
         }
       },
-      shop: true
+      shop: true,
+      returns: true
     }
   });
 
@@ -141,7 +142,7 @@ async function handleGetEscrowDetail(req: Request, res: Response): Promise<void>
   res.json(createShopeeSuccessResponse({
     order_sn: order.orderSn,
     buyer_user_name: order.buyerUsername,
-    return_order_sn_list: [],
+    return_order_sn_list: (order.returns || []).map((r: any) => r.returnSn),
     order_income: breakdown.order_income
   }));
 }
@@ -180,7 +181,8 @@ paymentRouter.post("/api/v2/payment/get_escrow_detail_batch", shopeeAuthGuard, a
           productModel: true
         }
       },
-      shop: true
+      shop: true,
+      returns: true
     }
   });
 
@@ -194,7 +196,7 @@ paymentRouter.post("/api/v2/payment/get_escrow_detail_batch", shopeeAuthGuard, a
         escrow_detail: {
           order_sn: order.orderSn,
           buyer_user_name: order.buyerUsername,
-          return_order_sn_list: [],
+          return_order_sn_list: (order.returns || []).map((r: any) => r.returnSn),
           order_income: breakdown.order_income
         }
       };
