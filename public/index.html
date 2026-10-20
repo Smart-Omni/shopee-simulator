@@ -39,9 +39,11 @@
           <span>Shop Screen (Seller)</span>
           <span>Buyer Screen (Shopee Customer)</span>
           <span>Integration & Test Console</span>
+          <span>Shopee Admin</span>
           <button id="tab-shop-btn" onclick="switchTab('shop')">Shop Screen (Seller)</button>
           <button id="tab-buyer-btn" onclick="switchTab('buyer')">Buyer Screen (Shopee Customer)</button>
           <button id="tab-console-btn" onclick="switchTab('console')">Integration & Test Console</button>
+          <button id="tab-admin-btn" onclick="switchTab('admin')">Shopee Admin</button>
         </div>
 
         <!-- Role Badge and Controls (Dynamic based on Persona) -->
@@ -88,6 +90,19 @@
             </button>
           </div>
 
+          <!-- ADMIN CONTROLS (Only visible when currentPersona.type === 'ADMIN') -->
+          <div id="admin-header-controls" class="hidden flex items-center space-x-2.5">
+            <div class="flex items-center bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 text-xs">
+              <span class="text-purple-600 mr-2 font-bold flex items-center">
+                <i class="fa-solid fa-scale-balanced mr-1"></i> Trọng Tài:
+              </span>
+              <span class="font-bold text-gray-800">Shopee Admin Platform</span>
+            </div>
+            <button onclick="logoutPersona()" class="px-2.5 py-1.5 text-xs text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition font-medium flex items-center" title="Đăng xuất / Chuyển vai trò">
+              <i class="fa-solid fa-right-from-bracket mr-1"></i> Đổi vai trò
+            </button>
+          </div>
+
           <!-- GUEST CONTROLS (When on login screen) -->
           <div id="guest-header-controls" class="flex items-center space-x-2 text-xs">
             <span class="text-gray-500 hidden sm:inline"><i class="fa-solid fa-circle-info text-orange-500 mr-1"></i> Đăng nhập 1-chạm bên dưới</span>
@@ -124,18 +139,18 @@
     <!-- VIEW 0: LOGIN & PERSONA SELECTOR SCREEN                               -->
     <!-- ===================================================================== -->
     <div id="view-login" class="py-6">
-      <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+      <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         <!-- Banner -->
         <div class="bg-gradient-to-r from-[#ee4d2d] via-orange-500 to-amber-500 p-8 text-white text-center">
           <div class="w-16 h-16 bg-white/20 rounded-2xl mx-auto flex items-center justify-center text-3xl mb-3 shadow-inner">
             <i class="fa-solid fa-bag-shopping"></i>
           </div>
           <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Shopee Open API Simulator</h1>
-          <p class="mt-2 text-sm text-orange-100 font-medium">Chọn vai trò đăng nhập nhanh (1-Chạm) để kiểm thử luồng Người Bán hoặc Người Mua</p>
+          <p class="mt-2 text-sm text-orange-100 font-medium">Chọn vai trò đăng nhập nhanh (1-Chạm) để kiểm thử luồng Người Bán, Người Mua hoặc Trọng Tài Shopee</p>
         </div>
 
         <div class="p-6 sm:p-8">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 md:grid-cols-2 gap-6">
             <!-- Seller Persona Card -->
             <div class="bg-orange-50/60 rounded-2xl p-5 border border-orange-200 flex flex-col justify-between">
               <div>
@@ -241,6 +256,38 @@
 
               <div class="mt-4 pt-3 border-t border-blue-100 text-[11px] text-blue-700 flex items-center justify-center font-medium">
                 <i class="fa-solid fa-bag-shopping mr-1"></i> Bấm để vào Sàn Mua Sắm Shopee
+              </div>
+            </div>
+
+            <!-- Shopee Admin Persona Card -->
+            <div class="bg-purple-50/60 rounded-2xl p-5 border border-purple-200 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center space-x-3 mb-4">
+                  <div class="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center text-lg font-bold shadow-sm">
+                    <i class="fa-solid fa-scale-balanced"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-bold text-sm text-gray-900">Trọng Tài Shopee (Shopee Admin)</h3>
+                    <p class="text-[11px] text-gray-500">Phán quyết khiếu nại, nhập kho hoàn hàng & bồi thường</p>
+                  </div>
+                </div>
+
+                <div class="space-y-2.5">
+                  <button onclick="quickLogin('ADMIN', 'shopee_admin')" class="w-full text-left p-3.5 bg-white hover:bg-purple-100/70 rounded-xl border border-purple-200 transition shadow-sm flex items-center justify-between group">
+                    <div>
+                      <div class="font-bold text-xs text-gray-900 group-hover:text-purple-600 flex items-center">
+                        <i class="fa-solid fa-gavel text-purple-500 mr-1.5"></i>
+                        Trọng Tài Khiếu Nại & Vận Hành
+                      </div>
+                      <div class="text-[10px] text-gray-500 mt-0.5">Xử lý án tranh chấp, kiểm định kho & giải ngân bảo hiểm Shopee</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-right text-gray-400 group-hover:text-purple-600 text-xs transition"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-purple-100 text-[11px] text-purple-700 flex items-center justify-center font-medium">
+                <i class="fa-solid fa-shield-halved mr-1"></i> Bấm để vào Bàn Trọng Tài Shopee
               </div>
             </div>
           </div>
@@ -658,6 +705,81 @@
         </div>
       </div>
 
+      <!-- Quản Lý Đổi Trả & Khiếu Nại (Returns & Refunds Section) -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+          <div>
+            <div class="flex items-center space-x-2">
+              <div class="w-8 h-8 rounded-lg bg-orange-100 text-[#ee4d2d] flex items-center justify-center font-bold text-sm">
+                <i class="fa-solid fa-rotate-left"></i>
+              </div>
+              <h3 class="text-lg font-bold text-gray-900">Quản Lý Đổi Trả & Khiếu Nại (Returns & Refunds)</h3>
+              <span id="shop-returns-count-badge" class="px-2.5 py-0.5 bg-orange-100 text-[#ee4d2d] rounded-full text-xs font-bold">0 Yêu cầu</span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Xử lý yêu cầu trả hàng, hoàn tiền, đề xuất phương án và khiếu nại lên Shopee theo chuẩn Open API v2.</p>
+          </div>
+          <div class="flex items-center space-x-3">
+            <button onclick="loadShopReturns()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs rounded-lg transition flex items-center space-x-1.5" title="Làm mới danh sách">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span>Làm mới</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Status Filter Tabs -->
+        <div class="px-6 pt-3 bg-gray-50/80 border-b border-gray-200 flex space-x-4 overflow-x-auto text-xs">
+          <button onclick="filterShopReturns('ALL')" id="ret-tab-ALL" class="pb-2.5 font-bold text-[#ee4d2d] border-b-2 border-[#ee4d2d] whitespace-nowrap">
+            Tất cả (<span id="ret-cnt-all">0</span>)
+          </button>
+          <button onclick="filterShopReturns('REQUESTED')" id="ret-tab-REQUESTED" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Chờ Shop xử lý (<span id="ret-cnt-req">0</span>)
+          </button>
+          <button onclick="filterShopReturns('JUDGING')" id="ret-tab-JUDGING" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Shopee xét duyệt (<span id="ret-cnt-jud">0</span>)
+          </button>
+          <button onclick="filterShopReturns('PROCESSING')" id="ret-tab-PROCESSING" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Đang hoàn hàng (<span id="ret-cnt-pro">0</span>)
+          </button>
+          <button onclick="filterShopReturns('ACCEPTED')" id="ret-tab-ACCEPTED" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Đã hoàn tiền (<span id="ret-cnt-acc">0</span>)
+          </button>
+          <button onclick="filterShopReturns('SELLER_DISPUTE')" id="ret-tab-SELLER_DISPUTE" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Đang khiếu nại (<span id="ret-cnt-dis">0</span>)
+          </button>
+          <button onclick="filterShopReturns('CLOSED')" id="ret-tab-CLOSED" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Đã đóng (<span id="ret-cnt-clo">0</span>)
+          </button>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-medium">
+              <tr>
+                <th class="px-6 py-3 text-left">Mã Trả Hàng / Đơn Hàng</th>
+                <th class="px-6 py-3 text-left">Người Mua</th>
+                <th class="px-6 py-3 text-left">Lý Do & Phương Án</th>
+                <th class="px-6 py-3 text-left">Số Tiền Hoàn</th>
+                <th class="px-6 py-3 text-left">Trạng Thái</th>
+                <th class="px-6 py-3 text-left">Hạn Xử Lý (SLA)</th>
+                <th class="px-6 py-3 text-right">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="shop-returns-table-body" class="divide-y divide-gray-200">
+              <tr>
+                <td colspan="7" class="text-center py-8 text-gray-400 text-xs">
+                  <i class="fa-solid fa-rotate-left text-2xl mb-2 text-gray-300 block"></i>
+                  Đang tải danh sách đổi trả...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination Bar -->
+        <div id="returns-pagination"></div>
+      </div>
+
     </div>
 
     <!-- ===================================================================== -->
@@ -730,8 +852,117 @@
     </div>
 
     <!-- ===================================================================== -->
-    <!-- TAB 3: INTEGRATION & TEST CONSOLE                                     -->
+    <!-- TAB: SHOPEE ADMIN SCREEN (ARBITRATION DESK & WAREHOUSE INBOUND)       -->
     <!-- ===================================================================== -->
+    <div id="tab-admin" class="hidden space-y-6">
+
+      <!-- Admin Banner -->
+      <div class="bg-gradient-to-r from-purple-800 via-indigo-700 to-purple-900 rounded-2xl text-white p-6 shadow-md">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div class="inline-flex items-center text-[10px] font-black bg-purple-100 text-purple-900 px-2 py-0.5 rounded uppercase tracking-wider mb-2">
+              <i class="fa-solid fa-scale-balanced mr-1"></i> Trung Tâm Trọng Tài Shopee Platform
+            </div>
+            <h2 class="text-2xl font-black">Cổng Trọng Tài & Vận Hành Shopee (Shopee Admin Arbitration Desk)</h2>
+            <p class="text-purple-100 text-xs mt-1">
+              Điều phối tranh chấp khiếu nại, giám định chất lượng bưu phẩm hoàn về kho Shopee, và quyết định giải ngân bồi thường.
+            </p>
+          </div>
+          <div class="flex items-center space-x-3">
+            <button onclick="loadAdminReturns()" class="px-4 py-2 bg-white text-purple-900 hover:bg-purple-50 font-bold text-xs rounded-xl shadow transition flex items-center">
+              <i class="fa-solid fa-arrows-rotate mr-2"></i> Làm Mới Dữ Liệu
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI Metrics Row -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+          <div class="text-[11px] font-semibold text-gray-500 uppercase">Chờ CS duyệt sơ bộ</div>
+          <div id="admin-metric-judging" class="text-2xl font-black text-amber-600 mt-1">0</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">Trạng thái: JUDGING</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+          <div class="text-[11px] font-semibold text-gray-500 uppercase">Đang hoàn về kho</div>
+          <div id="admin-metric-processing" class="text-2xl font-black text-blue-600 mt-1">0</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">Trạng thái: PROCESSING</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+          <div class="text-[11px] font-semibold text-gray-500 uppercase">Tranh chấp khiếu nại</div>
+          <div id="admin-metric-dispute" class="text-2xl font-black text-red-600 mt-1">0</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">Trạng thái: SELLER_DISPUTE</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+          <div class="text-[11px] font-semibold text-gray-500 uppercase">Đã hoàn tất hoàn tiền</div>
+          <div id="admin-metric-accepted" class="text-2xl font-black text-green-600 mt-1">0</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">Trạng thái: ACCEPTED</div>
+        </div>
+      </div>
+
+      <!-- Active Arbitration Cases Table -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+          <div>
+            <div class="flex items-center space-x-2">
+              <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+                <i class="fa-solid fa-gavel"></i>
+              </div>
+              <h3 class="text-lg font-bold text-gray-900">Danh Sách Tranh Chấp & Nghiệm Thu Kho Shopee</h3>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Phán quyết các vụ án đổi trả do người mua gửi tới hoặc do người bán khiếu nại lên sàn.</p>
+          </div>
+        </div>
+
+        <!-- Filter tabs for Admin -->
+        <div class="px-6 pt-3 bg-gray-50/80 border-b border-gray-200 flex space-x-4 overflow-x-auto text-xs">
+          <button onclick="filterAdminReturns('ALL')" id="admin-tab-ALL" class="pb-2.5 font-bold text-purple-600 border-b-2 border-purple-600 whitespace-nowrap">
+            Tất cả vụ án (<span id="admin-cnt-all">0</span>)
+          </button>
+          <button onclick="filterAdminReturns('JUDGING')" id="admin-tab-JUDGING" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Chờ xét duyệt sơ bộ (<span id="admin-cnt-jud">0</span>)
+          </button>
+          <button onclick="filterAdminReturns('PROCESSING')" id="admin-tab-PROCESSING" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Chờ kho nghiệm thu (<span id="admin-cnt-pro">0</span>)
+          </button>
+          <button onclick="filterAdminReturns('SELLER_DISPUTE')" id="admin-tab-SELLER_DISPUTE" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Shop khiếu nại (<span id="admin-cnt-dis">0</span>)
+          </button>
+          <button onclick="filterAdminReturns('ACCEPTED')" id="admin-tab-ACCEPTED" class="pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+            Đã hoàn tất (<span id="admin-cnt-acc">0</span>)
+          </button>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-medium">
+              <tr>
+                <th class="px-6 py-3 text-left">Mã Trả Hàng / Đơn Hàng</th>
+                <th class="px-6 py-3 text-left">Gian Hàng / Khách Hàng</th>
+                <th class="px-6 py-3 text-left">Loại Xử Lý & Giải Pháp</th>
+                <th class="px-6 py-3 text-left">Số Tiền Hoàn</th>
+                <th class="px-6 py-3 text-left">Trạng Thái</th>
+                <th class="px-6 py-3 text-left">Khiếu Nại / Bồi Thường</th>
+                <th class="px-6 py-3 text-right">Phán Quyết Trọng Tài</th>
+              </tr>
+            </thead>
+            <tbody id="admin-returns-table-body" class="divide-y divide-gray-200">
+              <tr>
+                <td colspan="7" class="text-center py-8 text-gray-400 text-xs">
+                  <i class="fa-solid fa-scale-balanced text-2xl mb-2 text-gray-300 block"></i>
+                  Đang tải danh sách trọng tài...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination Bar -->
+        <div id="admin-returns-pagination"></div>
+      </div>
+
+    </div>
       </main>
 
   <!-- ======================================================================= -->
@@ -1638,6 +1869,266 @@
   </div>
 
   <!-- ======================================================================= -->
+  <!-- PHASE 13: RETURN, REFUND & DISPUTE MODALS                               -->
+  <!-- ======================================================================= -->
+
+  <!-- Modal: Buyer Return / Refund Request -->
+  <div id="buyer-return-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+      <div class="bg-gradient-to-r from-[#ee4d2d] to-orange-600 text-white p-5 flex justify-between items-center">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white text-base">
+            <i class="fa-solid fa-rotate-left"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base">Yêu Cầu Trả Hàng / Hoàn Tiền</h3>
+            <p id="buyer-return-ordersn-label" class="text-xs text-orange-100 font-mono">Đơn hàng: ...</p>
+          </div>
+        </div>
+        <button onclick="closeBuyerReturnModal()" class="text-white/80 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+        <input type="hidden" id="buyer-return-ordersn">
+
+        <!-- Reason -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Lý do yêu cầu <span class="text-red-500">*</span></label>
+          <select id="buyer-return-reason" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white font-medium focus:outline-none focus:border-[#ee4d2d]">
+            <option value="SP_DAMAGE">Hàng bị vỡ, hư hỏng trong quá trình vận chuyển</option>
+            <option value="SP_WRONG_ITEM">Người bán giao sai hàng, nhầm phân loại / kích thước</option>
+            <option value="SP_ITEM_MISSING">Thiếu hàng / Phụ kiện trong kiện hàng</option>
+            <option value="SP_COUNTERFEIT">Nghi ngờ hàng giả, hàng nhái kém chất lượng</option>
+            <option value="SP_CHANGE_MIND">Đổi ý không còn nhu cầu sử dụng</option>
+          </select>
+        </div>
+
+        <!-- Detailed Description -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Mô tả chi tiết tình trạng</label>
+          <textarea id="buyer-return-text-reason" rows="2" placeholder="Nêu rõ lý do muốn đổi trả/hoàn tiền..." class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#ee4d2d]"></textarea>
+        </div>
+
+        <!-- Resolution Option -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1.5">Phương án mong muốn <span class="text-red-500">*</span></label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-orange-50/50 has-[:checked]:border-[#ee4d2d] has-[:checked]:bg-orange-50/70">
+              <input type="radio" name="buyer-return-sol" value="RETURN_REFUND" checked class="text-[#ee4d2d] focus:ring-[#ee4d2d] mr-2">
+              <div>
+                <div class="font-bold text-gray-800">Trả hàng & Hoàn tiền</div>
+                <div class="text-[10px] text-gray-500">Gửi trả bưu phẩm về kho</div>
+              </div>
+            </label>
+            <label class="flex items-center p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-orange-50/50 has-[:checked]:border-[#ee4d2d] has-[:checked]:bg-orange-50/70">
+              <input type="radio" name="buyer-return-sol" value="REFUND_ONLY" class="text-[#ee4d2d] focus:ring-[#ee4d2d] mr-2">
+              <div>
+                <div class="font-bold text-gray-800">Hoàn tiền ngay</div>
+                <div class="text-[10px] text-gray-500">Không cần gửi trả hàng</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Validation Flow Radio (warehouse_validation vs seller_validation) -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1.5">Quy trình xử lý (Flow Type)</label>
+          <div class="space-y-2">
+            <label class="flex items-start p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-purple-50/50 has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50/60">
+              <input type="radio" name="buyer-return-flow" value="warehouse_validation" checked class="text-purple-600 focus:ring-purple-500 mt-0.5 mr-2">
+              <div>
+                <div class="font-bold text-purple-900 flex items-center">
+                  <i class="fa-solid fa-bolt text-purple-600 mr-1 text-[11px]"></i> Shopee Trọng Tài & Kiểm Định Kho (Khuyên dùng)
+                </div>
+                <div class="text-[10px] text-gray-500 mt-0.5">Shopee CS xét duyệt sơ bộ & bưu tá nhận hàng gửi về kho Shopee kiểm tra trước khi hoàn tiền.</div>
+              </div>
+            </label>
+            <label class="flex items-start p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-orange-50/50 has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50/60">
+              <input type="radio" name="buyer-return-flow" value="seller_validation" class="text-orange-600 focus:ring-orange-500 mt-0.5 mr-2">
+              <div>
+                <div class="font-bold text-gray-800 flex items-center">
+                  <i class="fa-solid fa-store text-orange-500 mr-1 text-[11px]"></i> Người Bán Tự Xử Lý
+                </div>
+                <div class="text-[10px] text-gray-500 mt-0.5">Yêu cầu gửi thẳng cho Shop. Shop có 48h để đồng ý hoàn tiền hoặc đề xuất phương án khác.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Refund Amount -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Số tiền yêu cầu hoàn (₫)</label>
+          <input type="number" id="buyer-return-amount" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white font-bold text-[#ee4d2d] focus:outline-none focus:border-[#ee4d2d]">
+          <p id="buyer-return-max-note" class="text-[10px] text-gray-400 mt-1">Tối đa giá trị đơn hàng</p>
+        </div>
+
+        <!-- Proof URL (Optional) -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Bằng chứng hình ảnh / video (Tùy chọn)</label>
+          <input type="text" id="buyer-return-proof" placeholder="https://example.com/evidence_photo.jpg" class="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#ee4d2d]">
+          <p class="text-[10px] text-gray-400 mt-0.5">Dán link ảnh chụp bưu kiện bị hỏng hoặc sản phẩm lỗi</p>
+        </div>
+      </div>
+
+      <div class="bg-gray-50 px-6 py-3 border-t border-gray-100 flex justify-end space-x-2">
+        <button onclick="closeBuyerReturnModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs transition">
+          Hủy bỏ
+        </button>
+        <button onclick="submitBuyerReturn()" class="px-5 py-2 bg-[#ee4d2d] hover:bg-orange-600 text-white font-bold rounded-xl text-xs shadow transition flex items-center space-x-1.5">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Gửi Yêu Cầu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Seller Counter-Offer -->
+  <div id="seller-offer-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-5 flex justify-between items-center">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white text-base">
+            <i class="fa-solid fa-handshake"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base">Đề Xuất Hoàn Tiền Một Phần</h3>
+            <p id="seller-offer-return-label" class="text-xs text-blue-100 font-mono">Yêu cầu: RET...</p>
+          </div>
+        </div>
+        <button onclick="closeSellerOfferModal()" class="text-white/80 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs">
+        <input type="hidden" id="seller-offer-return-sn">
+        <div class="bg-blue-50 p-3 rounded-xl border border-blue-100 text-blue-800">
+          <div class="text-[11px] text-blue-600">Khách hàng yêu cầu hoàn:</div>
+          <div id="seller-offer-requested-amount" class="text-base font-black text-blue-900 mt-0.5">0 ₫</div>
+        </div>
+
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Số tiền đề xuất hoàn (₫) <span class="text-red-500">*</span></label>
+          <input type="number" id="seller-offer-amount" placeholder="VD: 50000" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white font-bold text-blue-600 focus:outline-none focus:border-blue-500">
+          <p class="text-[10px] text-gray-400 mt-1">Phải nhỏ hơn hoặc bằng số tiền người mua yêu cầu</p>
+        </div>
+
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Lý do / Lời nhắn cho khách</label>
+          <textarea id="seller-offer-reason" rows="2" placeholder="Shop xin phép hoàn một phần chi phí để bù đắp sự bất tiện..." class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-blue-500"></textarea>
+        </div>
+      </div>
+
+      <div class="bg-gray-50 px-6 py-3 border-t border-gray-100 flex justify-end space-x-2">
+        <button onclick="closeSellerOfferModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs transition">
+          Hủy bỏ
+        </button>
+        <button onclick="submitSellerOffer()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow transition flex items-center space-x-1.5">
+          <i class="fa-solid fa-check"></i>
+          <span>Gửi Đề Xuất</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Seller Dispute / Compensation Request -->
+  <div id="seller-dispute-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+      <div class="bg-gradient-to-r from-red-600 to-rose-700 text-white p-5 flex justify-between items-center">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white text-base">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base">Khiếu Nại Lên Shopee (Tranh Chấp & Bồi Thường)</h3>
+            <p id="seller-dispute-return-label" class="text-xs text-rose-100 font-mono">Yêu cầu: RET...</p>
+          </div>
+        </div>
+        <button onclick="closeSellerDisputeModal()" class="text-white/80 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+        <input type="hidden" id="seller-dispute-return-sn">
+
+        <!-- Predefined Reason -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Lý do khiếu nại (Shopee Standard) <span class="text-red-500">*</span></label>
+          <select id="seller-dispute-reason-id" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white font-medium focus:outline-none focus:border-red-500">
+            <option value="47">ID 47: Hàng bị người mua làm hỏng hoặc đã qua sử dụng (ITEM_DAMAGED_BY_BUYER)</option>
+            <option value="48">ID 48: Sai lệch kích thước, khối lượng bưu phẩm (WEIGHT_MEASUREMENT_MISMATCH)</option>
+            <option value="50">ID 50: Yêu cầu của người mua không đúng sự thật / Shop đã giao đủ (INCORRECT_CLAIM)</option>
+            <option value="51">ID 51: Người mua từ chối nhận hàng không có lý do chính đáng (NON_RECEIPT_REJECT)</option>
+            <option value="52">ID 52: Người bán chưa nhận được hàng hoàn về (NOT_RECEIVED_RETURN)</option>
+            <option value="49">ID 49: Lý do khác (OTHER)</option>
+          </select>
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Giải trình chi tiết của Shop <span class="text-red-500">*</span></label>
+          <textarea id="seller-dispute-text" rows="3" placeholder="Nêu rõ căn cứ từ chối hoặc yêu cầu Shopee bồi thường..." class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-red-500"></textarea>
+        </div>
+
+        <!-- Contact Email -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Email liên hệ tiếp nhận kết quả <span class="text-red-500">*</span></label>
+          <input type="email" id="seller-dispute-email" value="seller@smartomni.vn" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-red-500">
+        </div>
+
+        <!-- Proof Images (Optional) -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1">Hình ảnh bằng chứng đóng gói / mở hộp (Tùy chọn)</label>
+          <input type="text" id="seller-dispute-proof-url" placeholder="https://example.com/packing_video.jpg" class="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-red-500">
+        </div>
+      </div>
+
+      <div class="bg-gray-50 px-6 py-3 border-t border-gray-100 flex justify-end space-x-2">
+        <button onclick="closeSellerDisputeModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs transition">
+          Hủy bỏ
+        </button>
+        <button onclick="submitSellerDispute()" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow transition flex items-center space-x-1.5">
+          <i class="fa-solid fa-gavel"></i>
+          <span>Gửi Khiếu Nại</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Return Details Viewer -->
+  <div id="return-detail-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+      <div class="bg-gradient-to-r from-gray-900 to-gray-800 text-white p-5 flex justify-between items-center">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white text-base">
+            <i class="fa-solid fa-box-open"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base">Hồ Sơ Yêu Cầu Trả Hàng / Hoàn Tiền</h3>
+            <p id="return-detail-sn" class="text-xs text-gray-300 font-mono">RET...</p>
+          </div>
+        </div>
+        <button onclick="closeReturnDetailModal()" class="text-white/80 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div id="return-detail-content" class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="bg-gray-50 px-6 py-3 border-t border-gray-100 flex justify-end">
+        <button onclick="closeReturnDetailModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs transition">
+          Đóng
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
   <!-- JAVASCRIPT APPLICATION CORE                                             -->
   <!-- ======================================================================= -->
   <script>
@@ -1682,12 +2173,24 @@
       orders: 7,
       inventory: 5,
       ledger: 6,
-      buyerOrders: 5
+      buyerOrders: 5,
+      returns: 6,
+      adminReturns: 6
     };
     let ordersPage = 1;
     let inventoryPage = 1;
     let ledgerPage = 1;
     let buyerOrdersPage = 1;
+    let returnsPage = 1;
+    let adminReturnsPage = 1;
+
+    let shopReturnsList = [];
+    let currentShopReturnsFiltered = [];
+    let currentShopReturnStatusFilter = 'ALL';
+
+    let adminReturnsList = [];
+    let currentAdminReturnsFiltered = [];
+    let currentAdminReturnStatusFilter = 'ALL';
 
     function renderPaginationControls({ containerId, currentPage, totalItems, pageSize, onPageChange }) {
       const container = document.getElementById(containerId);
@@ -1744,6 +2247,16 @@
       renderBuyerOrdersList();
     }
 
+    function changeReturnsPage(p) {
+      returnsPage = p;
+      renderShopReturnsTable();
+    }
+
+    function changeAdminReturnsPage(p) {
+      adminReturnsPage = p;
+      renderAdminReturnsTable();
+    }
+
     // Helper to format Date for <input type="datetime-local">
     function formatDateTimeLocal(d) {
       const pad = (n) => String(n).padStart(2, '0');
@@ -1780,6 +2293,8 @@
         quickLogin('SELLER', activeShopId || '727720655');
       } else if (tab === 'buyer') {
         quickLogin('BUYER', activeBuyerId || '1001');
+      } else if (tab === 'admin') {
+        quickLogin('ADMIN', 'shopee_admin');
       } else if (tab === 'console') {
         openConsoleDrawer();
       }
@@ -1788,7 +2303,7 @@
     // ------------------------------------------------------------------------
     // PERSONA & DRAWER STATE MANAGEMENT
     // ------------------------------------------------------------------------
-    let currentPersona = null; // { type: 'SELLER' | 'BUYER', id: string }
+    let currentPersona = null; // { type: 'SELLER' | 'BUYER' | 'ADMIN', id: string }
 
     function initPersonaState() {
       const saved = localStorage.getItem('shopee_persona');
@@ -1806,8 +2321,10 @@
       const viewLogin = document.getElementById('view-login');
       const tabShop = document.getElementById('tab-shop');
       const tabBuyer = document.getElementById('tab-buyer');
+      const tabAdmin = document.getElementById('tab-admin');
       const sellerControls = document.getElementById('seller-header-controls');
       const buyerControls = document.getElementById('buyer-header-controls');
+      const adminControls = document.getElementById('admin-header-controls');
       const guestControls = document.getElementById('guest-header-controls');
       const subtitle = document.getElementById('header-subtitle');
 
@@ -1816,8 +2333,10 @@
         if (viewLogin) viewLogin.classList.remove('hidden');
         if (tabShop) tabShop.classList.add('hidden');
         if (tabBuyer) tabBuyer.classList.add('hidden');
+        if (tabAdmin) tabAdmin.classList.add('hidden');
         if (sellerControls) sellerControls.classList.add('hidden');
         if (buyerControls) buyerControls.classList.add('hidden');
+        if (adminControls) adminControls.classList.add('hidden');
         if (guestControls) guestControls.classList.remove('hidden');
         if (subtitle) subtitle.textContent = 'Nền Tảng Mô Phỏng Thương Mại Điện Tử Shopee v2';
       } else if (currentPersona.type === 'SELLER') {
@@ -1825,8 +2344,10 @@
         if (viewLogin) viewLogin.classList.add('hidden');
         if (tabShop) tabShop.classList.remove('hidden');
         if (tabBuyer) tabBuyer.classList.add('hidden');
+        if (tabAdmin) tabAdmin.classList.add('hidden');
         if (sellerControls) sellerControls.classList.remove('hidden');
         if (buyerControls) buyerControls.classList.add('hidden');
+        if (adminControls) adminControls.classList.add('hidden');
         if (guestControls) guestControls.classList.add('hidden');
         if (subtitle) subtitle.textContent = 'Kênh Người Bán (Shopee Seller Center)';
 
@@ -1842,13 +2363,16 @@
         loadShopReviews();
         loadSellerChatThreads();
         loadFinancialLedger();
+        loadShopReturns();
       } else if (currentPersona.type === 'BUYER') {
         // BUYER VIEW
         if (viewLogin) viewLogin.classList.add('hidden');
         if (tabShop) tabShop.classList.add('hidden');
         if (tabBuyer) tabBuyer.classList.remove('hidden');
+        if (tabAdmin) tabAdmin.classList.add('hidden');
         if (sellerControls) sellerControls.classList.add('hidden');
         if (buyerControls) buyerControls.classList.remove('hidden');
+        if (adminControls) adminControls.classList.add('hidden');
         if (guestControls) guestControls.classList.add('hidden');
         if (subtitle) subtitle.textContent = 'Sàn Mua Sắm Shopee (Shopee Marketplace)';
 
@@ -1860,6 +2384,19 @@
         loadBuyerCatalog();
         loadBuyerOrders();
         updateCartBadge();
+      } else if (currentPersona.type === 'ADMIN') {
+        // SHOPEE ADMIN VIEW
+        if (viewLogin) viewLogin.classList.add('hidden');
+        if (tabShop) tabShop.classList.add('hidden');
+        if (tabBuyer) tabBuyer.classList.add('hidden');
+        if (tabAdmin) tabAdmin.classList.remove('hidden');
+        if (sellerControls) sellerControls.classList.add('hidden');
+        if (buyerControls) buyerControls.classList.add('hidden');
+        if (adminControls) adminControls.classList.remove('hidden');
+        if (guestControls) guestControls.classList.add('hidden');
+        if (subtitle) subtitle.textContent = 'Cổng Trọng Tài & Vận Hành Shopee (Shopee Admin Arbitration Desk)';
+
+        loadAdminReturns();
       }
     }
 
@@ -1867,7 +2404,13 @@
       currentPersona = { type, id: String(id) };
       localStorage.setItem('shopee_persona', JSON.stringify(currentPersona));
       applyPersonaView();
-      showToast(type === 'SELLER' ? 'Đã đăng nhập vào Kênh Người Bán!' : 'Đã đăng nhập vào Sàn Mua Sắm Shopee!');
+      if (type === 'SELLER') {
+        showToast('Đã đăng nhập vào Kênh Người Bán!');
+      } else if (type === 'ADMIN') {
+        showToast('Đã đăng nhập vào Bàn Trọng Tài Shopee!');
+      } else {
+        showToast('Đã đăng nhập vào Sàn Mua Sắm Shopee!');
+      }
     }
 
     function logoutPersona() {
@@ -1883,7 +2426,9 @@
         showToast('Vui lòng nhập tên đăng nhập!', true);
         return;
       }
-      if (user.includes('seller') || user.startsWith('7') || user.startsWith('8') || user.startsWith('9')) {
+      if (user.includes('admin') || user.includes('shopee') || user.includes('arbitrat')) {
+        quickLogin('ADMIN', 'shopee_admin');
+      } else if (user.includes('seller') || user.startsWith('7') || user.startsWith('8') || user.startsWith('9')) {
         quickLogin('SELLER', activeShopId || '727720655');
       } else {
         quickLogin('BUYER', activeBuyerId || '1001');
@@ -1948,6 +2493,7 @@
       ordersPage = 1;
       inventoryPage = 1;
       ledgerPage = 1;
+      returnsPage = 1;
       showToast(`Switched active seller store`);
       loadShopOverview();
       loadProducts();
@@ -1956,6 +2502,7 @@
       loadShopReviews();
       loadSellerChatThreads();
       loadFinancialLedger();
+      loadShopReturns();
     }
 
     function onBuyerChange(buyerId) {
@@ -4221,6 +4768,12 @@
               </button>
             `;
           }
+
+          buyerBtns += `
+            <button onclick="openBuyerReturnModal('${o.order_sn}', ${Number(o.total_amount || 0)})" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-[#ee4d2d] border border-red-200 rounded text-xs font-bold transition flex items-center shadow-sm" title="Yêu cầu Trả hàng / Hoàn tiền">
+              <i class="fa-solid fa-rotate-left mr-1 text-[11px]"></i> Trả hàng / Hoàn tiền
+            </button>
+          `;
         }
 
         html += `
@@ -5167,6 +5720,795 @@
     function closeEscrowModal() {
       const modal = document.getElementById('escrow-modal');
       if (modal) modal.classList.add('hidden');
+    }
+
+    // ========================================================================
+    // 18. PHASE 13: RETURNS, REFUNDS & DISPUTE MANAGEMENT
+    // ========================================================================
+
+    const returnStatusMap = {
+      'REQUESTED': { text: 'Chờ Shop xử lý', class: 'bg-orange-100 text-orange-800 border-orange-200' },
+      'JUDGING': { text: 'Shopee đang xét duyệt', class: 'bg-amber-100 text-amber-800 border-amber-200' },
+      'PROCESSING': { text: 'Đang hoàn về kho', class: 'bg-blue-100 text-blue-800 border-blue-200' },
+      'ACCEPTED': { text: 'Đã chấp thuận hoàn tiền', class: 'bg-green-100 text-green-800 border-green-200' },
+      'CANCELLED': { text: 'Người mua đã hủy', class: 'bg-gray-100 text-gray-700 border-gray-200' },
+      'CLOSED': { text: 'Đã đóng / Từ chối', class: 'bg-gray-200 text-gray-800 border-gray-300' },
+      'SELLER_DISPUTE': { text: 'Shop khiếu nại', class: 'bg-red-100 text-red-800 border-red-200' }
+    };
+
+    const disputeReasonMap = {
+      47: 'Hàng bị người mua làm hỏng (ITEM_DAMAGED_BY_BUYER)',
+      48: 'Sai lệch kích thước / khối lượng (WEIGHT_MEASUREMENT_MISMATCH)',
+      49: 'Lý do khác (OTHER)',
+      50: 'Yêu cầu không đúng sự thật (INCORRECT_CLAIM)',
+      51: 'Từ chối nhận hàng vô lý (NON_RECEIPT_REJECT)',
+      52: 'Chưa nhận được hàng trả về (NOT_RECEIVED_RETURN)'
+    };
+
+    // Load Seller Returns
+    async function loadShopReturns() {
+      try {
+        const res = await fetch(`/api/v2/simulator/returns?shop_id=${activeShopId}`);
+        const data = await res.json();
+        const returns = data.response?.returns || [];
+        const summary = data.response?.summary || {};
+
+        shopReturnsList = returns;
+
+        const allCount = returns.length;
+        const badge = document.getElementById('shop-returns-count-badge');
+        if (badge) badge.textContent = `${allCount} Yêu cầu`;
+
+        const setCnt = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = val;
+        };
+
+        setCnt('ret-cnt-all', allCount);
+        setCnt('ret-cnt-req', summary.requested || 0);
+        setCnt('ret-cnt-jud', summary.judging || 0);
+        setCnt('ret-cnt-pro', summary.processing || 0);
+        setCnt('ret-cnt-acc', summary.accepted || 0);
+        setCnt('ret-cnt-dis', summary.disputed || 0);
+        setCnt('ret-cnt-clo', summary.closed || 0);
+
+        filterShopReturns(currentShopReturnStatusFilter);
+      } catch (err) {
+        console.error('Failed to load shop returns:', err);
+      }
+    }
+
+    function filterShopReturns(status) {
+      currentShopReturnStatusFilter = status;
+      returnsPage = 1;
+
+      ['ALL', 'REQUESTED', 'JUDGING', 'PROCESSING', 'ACCEPTED', 'SELLER_DISPUTE', 'CLOSED'].forEach(s => {
+        const tab = document.getElementById(`ret-tab-${s}`);
+        if (!tab) return;
+        if (s === status) {
+          tab.className = 'pb-2.5 font-bold text-[#ee4d2d] border-b-2 border-[#ee4d2d] whitespace-nowrap';
+        } else {
+          tab.className = 'pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap';
+        }
+      });
+
+      if (status === 'ALL') {
+        currentShopReturnsFiltered = shopReturnsList;
+      } else {
+        currentShopReturnsFiltered = shopReturnsList.filter(r => r.status === status);
+      }
+
+      renderShopReturnsTable();
+    }
+
+    function renderShopReturnsTable() {
+      const tbody = document.getElementById('shop-returns-table-body');
+      if (!tbody) return;
+
+      if (!currentShopReturnsFiltered || currentShopReturnsFiltered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="text-center py-10 text-gray-400 text-xs">
+              <i class="fa-solid fa-box-archive text-3xl mb-2 text-gray-300 block"></i>
+              Không có yêu cầu đổi trả nào trong mục này.
+            </td>
+          </tr>
+        `;
+        renderPaginationControls({
+          containerId: 'returns-pagination',
+          currentPage: 1,
+          totalItems: 0,
+          pageSize: PAGE_SIZES.returns,
+          onPageChange: 'changeReturnsPage'
+        });
+        return;
+      }
+
+      const totalPages = Math.ceil(currentShopReturnsFiltered.length / PAGE_SIZES.returns) || 1;
+      if (returnsPage > totalPages) returnsPage = totalPages;
+      if (returnsPage < 1) returnsPage = 1;
+
+      const startIdx = (returnsPage - 1) * PAGE_SIZES.returns;
+      const paged = currentShopReturnsFiltered.slice(startIdx, startIdx + PAGE_SIZES.returns);
+
+      let html = '';
+      paged.forEach(r => {
+        const badge = returnStatusMap[r.status] || { text: r.status, class: 'bg-gray-100 text-gray-800' };
+        const isWarehouse = r.validation_type === 'warehouse_validation';
+
+        let actionBtns = `
+          <button onclick="openReturnDetailModal('${r.return_sn}')" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-bold transition flex items-center shadow-xs">
+            <i class="fa-solid fa-eye mr-1"></i> Chi tiết
+          </button>
+        `;
+
+        if (r.status === 'REQUESTED') {
+          actionBtns += `
+            <button onclick="confirmReturn('${r.return_sn}')" class="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center">
+              <i class="fa-solid fa-check mr-1"></i> Đồng ý hoàn tiền
+            </button>
+            <button onclick="openSellerOfferModal('${r.return_sn}', ${r.refund_amount})" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center">
+              <i class="fa-solid fa-handshake mr-1"></i> Đề xuất hoàn 1 phần
+            </button>
+            <button onclick="openSellerDisputeModal('${r.return_sn}')" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center">
+              <i class="fa-solid fa-gavel mr-1"></i> Khiếu nại Shopee
+            </button>
+          `;
+        } else if (r.status === 'ACCEPTED') {
+          if (r.compensation_status === 'COMPENSATION_REQUESTED') {
+            actionBtns += `
+              <span class="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded text-[10px] font-bold">
+                <i class="fa-solid fa-hourglass-half mr-1"></i> Chờ Shopee bồi thường
+              </span>
+            `;
+          } else if (r.compensation_status === 'COMPENSATION_APPROVED') {
+            actionBtns += `
+              <span class="px-2 py-0.5 bg-green-50 text-green-800 border border-green-200 rounded text-[10px] font-bold">
+                <i class="fa-solid fa-shield-check mr-1"></i> Shopee đã bồi thường
+              </span>
+            `;
+          } else {
+            actionBtns += `
+              <button onclick="openSellerDisputeModal('${r.return_sn}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-xs font-bold transition flex items-center shadow-xs">
+                <i class="fa-solid fa-shield-halved mr-1"></i> Khiếu nại bồi thường
+              </button>
+            `;
+          }
+        } else if (r.status === 'SELLER_DISPUTE') {
+          actionBtns += `
+            <button onclick="cancelDispute('${r.return_sn}')" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-xs font-bold transition flex items-center shadow-xs">
+              <i class="fa-solid fa-xmark mr-1"></i> Hủy khiếu nại
+            </button>
+          `;
+        } else if (r.status === 'PROCESSING') {
+          actionBtns += `
+            <span class="text-[11px] text-gray-500 font-mono flex items-center">
+              <i class="fa-solid fa-truck mr-1 text-blue-500"></i> ${r.reverse_tracking_number || 'Chờ gửi hàng'}
+            </span>
+          `;
+        }
+
+        html += `
+          <tr class="hover:bg-gray-50/80 transition">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="font-mono font-bold text-gray-900">${r.return_sn}</div>
+              <div class="text-[11px] font-mono text-gray-400 mt-0.5">Đơn: ${r.order_sn}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="font-bold text-gray-900 flex items-center">
+                <i class="fa-solid fa-user-circle text-gray-400 mr-1.5 text-sm"></i>
+                ${r.buyer_username || 'Khách hàng'}
+              </div>
+              <div class="text-[10px] text-gray-400 mt-0.5">ID: ${r.buyer_id}</div>
+            </td>
+            <td class="px-6 py-4">
+              <div class="font-medium text-gray-800 text-xs">${r.text_reason || r.reason}</div>
+              <div class="mt-1 flex items-center space-x-1.5">
+                <span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold">
+                  ${r.solution === 'RETURN_REFUND' ? '📦 Trả hàng & hoàn tiền' : '💰 Hoàn tiền ngay'}
+                </span>
+                ${isWarehouse ? `
+                  <span class="px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded text-[10px] font-bold">
+                    Shopee kiểm định
+                  </span>
+                ` : `
+                  <span class="px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded text-[10px] font-bold">
+                    Shop tự xử lý
+                  </span>
+                `}
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="font-bold text-red-600">${formatCurrency(r.refund_amount)}</div>
+              ${r.offer_amount ? `
+                <div class="text-[10px] text-blue-600 mt-0.5 font-bold">Đề xuất: ${formatCurrency(r.offer_amount)}</div>
+              ` : ''}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2.5 py-1 rounded-full text-[11px] font-bold border ${badge.class}">
+                ${badge.text}
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+              ${r.due_date ? `
+                <div class="flex items-center text-gray-700 font-medium">
+                  <i class="fa-regular fa-clock mr-1 text-orange-500"></i>
+                  ${new Date(r.due_date * 1000).toLocaleDateString('vi-VN')}
+                </div>
+              ` : '<span class="text-gray-400">Không có hạn</span>'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right">
+              <div class="flex items-center justify-end space-x-1.5">
+                ${actionBtns}
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+
+      renderPaginationControls({
+        containerId: 'returns-pagination',
+        currentPage: returnsPage,
+        totalItems: currentShopReturnsFiltered.length,
+        pageSize: PAGE_SIZES.returns,
+        onPageChange: 'changeReturnsPage'
+      });
+    }
+
+    // Load Admin Returns (Arbitration Desk)
+    async function loadAdminReturns() {
+      try {
+        const res = await fetch('/api/v2/simulator/returns');
+        const data = await res.json();
+        const returns = data.response?.returns || [];
+        const summary = data.response?.summary || {};
+
+        adminReturnsList = returns;
+
+        const setTxt = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = val;
+        };
+
+        setTxt('admin-metric-judging', summary.judging || 0);
+        setTxt('admin-metric-processing', summary.processing || 0);
+        setTxt('admin-metric-dispute', summary.disputed || 0);
+        setTxt('admin-metric-accepted', summary.accepted || 0);
+
+        setTxt('admin-cnt-all', returns.length);
+        setTxt('admin-cnt-jud', summary.judging || 0);
+        setTxt('admin-cnt-pro', summary.processing || 0);
+        setTxt('admin-cnt-dis', summary.disputed || 0);
+        setTxt('admin-cnt-acc', summary.accepted || 0);
+
+        filterAdminReturns(currentAdminReturnStatusFilter);
+      } catch (err) {
+        console.error('Failed to load admin returns:', err);
+      }
+    }
+
+    function filterAdminReturns(status) {
+      currentAdminReturnStatusFilter = status;
+      adminReturnsPage = 1;
+
+      ['ALL', 'JUDGING', 'PROCESSING', 'SELLER_DISPUTE', 'ACCEPTED'].forEach(s => {
+        const tab = document.getElementById(`admin-tab-${s}`);
+        if (!tab) return;
+        if (s === status) {
+          tab.className = 'pb-2.5 font-bold text-purple-600 border-b-2 border-purple-600 whitespace-nowrap';
+        } else {
+          tab.className = 'pb-2.5 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap';
+        }
+      });
+
+      if (status === 'ALL') {
+        currentAdminReturnsFiltered = adminReturnsList;
+      } else {
+        currentAdminReturnsFiltered = adminReturnsList.filter(r => r.status === status);
+      }
+
+      renderAdminReturnsTable();
+    }
+
+    function renderAdminReturnsTable() {
+      const tbody = document.getElementById('admin-returns-table-body');
+      if (!tbody) return;
+
+      if (!currentAdminReturnsFiltered || currentAdminReturnsFiltered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="text-center py-10 text-gray-400 text-xs">
+              <i class="fa-solid fa-scale-balanced text-3xl mb-2 text-gray-300 block"></i>
+              Không có vụ án nào trong danh mục này.
+            </td>
+          </tr>
+        `;
+        renderPaginationControls({
+          containerId: 'admin-returns-pagination',
+          currentPage: 1,
+          totalItems: 0,
+          pageSize: PAGE_SIZES.adminReturns,
+          onPageChange: 'changeAdminReturnsPage'
+        });
+        return;
+      }
+
+      const totalPages = Math.ceil(currentAdminReturnsFiltered.length / PAGE_SIZES.adminReturns) || 1;
+      if (adminReturnsPage > totalPages) adminReturnsPage = totalPages;
+      if (adminReturnsPage < 1) adminReturnsPage = 1;
+
+      const startIdx = (adminReturnsPage - 1) * PAGE_SIZES.adminReturns;
+      const paged = currentAdminReturnsFiltered.slice(startIdx, startIdx + PAGE_SIZES.adminReturns);
+
+      let html = '';
+      paged.forEach(r => {
+        const badge = returnStatusMap[r.status] || { text: r.status, class: 'bg-gray-100 text-gray-800' };
+
+        let arbitrateBtns = `
+          <button onclick="openReturnDetailModal('${r.return_sn}')" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-bold transition flex items-center shadow-xs">
+            <i class="fa-solid fa-eye mr-1"></i> Xem
+          </button>
+        `;
+
+        if (r.status === 'JUDGING') {
+          arbitrateBtns += `
+            <button onclick="adminReviewReturn('${r.return_sn}', 'APPROVE_RETURN')" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Chấp thuận yêu cầu trả hàng, chuyển sang chờ khách gửi hàng">
+              <i class="fa-solid fa-check mr-1"></i> Duyệt trả hàng
+            </button>
+            <button onclick="adminReviewReturn('${r.return_sn}', 'REJECT')" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Bác bỏ yêu cầu của người mua">
+              <i class="fa-solid fa-ban mr-1"></i> Bác bỏ
+            </button>
+          `;
+        } else if (r.status === 'PROCESSING') {
+          arbitrateBtns += `
+            <button onclick="adminWarehouseInbound('${r.return_sn}', 'PASS')" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Hàng đã về kho Shopee và kiểm tra đạt chuẩn">
+              <i class="fa-solid fa-warehouse mr-1"></i> Nhập kho PASS
+            </button>
+            <button onclick="adminWarehouseInbound('${r.return_sn}', 'FAIL')" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Hàng bị hỏng hoặc thiếu phụ kiện">
+              <i class="fa-solid fa-triangle-exclamation mr-1"></i> Báo lỗi FAIL
+            </button>
+          `;
+        } else if (r.status === 'SELLER_DISPUTE') {
+          arbitrateBtns += `
+            <button onclick="adminArbitrateDispute('${r.return_sn}', 'SELLER_WIN')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Shop thắng: Từ chối hoàn tiền, bảo toàn doanh thu cho Shop">
+              <i class="fa-solid fa-award mr-1"></i> Shop Thắng
+            </button>
+            <button onclick="adminArbitrateDispute('${r.return_sn}', 'BUYER_WIN')" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Người mua thắng: Buộc hoàn tiền từ số dư Shop">
+              <i class="fa-solid fa-user-check mr-1"></i> Khách Thắng
+            </button>
+            <button onclick="adminArbitrateDispute('${r.return_sn}', 'PLATFORM_COMPENSATE')" class="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Bảo hiểm Shopee chi trả bồi thường cho Shop">
+              <i class="fa-solid fa-shield-halved mr-1"></i> Shopee Bồi Thường
+            </button>
+          `;
+        } else if (r.status === 'ACCEPTED' && r.compensation_status === 'COMPENSATION_REQUESTED') {
+          arbitrateBtns += `
+            <button onclick="adminArbitrateDispute('${r.return_sn}', 'PLATFORM_COMPENSATE')" class="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center">
+              <i class="fa-solid fa-check mr-1"></i> Duyệt Bồi Thường
+            </button>
+            <button onclick="adminArbitrateDispute('${r.return_sn}', 'BUYER_WIN')" class="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center">
+              <i class="fa-solid fa-xmark mr-1"></i> Bác Bỏ
+            </button>
+          `;
+        }
+
+        html += `
+          <tr class="hover:bg-gray-50/80 transition">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="font-mono font-bold text-gray-900">${r.return_sn}</div>
+              <div class="text-[11px] font-mono text-gray-400 mt-0.5">Đơn: ${r.order_sn}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="font-bold text-gray-800 text-xs flex items-center">
+                <i class="fa-solid fa-store text-orange-500 mr-1.5"></i> Shop: ${r.shop_id}
+              </div>
+              <div class="text-[11px] text-gray-500 mt-0.5 flex items-center">
+                <i class="fa-solid fa-user text-blue-500 mr-1.5"></i> ${r.buyer_username || 'Buyer'}
+              </div>
+            </td>
+            <td class="px-6 py-4">
+              <div class="font-medium text-gray-800 text-xs">${r.text_reason || r.reason}</div>
+              <div class="mt-1 flex items-center space-x-1.5">
+                <span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold">
+                  ${r.solution === 'RETURN_REFUND' ? 'Trả hàng & hoàn tiền' : 'Hoàn tiền ngay'}
+                </span>
+                <span class="px-1.5 py-0.5 ${r.validation_type === 'warehouse_validation' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-orange-50 text-orange-700 border border-orange-200'} rounded text-[10px] font-bold">
+                  ${r.validation_type}
+                </span>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap font-bold text-red-600">
+              ${formatCurrency(r.refund_amount)}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2.5 py-1 rounded-full text-[11px] font-bold border ${badge.class}">
+                ${badge.text}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-xs">
+              ${r.dispute_reason_id ? `
+                <div class="font-bold text-red-700 text-[11px]">${disputeReasonMap[r.dispute_reason_id] || `Mã ${r.dispute_reason_id}`}</div>
+                <div class="text-gray-500 text-[10px] truncate max-w-xs">${r.dispute_text_reason || ''}</div>
+              ` : '<span class="text-gray-400">Không có khiếu nại</span>'}
+              ${r.compensation_status !== 'COMPENSATION_NOT_APPLICABLE' ? `
+                <div class="mt-1 text-[10px] font-bold text-purple-700">Bồi thường: ${r.compensation_status}</div>
+              ` : ''}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right">
+              <div class="flex items-center justify-end space-x-1.5">
+                ${arbitrateBtns}
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+
+      renderPaginationControls({
+        containerId: 'admin-returns-pagination',
+        currentPage: adminReturnsPage,
+        totalItems: currentAdminReturnsFiltered.length,
+        pageSize: PAGE_SIZES.adminReturns,
+        onPageChange: 'changeAdminReturnsPage'
+      });
+    }
+
+    // Modal & Action Controllers
+    function openBuyerReturnModal(orderSn, maxAmount) {
+      document.getElementById('buyer-return-ordersn').value = orderSn;
+      document.getElementById('buyer-return-ordersn-label').textContent = `Đơn hàng: ${orderSn}`;
+      document.getElementById('buyer-return-amount').value = maxAmount;
+      document.getElementById('buyer-return-max-note').textContent = `Tối đa ${formatCurrency(maxAmount)}`;
+      document.getElementById('buyer-return-text-reason').value = '';
+      document.getElementById('buyer-return-proof').value = '';
+      document.getElementById('buyer-return-modal').classList.remove('hidden');
+    }
+
+    function closeBuyerReturnModal() {
+      document.getElementById('buyer-return-modal').classList.add('hidden');
+    }
+
+    async function submitBuyerReturn() {
+      const orderSn = document.getElementById('buyer-return-ordersn').value;
+      const reason = document.getElementById('buyer-return-reason').value;
+      const textReason = document.getElementById('buyer-return-text-reason').value;
+      const solution = document.querySelector('input[name="buyer-return-sol"]:checked')?.value || 'RETURN_REFUND';
+      const validationType = document.querySelector('input[name="buyer-return-flow"]:checked')?.value || 'warehouse_validation';
+      const refundAmount = parseFloat(document.getElementById('buyer-return-amount').value);
+      const proofUrl = document.getElementById('buyer-return-proof').value.trim();
+
+      if (!orderSn || isNaN(refundAmount) || refundAmount <= 0) {
+        showToast('Vui lòng nhập số tiền hoàn hợp lệ!', true);
+        return;
+      }
+
+      try {
+        const body = {
+          order_sn: orderSn,
+          reason,
+          text_reason: textReason,
+          solution,
+          refund_amount: refundAmount,
+          validation_type: validationType,
+          proof_images: proofUrl ? [proofUrl] : []
+        };
+
+        const res = await fetch('/api/v2/simulator/returns/buyer_request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        if (data.error) {
+          showToast(`Lỗi: ${data.message || data.error}`, true);
+        } else {
+          closeBuyerReturnModal();
+          showToast(`Đã gửi yêu cầu đổi trả (${data.response?.return_sn}) thành công!`);
+          loadBuyerOrders();
+          if (activeShopId) loadShopReturns();
+        }
+      } catch (err) {
+        console.error('Submit return error:', err);
+        showToast('Gửi yêu cầu thất bại', true);
+      }
+    }
+
+    async function confirmReturn(returnSn) {
+      if (!confirm(`Bạn có chắc chắn đồng ý hoàn tiền cho yêu cầu ${returnSn}?`)) return;
+      try {
+        const res = await fetch('/api/v2/simulator/returns/seller_confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ return_sn: returnSn })
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast(`Lỗi: ${data.message || data.error}`, true);
+        } else {
+          showToast(`Đã đồng ý hoàn tiền cho ${returnSn}!`);
+          loadShopReturns();
+          loadFinancialLedger();
+        }
+      } catch (err) {
+        showToast('Thao tác thất bại', true);
+      }
+    }
+
+    function openSellerOfferModal(returnSn, requestedAmount) {
+      document.getElementById('seller-offer-return-sn').value = returnSn;
+      document.getElementById('seller-offer-return-label').textContent = `Yêu cầu: ${returnSn}`;
+      document.getElementById('seller-offer-requested-amount').textContent = formatCurrency(requestedAmount);
+      document.getElementById('seller-offer-amount').value = Math.round(requestedAmount * 0.5);
+      document.getElementById('seller-offer-reason').value = '';
+      document.getElementById('seller-offer-modal').classList.remove('hidden');
+    }
+
+    function closeSellerOfferModal() {
+      document.getElementById('seller-offer-modal').classList.add('hidden');
+    }
+
+    async function submitSellerOffer() {
+      const returnSn = document.getElementById('seller-offer-return-sn').value;
+      const amount = parseFloat(document.getElementById('seller-offer-amount').value);
+      const reason = document.getElementById('seller-offer-reason').value.trim();
+
+      if (!returnSn || isNaN(amount) || amount <= 0) {
+        showToast('Vui lòng nhập số tiền đề xuất hợp lệ!', true);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/v2/simulator/returns/seller_offer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ return_sn: returnSn, offer_amount: amount, offer_reason: reason })
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast(`Lỗi: ${data.message || data.error}`, true);
+        } else {
+          closeSellerOfferModal();
+          showToast(`Đã gửi đề xuất hoàn ${formatCurrency(amount)} tới người mua!`);
+          loadShopReturns();
+        }
+      } catch (err) {
+        showToast('Gửi đề xuất thất bại', true);
+      }
+    }
+
+    function openSellerDisputeModal(returnSn) {
+      document.getElementById('seller-dispute-return-sn').value = returnSn;
+      document.getElementById('seller-dispute-return-label').textContent = `Yêu cầu: ${returnSn}`;
+      document.getElementById('seller-dispute-text').value = '';
+      document.getElementById('seller-dispute-proof-url').value = '';
+      document.getElementById('seller-dispute-modal').classList.remove('hidden');
+    }
+
+    function closeSellerDisputeModal() {
+      document.getElementById('seller-dispute-modal').classList.add('hidden');
+    }
+
+    async function submitSellerDispute() {
+      const returnSn = document.getElementById('seller-dispute-return-sn').value;
+      const reasonId = parseInt(document.getElementById('seller-dispute-reason-id').value, 10);
+      const textReason = document.getElementById('seller-dispute-text').value.trim();
+      const email = document.getElementById('seller-dispute-email').value.trim();
+      const proofUrl = document.getElementById('seller-dispute-proof-url').value.trim();
+
+      if (!returnSn || !textReason) {
+        showToast('Vui lòng nêu rõ lý do giải trình!', true);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/v2/simulator/returns/seller_dispute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            return_sn: returnSn,
+            dispute_reason_id: reasonId,
+            dispute_text_reason: textReason,
+            email,
+            proof_url: proofUrl
+          })
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast(`Lỗi: ${data.message || data.error}`, true);
+        } else {
+          closeSellerDisputeModal();
+          showToast(`Đã khiếu nại yêu cầu ${returnSn} lên Shopee!`);
+          loadShopReturns();
+        }
+      } catch (err) {
+        showToast('Khiếu nại thất bại', true);
+      }
+    }
+
+    async function cancelDispute(returnSn) {
+      if (!confirm(`Bạn có chắc chắn muốn hủy khiếu nại cho ${returnSn}?`)) return;
+      try {
+        const res = await fetch('/api/v2/simulator/returns/seller_cancel_dispute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ return_sn: returnSn })
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast(`Lỗi: ${data.message || data.error}`, true);
+        } else {
+          showToast(`Đã rút khiếu nại cho ${returnSn}!`);
+          loadShopReturns();
+        }
+      } catch (err) {
+        showToast('Thao tác thất bại', true);
+      }
+    }
+
+    async function adminReviewReturn(returnSn, action) {
+      const promptText = action === 'REJECT' ? 'Nhập lý do bác bỏ yêu cầu của người mua:' : 'Ghi chú thẩm định của Shopee CS:';
+      const notes = prompt(promptText, action === 'APPROVE_RETURN' ? 'Shopee CS duyệt yêu cầu trả hàng' : 'Bác bỏ yêu cầu');
+      if (notes === null) return;
+
+      try {
+        const res = await fetch('/api/v2/simulator/admin/returns/review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ return_sn: returnSn, action, notes })
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast(`Lỗi: ${data.message || data.error}`, true);
+        } else {
+          showToast(`Trọng tài Shopee đã thực hiện: ${action}!`);
+          loadAdminReturns();
+        }
+      } catch (err) {
+        showToast('Thao tác thất bại', true);
+      }
+    }
+
+    async function adminWarehouseInbound(returnSn, inspectionResult) {
+      const promptText = inspectionResult === 'PASS' 
+        ? 'Xác nhận kiện hàng đã nhập kho Shopee & kiểm tra ngoại quan đạt chuẩn?' 
+        : 'Xác nhận kiện hàng kiểm tra không đạt (Hỏng / Hàng sai lệch)?';
+      if (!confirm(promptText)) return;
+
+      try {
+        const res = await fetch('/api/v2/simulator/admin/returns/warehouse_inbound', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ return_sn: returnSn, inspection_result: inspectionResult })
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast(`Lỗi: ${data.message || data.error}`, true);
+        } else {
+          showToast(`Kho Shopee: Nghiệm thu ${inspectionResult} cho ${returnSn}!`);
+          loadAdminReturns();
+        }
+      } catch (err) {
+        showToast('Nghiệm thu kho thất bại', true);
+      }
+    }
+
+    async function adminArbitrateDispute(returnSn, ruling) {
+      const rulingDesc = ruling === 'SELLER_WIN' 
+        ? 'Phán quyết: SHOP THẮNG (Đóng vụ án, không hoàn tiền cho người mua)' 
+        : (ruling === 'BUYER_WIN' 
+          ? 'Phán quyết: KHÁCH THẮNG (Trừ tiền Shop hoàn cho người mua)' 
+          : 'Phán quyết: BẢO HIỂM SHOPEE BỒI THƯỜNG (Shopee chi trả bù đắp cho Shop)');
+
+      const notes = prompt(`Xác nhận phán quyết trọng tài cho ${returnSn}?\n${rulingDesc}\nNhập ghi chú phán quyết:`, rulingDesc);
+      if (notes === null) return;
+
+      try {
+        const res = await fetch('/api/v2/simulator/admin/returns/arbitrate_dispute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ return_sn: returnSn, ruling, notes })
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast(`Lỗi: ${data.message || data.error}`, true);
+        } else {
+          showToast(`Trọng tài Shopee đã ban hành phán quyết: ${ruling}!`);
+          loadAdminReturns();
+        }
+      } catch (err) {
+        showToast('Phán quyết thất bại', true);
+      }
+    }
+
+    function openReturnDetailModal(returnSn) {
+      const list = [...shopReturnsList, ...adminReturnsList];
+      const r = list.find(item => item.return_sn === returnSn);
+      if (!r) {
+        showToast('Không tìm thấy thông tin đổi trả', true);
+        return;
+      }
+
+      document.getElementById('return-detail-sn').textContent = `Mã: ${r.return_sn} • Đơn: ${r.order_sn}`;
+      const content = document.getElementById('return-detail-content');
+
+      const badge = returnStatusMap[r.status] || { text: r.status, class: 'bg-gray-100 text-gray-800' };
+
+      content.innerHTML = `
+        <div class="p-3 bg-gray-50 rounded-xl border border-gray-200 flex justify-between items-center">
+          <div>
+            <div class="text-[11px] text-gray-500">Trạng thái hiện tại:</div>
+            <div class="mt-0.5"><span class="px-2.5 py-1 rounded-full text-xs font-bold border ${badge.class}">${badge.text}</span></div>
+          </div>
+          <div class="text-right">
+            <div class="text-[11px] text-gray-500">Số tiền yêu cầu hoàn:</div>
+            <div class="text-base font-black text-red-600">${formatCurrency(r.refund_amount)}</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 bg-white rounded-xl border border-gray-200">
+            <div class="text-gray-500 font-bold mb-1">Phương thức giải quyết:</div>
+            <div class="font-medium text-gray-800">${r.solution === 'RETURN_REFUND' ? '📦 Trả hàng & hoàn tiền' : '💰 Hoàn tiền ngay'}</div>
+            <div class="text-gray-400 text-[10px] mt-0.5">Quy trình: ${r.validation_type}</div>
+          </div>
+          <div class="p-3 bg-white rounded-xl border border-gray-200">
+            <div class="text-gray-500 font-bold mb-1">Mã vận đơn hoàn trả:</div>
+            <div class="font-mono font-bold text-blue-600">${r.reverse_tracking_number || 'Chưa phát sinh vận đơn'}</div>
+            <div class="text-gray-400 text-[10px] mt-0.5">Hạn xử lý: ${r.due_date ? new Date(r.due_date * 1000).toLocaleString('vi-VN') : 'Không có'}</div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-white rounded-xl border border-gray-200">
+          <div class="text-gray-500 font-bold mb-1">Lý do từ người mua:</div>
+          <div class="text-gray-900 font-medium">${r.text_reason || r.reason}</div>
+          ${r.proof_images && r.proof_images.length > 0 ? `
+            <div class="mt-2 flex space-x-2">
+              ${r.proof_images.map(img => `<a href="${img}" target="_blank" class="block w-16 h-16 rounded-lg border border-gray-200 overflow-hidden bg-gray-100"><img src="${img}" class="w-full h-full object-cover"></a>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+
+        ${r.dispute_reason_id ? `
+          <div class="p-3 bg-red-50 rounded-xl border border-red-200">
+            <div class="text-red-700 font-bold mb-1">Khiếu nại từ Người Bán:</div>
+            <div class="font-bold text-red-900 text-xs">${disputeReasonMap[r.dispute_reason_id] || `Mã ${r.dispute_reason_id}`}</div>
+            <div class="text-red-800 mt-1">${r.dispute_text_reason || ''}</div>
+            <div class="text-[10px] text-red-500 mt-1">Trạng thái bồi thường: <strong>${r.compensation_status}</strong></div>
+          </div>
+        ` : ''}
+
+        ${r.ruling_notes ? `
+          <div class="p-3 bg-purple-50 rounded-xl border border-purple-200">
+            <div class="text-purple-700 font-bold mb-1 flex items-center"><i class="fa-solid fa-gavel mr-1"></i> Phán Quyết Trọng Tài Shopee:</div>
+            <div class="text-purple-900 font-medium">${r.ruling_notes}</div>
+          </div>
+        ` : ''}
+
+        <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
+          <div class="text-gray-500 font-bold mb-2">Sản phẩm trong kiện hàng hoàn trả:</div>
+          <div class="space-y-1.5">
+            ${(r.items || []).map(it => `
+              <div class="flex justify-between items-center py-1 border-b border-gray-200 last:border-b-0 text-xs">
+                <div>
+                  <span class="font-bold text-gray-900">${it.item_name}</span>
+                  ${it.model_name ? `<span class="text-gray-500"> (${it.model_name})</span>` : ''}
+                  <span class="text-gray-400"> x${it.quantity}</span>
+                </div>
+                <div class="font-bold text-gray-800">${formatCurrency(it.refund_amount || it.item_price)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      document.getElementById('return-detail-modal').classList.remove('hidden');
+    }
+
+    function closeReturnDetailModal() {
+      document.getElementById('return-detail-modal').classList.add('hidden');
     }
 
     // Initialize on page load

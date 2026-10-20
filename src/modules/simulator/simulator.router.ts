@@ -1994,6 +1994,258 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_cancel", async (req: Reque
   }
 });
 
+// 17.3b Seller confirms return / refund directly from UI
+simulatorRouter.post("/api/v2/simulator/returns/seller_confirm", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { return_sn } = req.body;
+    if (!return_sn) {
+      res.json(createShopeeErrorResponse("error_param", "return_sn is required"));
+      return;
+    }
+
+    const r = await prisma.return.findUnique({
+      where: { returnSn: return_sn },
+      include: { shop: true, order: true }
+    });
+
+    if (!r) {
+      res.json(createShopeeErrorResponse("return.not_found", "Return request not found"));
+      return;
+    }
+
+    if (r.status === "ACCEPTED" || r.status === "CLOSED" || r.status === "CANCELLED") {
+      res.json(createShopeeErrorResponse("return.invalid_status", `Cannot confirm return in ${r.status} status`));
+      return;
+    }
+
+    const oldStatus = r.status;
+    const refundAmount = Number(r.refundAmount);
+
+    await prisma.return.update({
+      where: { returnSn: return_sn },
+      data: {
+        status: "ACCEPTED",
+        negotiationStatus: "TERMINATED"
+      }
+    });
+
+    const currentEscrow = Number(r.order.escrowAmount || 0);
+    const newEscrow = Math.max(0, currentEscrow - refundAmount);
+
+    await prisma.order.update({
+      where: { orderSn: r.orderSn },
+      data: { escrowAmount: newEscrow }
+    });
+
+    await WebhookService.dispatchReturnUpdate({
+      partnerId: r.shop.partnerId,
+      shopId: r.shopId,
+      orderSn: r.orderSn,
+      returnSn: r.returnSn,
+      updateField: "return_status",
+      oldValue: oldStatus,
+      newValue: "ACCEPTED"
+    });
+
+    res.json(createShopeeSuccessResponse({
+      return_sn: r.returnSn,
+      status: "ACCEPTED"
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to confirm return"));
+  }
+});
+
+// 17.3c Seller counter-offer from UI
+simulatorRouter.post("/api/v2/simulator/returns/seller_offer", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { return_sn, offer_amount, offer_reason } = req.body;
+    const amount = parseFloat(String(offer_amount));
+
+    if (!return_sn || isNaN(amount)) {
+      res.json(createShopeeErrorResponse("error_param", "return_sn and valid offer_amount are required"));
+      return;
+    }
+
+    const r = await prisma.return.findUnique({
+      where: { returnSn: return_sn },
+      include: { shop: true }
+    });
+
+    if (!r) {
+      res.json(createShopeeErrorResponse("return.not_found", "Return request not found"));
+      return;
+    }
+
+    if (amount <= 0 || amount > Number(r.refundAmount)) {
+      res.json(createShopeeErrorResponse("error_param", "offer_amount must be > 0 and <= original requested refund"));
+      return;
+    }
+
+    await prisma.return.update({
+      where: { returnSn: return_sn },
+      data: {
+        negotiationStatus: "PENDING_BUYER_RESPOND",
+        offerAmount: amount,
+        offerReason: offer_reason || "Seller proposed counter-offer"
+      }
+    });
+
+    await WebhookService.dispatchReturnUpdate({
+      partnerId: r.shop.partnerId,
+      shopId: r.shopId,
+      orderSn: r.orderSn,
+      returnSn: r.returnSn,
+      updateField: "negotiation_status",
+      oldValue: r.negotiationStatus || "TERMINATED",
+      newValue: "PENDING_BUYER_RESPOND"
+    });
+
+    res.json(createShopeeSuccessResponse({
+      return_sn: r.returnSn,
+      offer_amount: amount
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to submit counter-offer"));
+  }
+});
+
+// 17.3d Seller dispute / request compensation from UI
+simulatorRouter.post("/api/v2/simulator/returns/seller_dispute", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { return_sn, dispute_reason_id, dispute_text_reason, email, proof_url } = req.body;
+    const reasonId = parseInt(String(dispute_reason_id), 10);
+
+    if (!return_sn || isNaN(reasonId)) {
+      res.json(createShopeeErrorResponse("error_param", "return_sn and dispute_reason_id are required"));
+      return;
+    }
+
+    const r = await prisma.return.findUnique({
+      where: { returnSn: return_sn },
+      include: { shop: true }
+    });
+
+    if (!r) {
+      res.json(createShopeeErrorResponse("return.not_found", "Return request not found"));
+      return;
+    }
+
+    const isCompensationDispute = r.status === "ACCEPTED";
+    const newStatus = isCompensationDispute ? "ACCEPTED" : "SELLER_DISPUTE";
+    const compensationStatus = isCompensationDispute ? "COMPENSATION_REQUESTED" : r.compensationStatus;
+    const oldStatus = r.status;
+
+    await prisma.return.update({
+      where: { returnSn: return_sn },
+      data: {
+        status: newStatus,
+        disputeReasonId: reasonId,
+        disputeTextReason: dispute_text_reason || "",
+        disputeEmail: email || "seller@smartomni.vn",
+        sellerProofStatus: "UPLOADED",
+        compensationStatus
+      }
+    });
+
+    if (proof_url) {
+      await prisma.returnProof.create({
+        data: {
+          returnSn: return_sn,
+          uploaderType: "SELLER",
+          imageUrl: proof_url,
+          comment: dispute_text_reason || "Seller proof upload"
+        }
+      });
+    }
+
+    await WebhookService.dispatchReturnUpdate({
+      partnerId: r.shop.partnerId,
+      shopId: r.shopId,
+      orderSn: r.orderSn,
+      returnSn: r.returnSn,
+      updateField: isCompensationDispute ? "seller_compensation_status" : "return_status",
+      oldValue: isCompensationDispute ? r.compensationStatus : oldStatus,
+      newValue: isCompensationDispute ? "COMPENSATION_REQUESTED" : "SELLER_DISPUTE"
+    });
+
+    res.json(createShopeeSuccessResponse({
+      return_sn: r.returnSn,
+      status: newStatus,
+      compensation_status: compensationStatus
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to submit dispute"));
+  }
+});
+
+// 17.3e Seller cancel dispute from UI
+simulatorRouter.post("/api/v2/simulator/returns/seller_cancel_dispute", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { return_sn } = req.body;
+    if (!return_sn) {
+      res.json(createShopeeErrorResponse("error_param", "return_sn is required"));
+      return;
+    }
+
+    const r = await prisma.return.findUnique({
+      where: { returnSn: return_sn },
+      include: { shop: true }
+    });
+
+    if (!r) {
+      res.json(createShopeeErrorResponse("return.not_found", "Return request not found"));
+      return;
+    }
+
+    const isCompensationDispute = r.status === "ACCEPTED" && r.compensationStatus === "COMPENSATION_REQUESTED";
+    const isSellerDispute = r.status === "SELLER_DISPUTE";
+
+    let newStatus = r.status;
+    let newCompStatus = r.compensationStatus;
+    let updateField = "return_status";
+    let oldValue = r.status;
+    let newValue = r.status;
+
+    if (isSellerDispute) {
+      newStatus = "REQUESTED";
+      oldValue = "SELLER_DISPUTE";
+      newValue = "REQUESTED";
+    } else if (isCompensationDispute) {
+      newCompStatus = "COMPENSATION_CANCELLED";
+      updateField = "seller_compensation_status";
+      oldValue = "COMPENSATION_REQUESTED";
+      newValue = "COMPENSATION_CANCELLED";
+    }
+
+    await prisma.return.update({
+      where: { returnSn: return_sn },
+      data: {
+        status: newStatus,
+        compensationStatus: newCompStatus
+      }
+    });
+
+    await WebhookService.dispatchReturnUpdate({
+      partnerId: r.shop.partnerId,
+      shopId: r.shopId,
+      orderSn: r.orderSn,
+      returnSn: r.returnSn,
+      updateField,
+      oldValue,
+      newValue
+    });
+
+    res.json(createShopeeSuccessResponse({
+      return_sn: return_sn,
+      status: newStatus,
+      compensation_status: newCompStatus
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to cancel dispute"));
+  }
+});
+
 // 17.4 Shopee Admin reviews claim (Flow 1 triage in JUDGING)
 simulatorRouter.post("/api/v2/simulator/admin/returns/review", async (req: Request, res: Response): Promise<void> => {
   try {
