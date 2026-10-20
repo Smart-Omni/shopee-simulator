@@ -4,6 +4,52 @@ All notable changes, bug fixes, architecture evolution, and feature enhancements
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-10-20
+
+### 🎯 Overview
+Implemented **Phase 13: Returns, Refunds & Dispute Management Module** (`/api/v2/returns/*`), incorporating real Shopee business flows (Flow 1: Shopee-First `warehouse_validation` vs. Flow 2: Seller-First `seller_validation`), an explicit **Shopee Admin Arbitration Persona**, predefined dispute reason IDs (47–52 with "OTHER" ID 49), optional buyer/seller photo proof uploads, automatic escrow refund deductions clamped to $\ge 0$ ₫, and outbound push webhook Code 29 (`RETURN_STATUS_UPDATE`). The web simulator UI has also been elevated from dual-persona to a **Tri-Persona Interface** (*Người Bán*, *Người Mua*, *Trọng Tài Shopee*) in authentic Vietnamese (`vi-VN`).
+
+### 🔄 Phase 13: Returns, Refunds & Dispute Management
+- **Official Shopee Open API v2 Endpoints (`src/modules/returns/returns.router.ts`):**
+  - `POST & GET /api/v2/returns/get_return_list`: Query and paginate return requests with status filtering (`status: JUDGING | REQUESTED | PROCESSING | ACCEPTED | CANCELLED | CLOSED | SELLER_DISPUTE`), pagination controls (`page_no`, `page_size`, `more`), and dual envelope compatibility (`return` & `return_list`).
+  - `POST & GET /api/v2/returns/get_return_detail`: Retrieve itemized return information including return reason, refund amount, solution (`RETURN_REFUND` or `REFUND_ONLY`), buyer information, tracking numbers, proof images, and counter-offer status.
+  - `POST /api/v2/returns/confirm`: Seller acceptance of buyer return request or counter-offer, transitioning status to `ACCEPTED` and automatically deducting refund amount from order escrow.
+  - `POST /api/v2/returns/dispute`: Seller dispute submission with predefined dispute reason ID (`dispute_reason_id: 47..52`) and optional evidence images. Supports pre-arbitration escalation (`SELLER_DISPUTE`) and post-acceptance platform compensation disputes (`COMPENSATION_REQUESTED`).
+  - `POST /api/v2/returns/reject`: Seller rejection of return requests for non-eligible items.
+  - `POST /api/v2/returns/cancel_dispute`: Revert in-flight seller disputes back to previous pending states.
+  - `POST /api/v2/returns/get_available_solutions`: Retrieve available resolution types (`RETURN_REFUND`, `REFUND_ONLY`).
+  - `POST & GET /api/v2/returns/get_return_dispute_reason`: Return predefined dispute reason catalogs adhering to official Shopee reason IDs: 47 (`ITEM_DAMAGED_BY_BUYER`), 48 (`WEIGHT_MEASUREMENT_MISMATCH`), 49 (`OTHER`), 50 (`INCORRECT_CLAIM`), 51 (`NON_RECEIPT_REJECT`), and 52 (`NOT_RECEIVED_RETURN`).
+  - `POST /api/v2/returns/upload_proof`: Official proof image registration for dispute dossiers with generated `proof_id`.
+  - `POST & GET /api/v2/returns/query_proof`: Retrieve uploaded proof images and metadata.
+- **Two-Layer Dual Business Flows:**
+  - **Flow 1: Shopee-First Warehouse Validation (`warehouse_validation`)**:
+    - Buyer submits return request $\rightarrow$ Enters `JUDGING` state under Shopee Admin custody.
+    - Shopee Admin reviews and approves $\rightarrow$ Enters `PROCESSING` state awaiting warehouse return package.
+    - Platform warehouse performs physical inbound inspection (`warehouse_inbound: PASS`) $\rightarrow$ Enters `ACCEPTED` state, triggering immediate escrow refund.
+    - Seller can file post-return compensation dispute if goods returned damaged $\rightarrow$ Shopee Admin approves compensation (`COMPENSATION_APPROVED`).
+  - **Flow 2: Seller-First Direct Validation (`seller_validation`)**:
+    - Buyer submits return request $\rightarrow$ Enters `REQUESTED` state awaiting Seller action.
+    - Direct Resolution: Seller calls `confirm` $\rightarrow$ `ACCEPTED`, refund processed.
+    - Counter-Offer Negotiation: Seller offers partial refund amount $\rightarrow$ Buyer accepts $\rightarrow$ `ACCEPTED` at counter-offer amount.
+    - Escalation to Arbitration: Seller disputes request $\rightarrow$ `SELLER_DISPUTE` $\rightarrow$ Shopee Admin issues final binding ruling (`SELLER_WIN` closes return; `BUYER_WIN` accepts return; `PLATFORM_COMPENSATE` refunds buyer and compensates seller).
+- **Outbound Push Webhook Dispatching (Code 29):**
+  - Dispatches `RETURN_STATUS_UPDATE` (Push Code 29) with HMAC-SHA256 signature in `Authorization` header across every status transition (`JUDGING`, `PROCESSING`, `ACCEPTED`, `SELLER_DISPUTE`, `CLOSED`).
+- **Prisma Schema Enhancements:**
+  - Added `Return`, `ReturnItem`, and `ReturnProof` relational models linked to `Shop` and `Order`.
+  - Stored `validationType`, `solution`, `disputeReason`, `disputeReasonId`, `counterOfferAmount`, `compensationStatus`, and `trackingNumber`.
+- **Tri-Persona UI Architecture (`public/index.html`):**
+  - **Welcome View**: 1-click quick persona switch between **Kênh Người Bán (Seller)**, **Sàn Mua Sắm Shopee (Buyer)**, and **Bàn Trọng Tài Shopee (Admin)**.
+  - **Shopee Admin Arbitration Desk (`#tab-admin`)**:
+    - 4 real-time KPI metric cards (JUDGING, PROCESSING, SELLER_DISPUTE, ACCEPTED).
+    - Quick-action buttons: *Phê duyệt trả hàng*, *Yêu cầu Shop bổ sung bằng chứng*, *Bác bỏ yêu cầu người mua*, *Nhập kho Shopee (Đạt / Không đạt)*, and *Ban hành phán quyết Trọng tài*.
+  - **Buyer Return Request Modal**: Interactive return filing modal on delivered orders with predefined reasons, solution radio options, and optional proof image URLs.
+  - **Seller Returns Management Tab**: Filterable return requests with real-time status badges, *Đồng ý hoàn tiền*, *Đề xuất hoàn tiền một phần*, and *Khiếu nại lên Shopee* actions.
+- **OpenAPI / Swagger Documentation:**
+  - Added `src/swagger/swagger.returns.ts` with comprehensive schemas for all 10 Layer A endpoints.
+- **Automated Verification:**
+  - Added `test/phase13_returns_disputes.spec.ts` with 77 automated assertions verifying both validation flows, counter-offers, dispute cancellations, edge cases (non-delivered orders, excessive refund caps, duplicate returns, invalid dispute reason IDs, escrow floor clamping $\ge 0$), and Webhook Push Code 29.
+  - Total simulator test suite now stands at **464/464 passing assertions (100%)** across 13 test suites.
+
 ## [1.7.0] - 2026-10-19
 
 ### 🎯 Overview

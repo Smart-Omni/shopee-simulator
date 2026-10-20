@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-teal.svg)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Test Suite](https://img.shields.io/badge/Tests-387%2F387%20Passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/Tests-464%2F464%20Passing-brightgreen.svg)]()
 [![Shopee Open API](https://img.shields.io/badge/Shopee%20Open%20API-v2%20Standard-orange.svg)]()
 
 > High-fidelity, contractually conforming **Shopee Open API v2 Mock Server** and interactive web testbed built for **SmartOmni Channel** integration, multi-merchant e-commerce synchronization, automated testing, and development without sandbox rate limits or dependency on live Shopee seller accounts.
@@ -62,14 +62,14 @@ The simulator implements a **Two-Layer Dual Architecture**:
    - Exact error codes matching official Shopee specs (e.g. `error_sign`, `error_auth`, `error_param`, `product.duplicate_request`, `voucher.voucher_code_error`).
 2. **Layer B — Simulator Controls & Browser UI (`/api/v2/simulator/...` & `public/index.html`)**:
    - Allows instant browser testing without manual cryptographic signing.
-   - Dual-persona interface: **Seller Dashboard** vs. **Buyer Customer Storefront**.
+   - Tri-persona interface: **Seller Dashboard**, **Buyer Customer Storefront**, and **Shopee Admin Arbitration Desk**.
    - Real-time stock updates, order status advancement, AWB downloading, promotion creation, reviews, live chat, and webhook log inspector.
 
 ---
 
 ## 🚀 Supported Modules & Capabilities
 
-The simulator has completed **Phases 1 through 12** with **387 automated assertions passing (100%)**:
+The simulator has completed **Phases 1 through 13** with **464 automated assertions passing (100%)**:
 
 ### 1. Authentication & Dual-Token Grace Period (OAuth 2.0)
 - `POST /api/v2/public/get_token_by_resend_code`: Exchange authorization code for initial `access_token` and `refresh_token`.
@@ -86,6 +86,7 @@ The simulator has completed **Phases 1 through 12** with **387 automated asserti
   - **Code 7 & 9**: `item_promotion_update` & `marketing_campaign_update`
   - **Code 8**: `reserved_stock_change`
   - **Code 15**: `airwaybill_update`
+  - **Code 29**: `return_status_update`
 - Background retry worker with exponential backoff for failed webhook deliveries.
 
 ### 3. Product Catalog & 2-Tier Variations System (Fashion & Apparel)
@@ -160,6 +161,25 @@ The simulator has completed **Phases 1 through 12** with **387 automated asserti
   - Itemized settlement ledger table with one-click `[🔍 Chi tiết]` breakdown modal in authentic `vi-VN`.
 - **Layer B Developer Helpers**:
   - `GET /api/v2/simulator/payment/overview` & `GET /api/v2/simulator/payment/escrow_detail` for friction-free frontend integration.
+
+### 13. Returns, Refunds & Dispute Management Module (Shopee Open API v2 Standard)
+- Official Endpoints:
+  - `POST & GET /api/v2/returns/get_return_list`: Paginated query with status filtering (`JUDGING`, `REQUESTED`, `PROCESSING`, `ACCEPTED`, `CANCELLED`, `CLOSED`, `SELLER_DISPUTE`) and dual envelope compatibility (`return` & `return_list`).
+  - `POST & GET /api/v2/returns/get_return_detail`: Itemized return and refund accounting, buyer profile, items, tracking number, proof images, and counter-offer status.
+  - `POST /api/v2/returns/confirm`: Seller acceptance of return request or counter-offer, transitioning status to `ACCEPTED` and automatically deducting refund from order escrow.
+  - `POST /api/v2/returns/dispute`: Seller dispute submission with predefined reason IDs (`47..52`) and evidence images.
+  - `POST /api/v2/returns/reject`: Seller rejection of non-eligible return requests.
+  - `POST /api/v2/returns/cancel_dispute`: In-flight dispute retraction reverting to previous pending status.
+  - `POST /api/v2/returns/get_available_solutions`: Available resolution options (`RETURN_REFUND`, `REFUND_ONLY`).
+  - `POST & GET /api/v2/returns/get_return_dispute_reason`: Official Shopee reason IDs: 47 (`ITEM_DAMAGED_BY_BUYER`), 48 (`WEIGHT_MEASUREMENT_MISMATCH`), 49 (`OTHER`), 50 (`INCORRECT_CLAIM`), 51 (`NON_RECEIPT_REJECT`), and 52 (`NOT_RECEIVED_RETURN`).
+  - `POST /api/v2/returns/upload_proof` & `POST & GET /api/v2/returns/query_proof`: Dispute photo proof registration and retrieval.
+- **Two-Layer Dual Business Flows**:
+  - **Flow 1: Shopee-First Warehouse Validation (`warehouse_validation`)**: Buyer submits return $\rightarrow$ Shopee Admin reviews $\rightarrow$ Item shipped to platform warehouse $\rightarrow$ Physical inspection (`warehouse_inbound: PASS`) $\rightarrow$ Escrow refund issued. Post-acceptance seller compensation disputes supported.
+  - **Flow 2: Seller-First Direct Validation (`seller_validation`)**: Direct confirmation, partial refund counter-offers, or escalation to Shopee Admin for formal arbitration.
+- **Tri-Persona Interface (`public/index.html`)**:
+  - Quick-switch between **Kênh Người Bán (Seller)**, **Sàn Mua Sắm Shopee (Buyer)**, and **Bàn Trọng Tài Shopee (Admin)**.
+  - Shopee Admin Arbitration view with real-time status tabs and binding ruling controls (*Phê duyệt*, *Yêu cầu Shop bổ sung bằng chứng*, *Bác bỏ*, *Nhập kho Shopee*, *Ban hành phán quyết Trọng tài*).
+- **Outbound Webhook Dispatching (Code 29)**: Real-time `RETURN_STATUS_UPDATE` push notifications on all status transitions.
 
 ---
 
@@ -272,8 +292,8 @@ npm test
 ```
 
 ### Test Suite Invariants
-- **100% Pass Rate**: All 387 assertions must pass.
-- **Zero Regressions**: Any modification to existing modules must not break backward compatibility tests (Phases 1–11).
+- **100% Pass Rate**: All 464 assertions must pass.
+- **Zero Regressions**: Any modification to existing modules must not break backward compatibility tests (Phases 1–12).
 - **Network Note**: Because PostgreSQL operates on `localhost:5432`, ensure commands running the test suite have network socket access (`BypassSandbox: true` if using AI sandboxed terminals).
 
 ---
@@ -282,7 +302,7 @@ npm test
 
 When an AI coding agent begins a task in this repository:
 
-1. **Check Baseline**: Run `npm test` immediately. Verify that all 387 assertions pass before touching code.
+1. **Check Baseline**: Run `npm test` immediately. Verify that all 464 assertions pass before touching code.
 2. **Review Spec & Official Docs**:
    - Locate the target endpoint documentation in `../api-reference/<Module>/v2.<module>.<action>.md`.
    - Check webhook payloads in `../push-mechanism/`.
@@ -311,6 +331,6 @@ To safely transition to a new coding session while preserving maximum efficiency
 3. **Leverage the Workspace Skill**: The simulator has a dedicated skill at `.agents/skills/shopee-simulator/SKILL.md`. In Antigravity, workspace skills persist across conversation sessions and load automatically into any new agent prompt.
 4. **Kickoff Prompt for New Sessions**: Use the prompt template in [`PROMPT_NEXT_SESSION.md`](./PROMPT_NEXT_SESSION.md) when starting a fresh session:
 
-> *"We are continuing development on the Shopee Open API v2 Simulator in `shopee-simulator/`. Please activate the `shopee-simulator` skill, check the `develop` branch, review `README.md` and `CHANGELOG.md` (currently at v1.7.0, 387/387 tests passing), run `npm test` to verify baseline health, and proceed with [YOUR NEXT TASK]."*
+> *"We are continuing development on the Shopee Open API v2 Simulator in `shopee-simulator/`. Please activate the `shopee-simulator` skill, check the `develop` branch, review `README.md` and `CHANGELOG.md` (currently at v1.8.0, 464/464 tests passing), run `npm test` to verify baseline health, and proceed with [YOUR NEXT TASK]."*
 
 This ensures zero context decay, zero hallucinated regressions, and immediate productive pairing.
