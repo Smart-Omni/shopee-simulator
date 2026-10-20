@@ -184,17 +184,21 @@ paymentRouter.post("/api/v2/payment/get_escrow_detail_batch", shopeeAuthGuard, a
     }
   });
 
-  const escrowDetails = orders.map(order => {
-    const breakdown = buildOrderIncomeBreakdown(order);
-    return {
-      escrow_detail: {
-        order_sn: order.orderSn,
-        buyer_user_name: order.buyerUsername,
-        return_order_sn_list: [],
-        order_income: breakdown.order_income
-      }
-    };
-  });
+  const orderMap = new Map(orders.map(o => [o.orderSn, o]));
+  const escrowDetails = orderSnList
+    .map(sn => orderMap.get(sn))
+    .filter((o): o is NonNullable<typeof o> => Boolean(o))
+    .map(order => {
+      const breakdown = buildOrderIncomeBreakdown(order);
+      return {
+        escrow_detail: {
+          order_sn: order.orderSn,
+          buyer_user_name: order.buyerUsername,
+          return_order_sn_list: [],
+          order_income: breakdown.order_income
+        }
+      };
+    });
 
   res.json(createShopeeSuccessResponse(escrowDetails));
 });
