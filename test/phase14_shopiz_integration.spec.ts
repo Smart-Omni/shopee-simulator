@@ -359,6 +359,32 @@ async function runTests() {
     assert(analyticsRes.json.response.chart.labels.length === 7, "5.3 Chart time-series labels present");
     assert(analyticsRes.json.response.chart.values.length === 7, "5.3 Chart values data array present");
 
+    // ============================================================================
+    // TEST GROUP 6: CLOUD MEDIA UPLOAD (GOOGLE DRIVE / LOCAL STORAGE)
+    // ============================================================================
+    console.log("\n▶ TEST GROUP 6: Cloud Media Upload (Google Drive / Local Storage)");
+
+    // 6.1 Upload without file
+    const emptyUploadRes = await request("/api/v2/simulator/media/upload", {
+      method: "POST"
+    });
+    assert(emptyUploadRes.json.error === "error_param", "6.1 Missing file rejected with error_param");
+
+    // 6.2 Multipart file upload
+    const form = new FormData();
+    const pngBlob = new Blob([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64")], { type: "image/png" });
+    form.append("file", pngBlob, "test_evidence.png");
+
+    const uploadRes = await fetch(`${baseUrl}/api/v2/simulator/media/upload`, {
+      method: "POST",
+      body: form
+    });
+    const uploadJson: any = await uploadRes.json();
+    assert(uploadJson.error === "", "6.2 Multipart media upload endpoint succeeds");
+    assert(uploadJson.response.url !== undefined, "6.2 Returned valid media URL");
+    assert(uploadJson.response.file_id !== undefined, "6.2 Returned file ID");
+    assert(uploadJson.response.provider === "google_drive" || uploadJson.response.provider === "local", "6.2 Provider correctly identified");
+
     console.log("\n================================================================================");
     console.log("🎉 ALL PHASE 14 TESTS PASSED SUCCESSFULLY! (100% Pass Rate)");
     console.log("================================================================================");

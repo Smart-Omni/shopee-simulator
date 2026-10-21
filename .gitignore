@@ -8,6 +8,8 @@ dist/
 # Environment Variables (Keep .env.example tracked)
 .env
 .env.local
+*service-account*.json
+*credentials*.json
 
 # Database / SQLite
 *.sqlite
