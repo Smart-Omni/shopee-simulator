@@ -1,5 +1,6 @@
 import { app } from "../src/index";
 import { prisma } from "../src/common/prisma";
+import { storageService } from "../src/common/storage/storage.service";
 import * as http from "http";
 
 let server: http.Server;
@@ -371,19 +372,23 @@ async function runTests() {
     assert(emptyUploadRes.json.error === "error_param", "6.1 Missing file rejected with error_param");
 
     // 6.2 Multipart file upload
-    const form = new FormData();
-    const pngBlob = new Blob([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64")], { type: "image/png" });
-    form.append("file", pngBlob, "test_evidence.png");
+    if (storageService.providerType === "google_drive" && process.env.TEST_DRIVE_UPLOAD !== "true") {
+      console.log("  ↷ SKIPPED: 6.2 Google Drive file upload test skipped to prevent folder spam (Set TEST_DRIVE_UPLOAD=true to run live upload)");
+    } else {
+      const form = new FormData();
+      const pngBlob = new Blob([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64")], { type: "image/png" });
+      form.append("file", pngBlob, "test_evidence.png");
 
-    const uploadRes = await fetch(`${baseUrl}/api/v2/simulator/media/upload`, {
-      method: "POST",
-      body: form
-    });
-    const uploadJson: any = await uploadRes.json();
-    assert(uploadJson.error === "", "6.2 Multipart media upload endpoint succeeds");
-    assert(uploadJson.response.url !== undefined, "6.2 Returned valid media URL");
-    assert(uploadJson.response.file_id !== undefined, "6.2 Returned file ID");
-    assert(uploadJson.response.provider === "google_drive" || uploadJson.response.provider === "local", "6.2 Provider correctly identified");
+      const uploadRes = await fetch(`${baseUrl}/api/v2/simulator/media/upload`, {
+        method: "POST",
+        body: form
+      });
+      const uploadJson: any = await uploadRes.json();
+      assert(uploadJson.error === "", "6.2 Multipart media upload endpoint succeeds");
+      assert(uploadJson.response.url !== undefined, "6.2 Returned valid media URL");
+      assert(uploadJson.response.file_id !== undefined, "6.2 Returned file ID");
+      assert(uploadJson.response.provider === "google_drive" || uploadJson.response.provider === "local", "6.2 Provider correctly identified");
+    }
 
     console.log("\n================================================================================");
     console.log("🎉 ALL PHASE 14 TESTS PASSED SUCCESSFULLY! (100% Pass Rate)");

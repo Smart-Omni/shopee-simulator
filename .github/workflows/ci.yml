@@ -1,0 +1,79 @@
+name: Shopee Simulator CI/CD
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/**" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  test:
+    name: Build & Run Full Test Suite
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: shopee
+          POSTGRES_PASSWORD: shopee_mock_password
+          POSTGRES_DB: shopee_mock_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Migrate Database & Seed Data
+        env:
+          DATABASE_URL: postgresql://shopee:shopee_mock_password@localhost:5432/shopee_mock_db?schema=public
+        run: |
+          npx prisma db push
+          npm run prisma:seed
+
+      - name: Verify TypeScript Compilation
+        run: npm run build
+
+      - name: Run Full 14-Phase Test Suite
+        env:
+          DATABASE_URL: postgresql://shopee:shopee_mock_password@localhost:5432/shopee_mock_db?schema=public
+          SKIP_DRIVE_UPLOAD: "true"
+          PORT: 8080
+          AUTH_SECRET: shopee_mock_secret_key_2026
+        run: npm test
+
+  deploy:
+    name: Continuous Deployment (Webhook)
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Cloud Deployment Webhook
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.CLOUD_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$DEPLOY_HOOK_URL" ]; then
+            echo "🚀 Triggering cloud deployment via webhook..."
+            curl -fsS -X POST "$DEPLOY_HOOK_URL"
+            echo "✅ Deployment triggered successfully."
+          else
+            echo "ℹ️ CLOUD_DEPLOY_HOOK_URL not configured. Skipping automated deploy hook."
+          fi

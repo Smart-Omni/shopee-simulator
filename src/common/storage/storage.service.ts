@@ -13,6 +13,12 @@ class StorageServiceManager implements IStorageProvider {
   }
 
   private initProvider(): IStorageProvider {
+    if (process.env.SKIP_DRIVE_UPLOAD === "true") {
+      console.log(`[StorageService] SKIP_DRIVE_UPLOAD=true detected. Defaulting to LocalStorageProvider.`);
+      this.providerType = "local";
+      return new LocalStorageProvider();
+    }
+
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
     const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
@@ -49,6 +55,15 @@ class StorageServiceManager implements IStorageProvider {
 
     this.providerType = "local";
     return new LocalStorageProvider();
+  }
+
+  public setProvider(provider: IStorageProvider, type: "google_drive" | "local" = "local"): void {
+    this.activeProvider = provider;
+    this.providerType = type;
+  }
+
+  public getProviderType(): "google_drive" | "local" {
+    return this.providerType;
   }
 
   async uploadFile(file: Express.Multer.File, options?: { folderId?: string }): Promise<UploadResult> {
