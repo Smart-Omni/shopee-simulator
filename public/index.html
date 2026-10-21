@@ -849,6 +849,30 @@
         <div id="buyer-orders-pagination" class="mt-4"></div>
       </div>
 
+      <!-- Buyer Returns & Refunds Section (Point 1: Buyer View Active Returns) -->
+      <div id="buyer-returns-section" class="bg-white rounded-xl shadow-sm border border-purple-200 p-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+          <div>
+            <div class="flex items-center space-x-2">
+              <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                <i class="fa-solid fa-rotate-left text-sm"></i>
+              </div>
+              <h3 class="text-lg font-bold text-gray-900">Yêu Cầu Trả Hàng & Hoàn Tiền Của Tôi</h3>
+              <span id="buyer-returns-count" class="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs font-bold">0 yêu cầu</span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Theo dõi tiến độ xử lý trả hàng, phản hồi của Shop và quyết định của Trọng tài Shopee.</p>
+          </div>
+          <button onclick="loadBuyerReturns()" class="px-3 py-1.5 text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold rounded-lg border border-purple-200 transition flex items-center">
+            <i class="fa-solid fa-arrows-rotate mr-1.5"></i> Làm mới danh sách
+          </button>
+        </div>
+
+        <div id="buyer-returns-list" class="space-y-4">
+          <!-- Populated by JS loadBuyerReturns() -->
+        </div>
+        <div id="buyer-returns-pagination" class="mt-4"></div>
+      </div>
+
     </div>
 
     <!-- ===================================================================== -->
@@ -1976,7 +2000,7 @@
         <button onclick="closeBuyerReturnModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs transition">
           Hủy bỏ
         </button>
-        <button onclick="submitBuyerReturn()" class="px-5 py-2 bg-[#ee4d2d] hover:bg-orange-600 text-white font-bold rounded-xl text-xs shadow transition flex items-center space-x-1.5">
+        <button id="buyer-return-submit-btn" onclick="submitBuyerReturn()" class="px-5 py-2 bg-[#ee4d2d] hover:bg-orange-600 text-white font-bold rounded-xl text-xs shadow transition flex items-center space-x-1.5">
           <i class="fa-solid fa-paper-plane"></i>
           <span>Gửi Yêu Cầu</span>
         </button>
@@ -2158,7 +2182,14 @@
       'SHIPPED': 'Đang giao hàng',
       'COMPLETED': 'Đã giao (Hoàn thành)',
       'IN_CANCEL': 'Chờ duyệt hủy',
-      'CANCELLED': 'Đã hủy'
+      'CANCELLED': 'Đã hủy',
+      'TO_RETURN': 'Đang trả hàng / hoàn tiền',
+      'REQUESTED': 'Chờ Shop xử lý',
+      'JUDGING': 'Shopee đang xem xét',
+      'PROCESSING': 'Đang chuyển hàng trả về',
+      'ACCEPTED': 'Đã hoàn tiền',
+      'SELLER_DISPUTE': 'Trọng tài Shopee xử lý',
+      'CLOSED': 'Đã đóng (Bác bỏ)'
     };
 
     // Helper to format currency in Vietnamese Dong (vi-VN)
@@ -2174,10 +2205,13 @@
       inventory: 5,
       ledger: 6,
       buyerOrders: 5,
+      buyerReturns: 5,
       returns: 6,
       adminReturns: 6
     };
     let ordersPage = 1;
+    let buyerReturnsPage = 1;
+    let currentBuyerReturnsList = [];
     let inventoryPage = 1;
     let ledgerPage = 1;
     let buyerOrdersPage = 1;
@@ -2383,6 +2417,7 @@
 
         loadBuyerCatalog();
         loadBuyerOrders();
+        loadBuyerReturns();
         updateCartBadge();
       } else if (currentPersona.type === 'ADMIN') {
         // SHOPEE ADMIN VIEW
@@ -2509,9 +2544,11 @@
       activeBuyerId = buyerId;
       localStorage.setItem('activeBuyerId', buyerId);
       buyerOrdersPage = 1;
+      buyerReturnsPage = 1;
       updateActiveBuyerFields();
       showToast(`Switched active buyer session`);
       loadBuyerOrders();
+      loadBuyerReturns();
     }
 
     function updateActiveBuyerFields() {
@@ -4754,14 +4791,14 @@
               <i class="fa-solid fa-check mr-1"></i> Đã nhận được hàng
             </button>
           `;
-        } else if (o.order_status === 'COMPLETED') {
+        } else if (o.order_status === 'COMPLETED' || o.order_status === 'TO_RETURN') {
           if (o.has_reviewed) {
             buyerBtns += `
               <button disabled class="px-3 py-1 bg-gray-200 text-gray-500 rounded text-xs font-bold cursor-not-allowed flex items-center shadow-none">
                 <i class="fa-solid fa-star mr-1 text-[11px] text-amber-400"></i> Đã đánh giá
               </button>
             `;
-          } else {
+          } else if (o.order_status === 'COMPLETED') {
             buyerBtns += `
               <button onclick="openReviewModalForOrder('${o.order_sn}')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition flex items-center shadow-sm">
                 <i class="fa-solid fa-star mr-1 text-[11px]"></i> Đánh giá
@@ -4769,11 +4806,27 @@
             `;
           }
 
-          buyerBtns += `
-            <button onclick="openBuyerReturnModal('${o.order_sn}', ${Number(o.total_amount || 0)})" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-[#ee4d2d] border border-red-200 rounded text-xs font-bold transition flex items-center shadow-sm" title="Yêu cầu Trả hàng / Hoàn tiền">
-              <i class="fa-solid fa-rotate-left mr-1 text-[11px]"></i> Trả hàng / Hoàn tiền
-            </button>
-          `;
+          // Point 3: Return & Refund button guard
+          if (o.has_accepted_return) {
+            buyerBtns += `
+              <span class="px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-xs font-bold flex items-center shadow-xs" title="Đã được hoàn tiền thành công">
+                <i class="fa-solid fa-circle-check mr-1 text-[11px]"></i> Đã hoàn tiền
+              </span>
+            `;
+          } else if (o.has_active_return || o.order_status === 'TO_RETURN') {
+            const retStatus = o.return_status || 'Đang xử lý';
+            buyerBtns += `
+              <span class="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded text-xs font-bold flex items-center shadow-xs" title="Đơn hàng đang trong quá trình khiếu nại Trả hàng & Hoàn tiền">
+                <i class="fa-solid fa-clock-rotate-left mr-1 text-[11px]"></i> Đã yêu cầu trả hàng (${statusTextMap[retStatus] || retStatus})
+              </span>
+            `;
+          } else {
+            buyerBtns += `
+              <button onclick="openBuyerReturnModal('${o.order_sn}', ${Number(o.total_amount || 0)})" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-[#ee4d2d] border border-red-200 rounded text-xs font-bold transition flex items-center shadow-sm" title="Yêu cầu Trả hàng / Hoàn tiền">
+                <i class="fa-solid fa-rotate-left mr-1 text-[11px]"></i> Trả hàng / Hoàn tiền
+              </button>
+            `;
+          }
         }
 
         html += `
@@ -4782,6 +4835,15 @@
               <div class="flex items-center space-x-2">
                 <span class="font-mono font-bold text-gray-900">${o.order_sn}</span>
                 <span class="text-[11px] bg-gray-200 px-2 py-0.5 rounded font-bold">${statusTextMap[o.order_status] || o.order_status}</span>
+                ${o.has_accepted_return ? `
+                  <span class="text-[11px] bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 rounded font-bold flex items-center">
+                    <i class="fa-solid fa-rotate-left mr-1 text-[10px]"></i> Đã hoàn tiền
+                  </span>
+                ` : (o.has_active_return || o.order_status === 'TO_RETURN') ? `
+                  <span class="text-[11px] bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded font-bold flex items-center">
+                    <i class="fa-solid fa-hourglass-half mr-1 text-[10px]"></i> Đang trả hàng (${statusTextMap[o.return_status] || o.return_status || 'Đang xử lý'})
+                  </span>
+                ` : ''}
                 <span class="text-[11px] text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-200 font-medium flex items-center">
                   <i class="fa-solid fa-store mr-1 text-[#ee4d2d]"></i>${o.shop_name || 'Shopee Store'}
                 </span>
@@ -4818,6 +4880,229 @@
         pageSize: PAGE_SIZES.buyerOrders,
         onPageChange: 'changeBuyerOrdersPage'
       });
+    }
+
+    function changeBuyerReturnsPage(p) {
+      buyerReturnsPage = p;
+      renderBuyerReturnsList();
+    }
+
+    async function loadBuyerReturns() {
+      try {
+        const res = await fetch(`/api/v2/simulator/returns?buyer_id=${activeBuyerId}`);
+        const data = await res.json();
+        const returns = data.response?.returns || [];
+        window.buyerReturnsList = returns;
+        currentBuyerReturnsList = returns;
+        const countEl = document.getElementById('buyer-returns-count');
+        if (countEl) countEl.textContent = `${returns.length} yêu cầu`;
+        renderBuyerReturnsList();
+      } catch (err) {
+        console.error("loadBuyerReturns failed:", err);
+      }
+    }
+
+    function renderBuyerReturnsList() {
+      const container = document.getElementById('buyer-returns-list');
+      if (!container) return;
+
+      if (!currentBuyerReturnsList || currentBuyerReturnsList.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-400 text-xs bg-gray-50 rounded-xl border border-dashed border-gray-200"><i class="fa-solid fa-box-open text-3xl mb-2 text-gray-300 block"></i>Bạn chưa có yêu cầu trả hàng hoặc hoàn tiền nào.</div>';
+        renderPaginationControls({
+          containerId: 'buyer-returns-pagination',
+          currentPage: 1,
+          totalItems: 0,
+          pageSize: PAGE_SIZES.buyerReturns,
+          onPageChange: 'changeBuyerReturnsPage'
+        });
+        return;
+      }
+
+      const totalPages = Math.ceil(currentBuyerReturnsList.length / PAGE_SIZES.buyerReturns) || 1;
+      if (buyerReturnsPage > totalPages) buyerReturnsPage = totalPages;
+      if (buyerReturnsPage < 1) buyerReturnsPage = 1;
+
+      const startIdx = (buyerReturnsPage - 1) * PAGE_SIZES.buyerReturns;
+      const pagedReturns = currentBuyerReturnsList.slice(startIdx, startIdx + PAGE_SIZES.buyerReturns);
+
+      let html = '';
+      pagedReturns.forEach(r => {
+        let statusBadge = '';
+        if (r.status === 'JUDGING') {
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 flex items-center"><i class="fa-solid fa-magnifying-glass mr-1"></i>Shopee đang xem xét (JUDGING)</span>';
+        } else if (r.status === 'REQUESTED') {
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 flex items-center"><i class="fa-solid fa-clock mr-1"></i>Chờ Shop phản hồi (REQUESTED)</span>';
+        } else if (r.status === 'PROCESSING') {
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 flex items-center"><i class="fa-solid fa-truck-fast mr-1"></i>Đang chuyển hàng trả về (PROCESSING)</span>';
+        } else if (r.status === 'SELLER_DISPUTE') {
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 flex items-center"><i class="fa-solid fa-gavel mr-1"></i>Bàn Trọng Tài Shopee xử lý (SELLER_DISPUTE)</span>';
+        } else if (r.status === 'ACCEPTED') {
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center"><i class="fa-solid fa-circle-check mr-1"></i>Đã chấp nhận hoàn tiền (ACCEPTED)</span>';
+        } else if (r.status === 'CLOSED') {
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 flex items-center"><i class="fa-solid fa-ban mr-1"></i>Đã bác bỏ / Đóng (CLOSED)</span>';
+        } else {
+          statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">${r.status}</span>`;
+        }
+
+        const solText = r.solution === 'REFUND_ONLY' || r.solution === 'REFUND' ? 'Chỉ hoàn tiền (Không trả hàng)' : 'Trả hàng & Hoàn tiền';
+
+        // Check if seller proposed counter offer
+        let counterOfferHtml = '';
+        if (r.negotiation_status === 'PENDING_BUYER_RESPOND' && r.offer_amount && r.status === 'REQUESTED') {
+          counterOfferHtml = `
+            <div class="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+              <div>
+                <div class="text-xs font-bold text-orange-900 flex items-center">
+                  <i class="fa-solid fa-handshake mr-1.5 text-[#ee4d2d]"></i> Người Bán đề xuất hoàn tiền một phần:
+                  <span class="ml-1 text-sm font-black text-[#ee4d2d]">${formatCurrency(r.offer_amount)}</span>
+                </div>
+                <div class="text-[11px] text-orange-800 mt-0.5">${r.offer_reason || 'Đề xuất giải quyết nhanh qua thỏa thuận đôi bên.'}</div>
+              </div>
+              <button onclick="buyerAcceptOffer('${r.return_sn}')" class="px-3 py-1.5 bg-[#ee4d2d] hover:bg-orange-600 text-white font-bold text-xs rounded-lg transition shadow-xs flex items-center whitespace-nowrap">
+                <i class="fa-solid fa-check mr-1.5"></i> Chấp nhận đề xuất ${formatCurrency(r.offer_amount)}
+              </button>
+            </div>
+          `;
+        }
+
+        // Proof images gallery if any
+        let proofsHtml = '';
+        const allProofs = [...(r.proof_images || []), ...(r.proofs || []).map(p => p.image_url)].filter(Boolean);
+        if (allProofs.length > 0) {
+          proofsHtml = `
+            <div class="mt-2 flex items-center space-x-2">
+              <span class="text-[11px] text-gray-500 font-medium">Bằng chứng:</span>
+              <div class="flex items-center space-x-1.5">
+                ${allProofs.map(img => `
+                  <a href="${escapeHtml(img)}" target="_blank" class="block w-9 h-9 rounded border border-gray-200 overflow-hidden hover:opacity-80 transition">
+                    <img src="${escapeHtml(img)}" alt="proof" class="w-full h-full object-cover">
+                  </a>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        let buyerActionBtns = `
+          <button onclick="viewOrderDetail('${r.order_sn}')" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-xs font-bold transition flex items-center">
+            <i class="fa-solid fa-eye mr-1"></i> Chi tiết đơn
+          </button>
+        `;
+
+        if (r.status === 'REQUESTED' || r.status === 'JUDGING') {
+          buyerActionBtns += `
+            <button onclick="buyerCancelReturn('${r.return_sn}')" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-xs font-bold transition flex items-center">
+              <i class="fa-solid fa-xmark mr-1"></i> Hủy yêu cầu
+            </button>
+          `;
+        }
+
+        html += `
+          <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 hover:border-purple-300 transition">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-3 border-b border-gray-200">
+              <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                <span class="font-mono font-bold text-purple-900 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded text-xs">${r.return_sn}</span>
+                <span class="text-xs text-gray-500">Đơn hàng: <a href="javascript:void(0)" onclick="viewOrderDetail('${r.order_sn}')" class="font-mono font-bold text-gray-800 hover:underline">${r.order_sn}</a></span>
+                <span class="text-[11px] text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-200 font-medium">
+                  <i class="fa-solid fa-store mr-1 text-[#ee4d2d]"></i>Shop ${r.shop_id}
+                </span>
+              </div>
+              <div>
+                ${statusBadge}
+              </div>
+            </div>
+
+            <div class="pt-3 flex flex-col sm:flex-row justify-between sm:items-start gap-4">
+              <div class="space-y-1.5 flex-1">
+                <div class="flex items-center space-x-2">
+                  <span class="text-xs font-bold text-gray-900">Phương án:</span>
+                  <span class="text-xs text-purple-700 font-semibold bg-purple-50 px-2 py-0.5 rounded border border-purple-200">${solText}</span>
+                  <span class="text-xs font-bold text-gray-900 ml-2">Số tiền hoàn:</span>
+                  <span class="text-xs font-black text-[#ee4d2d]">${formatCurrency(r.refund_amount)}</span>
+                </div>
+                <div class="text-xs text-gray-700">
+                  <span class="font-semibold text-gray-900">Lý do:</span> ${escapeHtml(r.reason || 'Không có')}
+                  ${r.text_reason ? ` • <span class="text-gray-500 italic">"${escapeHtml(r.text_reason)}"</span>` : ''}
+                </div>
+                ${r.items && r.items.length > 0 ? `
+                  <div class="text-xs text-gray-500">
+                    <span class="font-semibold text-gray-700">Sản phẩm trả lại:</span>
+                    ${r.items.map(it => `${escapeHtml(it.item_name)} ${it.model_name ? `(${escapeHtml(it.model_name)})` : ''} x${it.quantity}`).join(' • ')}
+                  </div>
+                ` : ''}
+                ${r.ruling_notes ? `
+                  <div class="text-xs text-purple-800 bg-purple-50 p-2 rounded-lg border border-purple-100 flex items-center">
+                    <i class="fa-solid fa-scale-balanced mr-1.5"></i>
+                    <span><strong>Trọng tài Shopee:</strong> ${escapeHtml(r.ruling_notes)}</span>
+                  </div>
+                ` : ''}
+                ${proofsHtml}
+              </div>
+
+              <div class="flex items-center space-x-2 shrink-0">
+                ${buyerActionBtns}
+              </div>
+            </div>
+
+            ${counterOfferHtml}
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      renderPaginationControls({
+        containerId: 'buyer-returns-pagination',
+        currentPage: buyerReturnsPage,
+        totalItems: currentBuyerReturnsList.length,
+        pageSize: PAGE_SIZES.buyerReturns,
+        onPageChange: 'changeBuyerReturnsPage'
+      });
+    }
+
+    async function buyerAcceptOffer(returnSn) {
+      if (!confirm(`Bạn có đồng ý nhận hoàn tiền một phần theo đề xuất của Shop cho mã trả hàng ${returnSn}?`)) return;
+      try {
+        const res = await fetch('/api/v2/simulator/returns/buyer_accept_offer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ return_sn: returnSn })
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast('Không thể chấp nhận đề xuất: ' + data.message, true);
+          return;
+        }
+        showToast('Đã chấp nhận đề xuất hoàn tiền thành công!');
+        loadBuyerReturns();
+        loadBuyerOrders();
+        if (activeShopId) loadShopReturns();
+      } catch (err) {
+        console.error(err);
+        showToast('Lỗi kết nối khi gửi chấp nhận đề xuất', true);
+      }
+    }
+
+    async function buyerCancelReturn(returnSn) {
+      if (!confirm(`Bạn có chắc chắn muốn hủy yêu cầu trả hàng ${returnSn}?`)) return;
+      try {
+        const res = await fetch('/api/v2/simulator/returns/buyer_cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ return_sn: returnSn })
+        });
+        const data = await res.json();
+        if (data.error) {
+          showToast('Không thể hủy yêu cầu: ' + data.message, true);
+          return;
+        }
+        showToast('Đã hủy yêu cầu trả hàng!');
+        loadBuyerReturns();
+        loadBuyerOrders();
+        if (activeShopId) loadShopReturns();
+      } catch (err) {
+        console.error(err);
+        showToast('Lỗi kết nối khi hủy yêu cầu trả hàng', true);
+      }
     }
 
     async function buyerPayOrder(orderSn) {
@@ -5600,7 +5885,13 @@
         if (feesEl) feesEl.textContent = formatCurrency(summary.total_platform_fees || 0);
 
         const countBadge = document.getElementById('escrow-status-badge');
-        if (countBadge) countBadge.textContent = `${summary.settled_orders_count || 0} Đã tất toán`;
+        if (countBadge) {
+          let badgeText = `${summary.settled_orders_count || 0} Đã tất toán`;
+          if (summary.returned_orders_count > 0) {
+            badgeText += ` • ${summary.returned_orders_count} Đã trả hàng/hoàn tiền`;
+          }
+          countBadge.textContent = badgeText;
+        }
 
         renderLedgerTable();
       } catch (err) {
@@ -5635,9 +5926,16 @@
       pagedLedger.forEach(item => {
         const isCompleted = item.order_status === 'COMPLETED';
         const isCancelled = item.order_status === 'CANCELLED';
+        const isToReturn = item.order_status === 'TO_RETURN';
+        const isReturned = item.is_fully_refunded || item.has_accepted_return;
+        const isReturning = item.has_active_return || isToReturn;
 
         let statusBadge = '';
-        if (isCompleted) {
+        if (isReturned) {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 flex items-center inline-flex"><i class="fa-solid fa-rotate-left mr-1"></i>Đã trả hàng/Hoàn tiền</span>';
+        } else if (isReturning) {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center inline-flex"><i class="fa-solid fa-hourglass-half mr-1"></i>Đang khiếu nại trả hàng</span>';
+        } else if (isCompleted) {
           statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Đã giải ngân</span>';
         } else if (isCancelled) {
           statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">Đã hủy (0 ₫)</span>';
@@ -5645,9 +5943,25 @@
           statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Đang giữ escrow</span>';
         }
 
-        const releaseTimeStr = item.escrow_release_time 
-          ? new Date(item.escrow_release_time * 1000).toLocaleString('vi-VN') 
-          : '<span class="text-gray-400 font-normal">Chờ giao hàng</span>';
+        let releaseTimeStr = '';
+        if (isReturned) {
+          releaseTimeStr = '<span class="text-purple-700 font-semibold">Đã hoàn tiền cho Người mua</span>';
+        } else if (isReturning) {
+          releaseTimeStr = '<span class="text-amber-700 font-medium">Tạm giữ chờ Trọng tài</span>';
+        } else if (item.escrow_release_time) {
+          releaseTimeStr = new Date(item.escrow_release_time * 1000).toLocaleString('vi-VN');
+        } else {
+          releaseTimeStr = '<span class="text-gray-400 font-normal">Chờ giao hàng</span>';
+        }
+
+        let escrowCol = '';
+        if (isReturned) {
+          escrowCol = `<div class="font-extrabold text-purple-700">${formatCurrency(item.escrow_amount)}</div><div class="text-[10px] text-gray-400 font-normal">(Hoàn -${formatCurrency(item.refund_amount)})</div>`;
+        } else if (isCompleted) {
+          escrowCol = `<div class="font-extrabold text-emerald-600">${formatCurrency(item.escrow_amount)}</div>`;
+        } else {
+          escrowCol = `<div class="font-extrabold text-gray-700">${formatCurrency(item.escrow_amount)}</div>`;
+        }
 
         html += `
           <tr class="hover:bg-gray-50 transition text-xs">
@@ -5656,7 +5970,7 @@
             <td class="py-3 px-4">${statusBadge}</td>
             <td class="py-3 px-4 text-right font-semibold text-gray-900">${formatCurrency(item.total_amount)}</td>
             <td class="py-3 px-4 text-right font-medium text-red-600">-${formatCurrency(item.total_platform_fees)}</td>
-            <td class="py-3 px-4 text-right font-extrabold ${isCompleted ? 'text-emerald-600' : 'text-gray-700'}">${formatCurrency(item.escrow_amount)}</td>
+            <td class="py-3 px-4 text-right">${escrowCol}</td>
             <td class="py-3 px-4 text-center text-[11px] text-gray-600">${releaseTimeStr}</td>
             <td class="py-3 px-4 text-center">
               <button onclick="viewEscrowDetail('${item.order_sn}')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg border border-emerald-200 transition shadow-xs flex items-center mx-auto space-x-1" title="Xem chi tiết bút toán">
@@ -6167,6 +6481,11 @@
     }
 
     function closeBuyerReturnModal() {
+      const submitBtn = document.getElementById('buyer-return-submit-btn');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1.5"></i> Gửi Yêu Cầu';
+      }
       document.getElementById('buyer-return-modal').classList.add('hidden');
     }
 
@@ -6182,6 +6501,12 @@
       if (!orderSn || isNaN(refundAmount) || refundAmount <= 0) {
         showToast('Vui lòng nhập số tiền hoàn hợp lệ!', true);
         return;
+      }
+
+      const submitBtn = document.getElementById('buyer-return-submit-btn');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Đang gửi...';
       }
 
       try {
@@ -6204,15 +6529,28 @@
         const data = await res.json();
         if (data.error) {
           showToast(`Lỗi: ${data.message || data.error}`, true);
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1.5"></i> Gửi Yêu Cầu';
+          }
         } else {
           closeBuyerReturnModal();
           showToast(`Đã gửi yêu cầu đổi trả (${data.response?.return_sn}) thành công!`);
           loadBuyerOrders();
-          if (activeShopId) loadShopReturns();
+          loadBuyerReturns();
+          if (activeShopId) {
+            loadShopReturns();
+            loadOrders();
+            loadFinancialLedger();
+          }
         }
       } catch (err) {
         console.error('Submit return error:', err);
         showToast('Gửi yêu cầu thất bại', true);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1.5"></i> Gửi Yêu Cầu';
+        }
       }
     }
 

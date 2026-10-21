@@ -34,6 +34,10 @@ function buildOrderIncomeBreakdown(order: any) {
         )
   );
 
+  const acceptedReturns = (order.returns || []).filter((r: any) => r.status === "ACCEPTED");
+  const totalReturnRefund = acceptedReturns.reduce((sum: number, r: any) => sum + Number(r.refundAmount || 0), 0);
+  const sellerReturnRefund = totalReturnRefund > 0 ? -totalReturnRefund : 0;
+
   const itemsBreakdown = order.items.map((it: any) => ({
     item_id: Number(it.itemId),
     item_name: it.itemName,
@@ -94,7 +98,7 @@ function buildOrderIncomeBreakdown(order: any) {
       cost_of_goods_sold: itemsSubtotal,
       original_cost_of_goods_sold: itemsSubtotal,
       original_shopee_discount: 0,
-      seller_return_refund: 0,
+      seller_return_refund: sellerReturnRefund,
       buyer_payment_method: order.paymentMethod || "ShopeePay",
       items: itemsBreakdown
     }
@@ -272,12 +276,13 @@ paymentRouter.get("/api/v2/payment/get_income_overview", shopeeAuthGuard, async 
   const incomeStatusRaw = req.query.income_status as string | undefined;
   const incomeStatus = incomeStatusRaw ? parseInt(incomeStatusRaw, 10) : undefined;
 
-  // Query all non-cancelled orders for shop
+  // Query all non-cancelled orders for shop, including returns
   const orders = await prisma.order.findMany({
     where: {
       shopId,
       orderStatus: { not: OrderStatus.CANCELLED }
-    }
+    },
+    include: { returns: true }
   });
 
   let releasedAmount = 0;
@@ -285,9 +290,13 @@ paymentRouter.get("/api/v2/payment/get_income_overview", shopeeAuthGuard, async 
 
   for (const o of orders) {
     const amount = Number(o.escrowAmount || 0);
-    if (o.orderStatus === OrderStatus.COMPLETED) {
+    const hasAcceptedReturn = (o.returns || []).some((r: any) => r.status === "ACCEPTED");
+    const isFullyRefunded = hasAcceptedReturn && (amount <= 0 || (o.returns || []).some((r: any) => Number(r.refundAmount) >= Number(o.totalAmount)));
+    const isToReturn = o.orderStatus === OrderStatus.TO_RETURN;
+
+    if (o.orderStatus === OrderStatus.COMPLETED && !isFullyRefunded) {
       releasedAmount += amount;
-    } else {
+    } else if (!isToReturn && !isFullyRefunded) {
       pendingAmount += amount;
     }
   }
@@ -326,7 +335,7 @@ paymentRouter.get("/api/v2/simulator/payment/overview", async (req: Request, res
   const orders = await prisma.order.findMany({
     where: { shopId },
     orderBy: { createdAt: "desc" },
-    include: { items: true }
+    include: { items: true, returns: true }
   });
 
   let releasedAmount = 0;
@@ -335,22 +344,36 @@ paymentRouter.get("/api/v2/simulator/payment/overview", async (req: Request, res
   let totalServiceFees = 0;
   let totalTransactionFees = 0;
   let settledOrdersCount = 0;
+  let returnedOrdersCount = 0;
 
   const orderLedger = orders.map(o => {
     const isCompleted = o.orderStatus === OrderStatus.COMPLETED;
     const isCancelled = o.orderStatus === OrderStatus.CANCELLED;
+    const isToReturn = o.orderStatus === OrderStatus.TO_RETURN;
+    const acceptedReturns = (o.returns || []).filter((r: any) => r.status === "ACCEPTED");
+    const activeReturns = (o.returns || []).filter((r: any) => ["REQUESTED", "JUDGING", "PROCESSING", "SELLER_DISPUTE"].includes(r.status));
+    const hasAcceptedReturn = acceptedReturns.length > 0;
+    const hasActiveReturn = activeReturns.length > 0;
+    const totalRefundAmount = acceptedReturns.reduce((sum: number, r: any) => sum + Number(r.refundAmount || 0), 0);
+    const isFullyRefunded = hasAcceptedReturn && (totalRefundAmount >= Number(o.totalAmount) || Number(o.escrowAmount || 0) <= 0);
+
     const escrow = Number(o.escrowAmount || 0);
     const comm = Number(o.commissionFee || 0);
     const serv = Number(o.serviceFee || 0);
     const tran = Number(o.sellerTransactionFee || 0);
 
-    if (isCompleted) {
+    if (hasAcceptedReturn) {
+      returnedOrdersCount += 1;
+    }
+
+    // Only count as settled sold order if COMPLETED and NOT fully refunded!
+    if (isCompleted && !isFullyRefunded) {
       releasedAmount += escrow;
       totalCommissionFees += comm;
       totalServiceFees += serv;
       totalTransactionFees += tran;
       settledOrdersCount += 1;
-    } else if (!isCancelled) {
+    } else if (!isCancelled && !isToReturn && !isFullyRefunded) {
       pendingAmount += escrow;
     }
 
@@ -366,10 +389,18 @@ paymentRouter.get("/api/v2/simulator/payment/overview", async (req: Request, res
       commission_fee: comm,
       service_fee: serv,
       seller_transaction_fee: tran,
-      total_platform_fees: comm + serv + tran,
+      total_platform_fees: isFullyRefunded ? 0 : (comm + serv + tran),
       escrow_amount: escrow,
       escrow_release_time: o.escrowReleaseTime ? Math.floor(o.escrowReleaseTime.getTime() / 1000) : null,
-      created_at: Math.floor(o.createdAt.getTime() / 1000)
+      created_at: Math.floor(o.createdAt.getTime() / 1000),
+      has_return: (o.returns || []).length > 0,
+      has_accepted_return: hasAcceptedReturn,
+      has_active_return: hasActiveReturn,
+      is_fully_refunded: isFullyRefunded,
+      refund_amount: totalRefundAmount,
+      seller_return_refund: -totalRefundAmount,
+      return_sn: (o.returns || [])[0]?.returnSn || null,
+      return_status: (o.returns || [])[0]?.status || null
     };
   });
 
@@ -379,6 +410,7 @@ paymentRouter.get("/api/v2/simulator/payment/overview", async (req: Request, res
       pending_amount: pendingAmount,
       total_platform_fees: totalCommissionFees + totalServiceFees + totalTransactionFees,
       settled_orders_count: settledOrdersCount,
+      returned_orders_count: returnedOrdersCount,
       total_orders_count: orders.length
     },
     ledger: orderLedger

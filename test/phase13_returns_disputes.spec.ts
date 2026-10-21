@@ -89,11 +89,20 @@ async function runPhase13Tests() {
     // PREPARATION: Fetch Access Token & Clean Up Old Test Data
     // -------------------------------------------------------------------------
     console.log("PREPARATION: Setting up active token and test orders...");
-    const shop = await prisma.shop.findUnique({ where: { shopId: BigInt(SHOP_ID) } });
+    let shop = await prisma.shop.findUnique({ where: { shopId: BigInt(SHOP_ID) } });
     if (!shop || !shop.accessToken) {
       throw new Error("Target shop or access token not found");
     }
-    accessToken = shop.accessToken;
+    const now = new Date();
+    if (!shop.accessTokenExpiresAt || shop.accessTokenExpiresAt <= now) {
+      shop = await prisma.shop.update({
+        where: { shopId: BigInt(SHOP_ID) },
+        data: {
+          accessTokenExpiresAt: new Date(now.getTime() + 14400 * 1000)
+        }
+      });
+    }
+    accessToken = shop.accessToken!;
 
     const testOrders = [testOrderSn1, testOrderSn2, testOrderSn3, testOrderSn4, testOrderSn5];
 

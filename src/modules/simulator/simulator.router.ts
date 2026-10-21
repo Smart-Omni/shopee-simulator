@@ -304,7 +304,8 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
       shop: true,
       items: true,
       packages: true,
-      comments: true
+      comments: true,
+      returns: true
     },
     orderBy: { createdAt: "desc" },
     take: 100
@@ -338,6 +339,23 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
       created_at: o.createdAt.toISOString(),
       has_reviewed: (o.comments || []).length > 0 && ((o.items || []).length === 0 || (o.items || []).every((item: any) => (o.comments || []).some((c: any) => c.itemId === item.itemId))),
       reviewed_item_ids: (o.comments || []).map((c: any) => Number(c.itemId)),
+      has_return: (o.returns || []).length > 0,
+      has_active_return: (o.returns || []).some((r: any) => ["REQUESTED", "JUDGING", "PROCESSING", "SELLER_DISPUTE"].includes(r.status)),
+      has_accepted_return: (o.returns || []).some((r: any) => r.status === "ACCEPTED"),
+      return_status: (o.returns || [])[0]?.status || null,
+      return_sn: (o.returns || [])[0]?.returnSn || null,
+      returns: (o.returns || []).map((r: any) => ({
+        return_sn: r.returnSn,
+        status: r.status,
+        validation_type: r.validationType,
+        solution: r.solution,
+        refund_amount: Number(r.refundAmount),
+        reason: r.reason,
+        text_reason: r.textReason || "",
+        offer_amount: r.offerAmount ? Number(r.offerAmount) : null,
+        negotiation_status: r.negotiationStatus || "TERMINATED",
+        created_at: r.createdAt.toISOString()
+      })),
       items: (o.items || []).map((i: any) => ({
         order_item_id: Number(i.orderItemId),
         item_id: Number(i.itemId),
@@ -1776,22 +1794,22 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", async (req: Requ
       return;
     }
 
-    // State machine check: return can only be requested on SHIPPED or COMPLETED orders
-    if (order.orderStatus !== OrderStatus.SHIPPED && order.orderStatus !== OrderStatus.COMPLETED) {
-      res.json(createShopeeErrorResponse("order.invalid_status", "Returns can only be requested for SHIPPED or COMPLETED orders"));
-      return;
-    }
-
-    // Duplicate check: reject if active return already exists
+    // Duplicate check: reject if active or accepted return already exists
     const activeReturn = await prisma.return.findFirst({
       where: {
         orderSn: order_sn,
-        status: { in: ["REQUESTED", "JUDGING", "PROCESSING", "SELLER_DISPUTE"] }
+        status: { in: ["REQUESTED", "JUDGING", "PROCESSING", "SELLER_DISPUTE", "ACCEPTED"] }
       }
     });
 
     if (activeReturn) {
-      res.json(createShopeeErrorResponse("return.duplicate_request", "An active return request already exists for this order"));
+      res.json(createShopeeErrorResponse("return.duplicate_request", "An active return request already exists or has already been accepted for this order"));
+      return;
+    }
+
+    // State machine check: return can only be requested on SHIPPED or COMPLETED orders
+    if (order.orderStatus !== OrderStatus.SHIPPED && order.orderStatus !== OrderStatus.COMPLETED) {
+      res.json(createShopeeErrorResponse("order.invalid_status", "Returns can only be requested for SHIPPED or COMPLETED orders"));
       return;
     }
 
@@ -1867,6 +1885,12 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", async (req: Requ
         });
       }
     }
+
+    // Update order status to TO_RETURN as per Shopee official lifecycle
+    await prisma.order.update({
+      where: { orderSn: order.orderSn },
+      data: { orderStatus: OrderStatus.TO_RETURN }
+    });
 
     // Fire Webhook Push Code 29 (return_updates_push)
     await WebhookService.dispatchReturnUpdate({
@@ -1974,6 +1998,20 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_cancel", async (req: Reque
         negotiationStatus: "TERMINATED"
       }
     });
+
+    // Revert order back to COMPLETED if no other active returns
+    const otherActiveReturn = await prisma.return.findFirst({
+      where: {
+        orderSn: r.orderSn,
+        status: { in: ["REQUESTED", "JUDGING", "PROCESSING", "SELLER_DISPUTE"] }
+      }
+    });
+    if (!otherActiveReturn) {
+      await prisma.order.update({
+        where: { orderSn: r.orderSn },
+        data: { orderStatus: OrderStatus.COMPLETED }
+      });
+    }
 
     await WebhookService.dispatchReturnUpdate({
       partnerId: r.shop.partnerId,
@@ -2107,6 +2145,70 @@ simulatorRouter.post("/api/v2/simulator/returns/seller_offer", async (req: Reque
     }));
   } catch (err: any) {
     res.json(createShopeeErrorResponse("server_error", err.message || "Failed to submit counter-offer"));
+  }
+});
+
+// 17.3c2 Buyer accepts seller counter-offer from UI
+simulatorRouter.post("/api/v2/simulator/returns/buyer_accept_offer", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { return_sn } = req.body;
+    if (!return_sn) {
+      res.json(createShopeeErrorResponse("error_param", "return_sn is required"));
+      return;
+    }
+
+    const r = await prisma.return.findUnique({
+      where: { returnSn: return_sn },
+      include: { shop: true, order: true }
+    });
+
+    if (!r) {
+      res.json(createShopeeErrorResponse("return.not_found", "Return request not found"));
+      return;
+    }
+
+    if (!r.offerAmount || r.negotiationStatus !== "PENDING_BUYER_RESPOND") {
+      res.json(createShopeeErrorResponse("return.no_active_offer", "No pending counter-offer to accept"));
+      return;
+    }
+
+    const agreedRefund = Number(r.offerAmount);
+    const oldStatus = r.status;
+
+    await prisma.return.update({
+      where: { returnSn: return_sn },
+      data: {
+        status: "ACCEPTED",
+        refundAmount: agreedRefund,
+        negotiationStatus: "TERMINATED"
+      }
+    });
+
+    // Deduct agreed refund amount from order escrow
+    const currentEscrow = Number(r.order.escrowAmount || 0);
+    const newEscrow = Math.max(0, currentEscrow - agreedRefund);
+    await prisma.order.update({
+      where: { orderSn: r.orderSn },
+      data: { escrowAmount: newEscrow }
+    });
+
+    await WebhookService.dispatchReturnUpdate({
+      partnerId: r.shop.partnerId,
+      shopId: r.shopId,
+      orderSn: r.orderSn,
+      returnSn: r.returnSn,
+      updateField: "return_status",
+      oldValue: oldStatus,
+      newValue: "ACCEPTED"
+    });
+
+    res.json(createShopeeSuccessResponse({
+      return_sn: r.returnSn,
+      status: "ACCEPTED",
+      refund_amount: agreedRefund
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to accept counter-offer"));
   }
 });
 
@@ -2286,6 +2388,10 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/review", async (req: Reque
       sellerProofStatus = "PENDING";
     } else if (action === "REJECT") {
       newStatus = "CLOSED";
+      await prisma.order.update({
+        where: { orderSn: r.orderSn },
+        data: { orderStatus: OrderStatus.COMPLETED }
+      });
     } else {
       res.json(createShopeeErrorResponse("error_param", "Invalid action. Use APPROVE_RETURN, REQUEST_SELLER_PROOF, or REJECT"));
       return;
@@ -2418,7 +2524,11 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/arbitrate_dispute", async 
     } else if (ruling === "SELLER_WIN") {
       newStatus = "CLOSED";
       compensationStatus = "COMPENSATION_REJECTED";
-      // Escrow remains 100% intact for seller
+      // Escrow remains 100% intact for seller, revert order to COMPLETED
+      await prisma.order.update({
+        where: { orderSn: r.orderSn },
+        data: { orderStatus: OrderStatus.COMPLETED }
+      });
     } else if (ruling === "PLATFORM_COMPENSATE") {
       newStatus = "ACCEPTED";
       compensationStatus = "COMPENSATION_APPROVED";

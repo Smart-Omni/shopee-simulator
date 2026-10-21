@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { OrderStatus } from "@prisma/client";
 import { prisma } from "../../common/prisma";
 import { shopeeAuthGuard } from "../../common/middleware/auth-guard";
 import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../common/utils/envelope";
@@ -247,7 +248,8 @@ returnsRouter.post("/api/v2/returns/confirm", shopeeAuthGuard, async (req: Reque
   await prisma.order.update({
     where: { orderSn: r.orderSn },
     data: {
-      escrowAmount: newEscrow
+      escrowAmount: newEscrow,
+      orderStatus: newEscrow === 0 ? OrderStatus.TO_RETURN : r.order.orderStatus
     }
   });
 
@@ -378,7 +380,10 @@ returnsRouter.post("/api/v2/returns/accept_offer", shopeeAuthGuard, async (req: 
 
   await prisma.order.update({
     where: { orderSn: r.orderSn },
-    data: { escrowAmount: newEscrow }
+    data: {
+      escrowAmount: newEscrow,
+      orderStatus: newEscrow === 0 ? OrderStatus.TO_RETURN : r.order.orderStatus
+    }
   });
 
   await WebhookService.dispatchReturnUpdate({
