@@ -1,7 +1,12 @@
 import { app } from "../src/index";
 import { prisma } from "../src/common/prisma";
 import { calculateHmacSha256, buildBaseString } from "../src/common/utils/crypto";
+import { storageService } from "../src/common/storage/storage.service";
+import { LocalStorageProvider } from "../src/common/storage/local-storage.provider";
 import * as http from "http";
+
+// Use local storage in Phase 2 tests to prevent uploading dummy test images to Google Drive
+storageService.setProvider(new LocalStorageProvider(), "local");
 
 const PARTNER_ID = 1001141;
 const PARTNER_KEY = "shopee_mock_secret_key_2026";

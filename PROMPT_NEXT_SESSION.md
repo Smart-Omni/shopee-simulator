@@ -10,9 +10,9 @@ Use this prompt when initiating a new coding or pairing session with an AI codin
 We are continuing development on the **Shopee Open API v2 Simulator** located in `shopee-simulator/`.
 
 ### 1. Context & Baseline
-- **Current Version:** v1.8.0 (Phases 1 through 13 complete, Tri-Persona UI: Seller, Buyer, Shopee Admin, vi-VN localization).
-- **Test Baseline:** 464 / 464 test assertions passing (100% pass rate across all 13 phases). Run `npm test` immediately (with network socket access enabled for port 5432) to verify baseline health before making any changes.
-- **Git Branch:** Currently on `feature/returns-and-refunds` (or `develop`). Follow the Conventional Commits specification for all commit messages.
+- **Current Version:** v1.9.0 (Phases 1 through 14 complete, Cloud Media Storage via Google Drive/Local, Automated CI/CD, Tri-Persona UI: Seller, Buyer, Shopee Admin, vi-VN localization).
+- **Test Baseline:** 509 / 509 test assertions passing (100% pass rate across all 14 phases). Run `npm test` immediately (with network socket access enabled for port 5432) to verify baseline health before making any changes.
+- **Git Branch:** Currently on `feature/shopiz-integration` (or `develop`). Follow the Conventional Commits specification for all commit messages.
 
 ### 2. Architecture & Rules of Engagement
 - **Two-Layer Architecture:**
@@ -44,7 +44,7 @@ Please confirm that you have checked the `develop` branch, verified baseline hea
 
 | Task | Command |
 | :--- | :--- |
-| **Verify baseline health** | `npm test` (run across all 13 phases) |
+| **Verify baseline health** | `npm test` (run across all 14 phases) |
 | **Compile TypeScript** | `npm run build` (`tsc` exits 0) |
 | **Check git branch status** | `git status` (should be on `develop` or feature branch) |
 | **Synchronize live Docker container** | `docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker cp prisma/schema.prisma shopee-mock-server:/app/prisma/schema.prisma && docker restart shopee-mock-server` |

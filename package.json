@@ -1,6 +1,6 @@
 {
   "name": "shopee-simulator",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Shopee Open API v2 Mock Simulator Server & Webhook Dispatcher",
   "main": "dist/index.js",
   "scripts": {
@@ -24,13 +24,15 @@
     "test:phase11": "ts-node test/phase11_chat_reviews.spec.ts",
     "test:phase12": "ts-node test/phase12_escrow_payment.spec.ts",
     "test:phase13": "ts-node test/phase13_returns_disputes.spec.ts",
-    "test": "ts-node test/phase1_auth.spec.ts && ts-node test/phase2_shop.spec.ts && ts-node test/phase3_product.spec.ts && ts-node test/phase4_order.spec.ts && ts-node test/phase5_webhook.spec.ts && ts-node test/phase6_frontend.spec.ts && ts-node test/phase7_promotions.spec.ts && ts-node test/phase8_shipping_fee.spec.ts && ts-node test/phase9_variations.spec.ts && ts-node test/phase10_lifecycle_deadline.spec.ts && ts-node test/phase11_chat_reviews.spec.ts && ts-node test/phase12_escrow_payment.spec.ts && ts-node test/phase13_returns_disputes.spec.ts"
+    "test:phase14": "ts-node test/phase14_shopiz_integration.spec.ts",
+    "test": "ts-node test/phase1_auth.spec.ts && ts-node test/phase2_shop.spec.ts && ts-node test/phase3_product.spec.ts && ts-node test/phase4_order.spec.ts && ts-node test/phase5_webhook.spec.ts && ts-node test/phase6_frontend.spec.ts && ts-node test/phase7_promotions.spec.ts && ts-node test/phase8_shipping_fee.spec.ts && ts-node test/phase9_variations.spec.ts && ts-node test/phase10_lifecycle_deadline.spec.ts && ts-node test/phase11_chat_reviews.spec.ts && ts-node test/phase12_escrow_payment.spec.ts && ts-node test/phase13_returns_disputes.spec.ts && ts-node test/phase14_shopiz_integration.spec.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.4.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "googleapis": "^187.0.0",
     "multer": "^2.4.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0"
