@@ -437,6 +437,242 @@ async function main() {
   });
   console.log(`✓ Configured Simulator Fault Injection defaults`);
 
+  // 7. Seed Sample Buyer-Seller Live Chats
+  const sampleChats = [
+    {
+      shopId: BigInt(727720655),
+      buyerUserId: BigInt(1001),
+      buyerUsername: "Nguyen Van A",
+      senderType: "BUYER",
+      message: "Shop ơi, tai nghe Pro chống ồn có sẵn hàng màu đen không ạ?",
+      isRead: true,
+      readAt: new Date(Date.now() - 3600000),
+      createdAt: new Date(Date.now() - 3700000)
+    },
+    {
+      shopId: BigInt(727720655),
+      buyerUserId: BigInt(1001),
+      buyerUsername: "Nguyen Van A",
+      senderType: "SELLER",
+      message: "Dạ chào bạn, tai nghe màu Đen hiện còn sẵn hàng ạ. Shop hỗ trợ giao ngay trong 2h nhé!",
+      isRead: true,
+      readAt: new Date(Date.now() - 3500000),
+      createdAt: new Date(Date.now() - 3600000)
+    },
+    {
+      shopId: BigInt(727720655),
+      buyerUserId: BigInt(1002),
+      buyerUsername: "Tran Thi B",
+      senderType: "BUYER",
+      message: "Sản phẩm được bảo hành chính hãng bao lâu vậy shop?",
+      isRead: false,
+      readAt: null,
+      createdAt: new Date(Date.now() - 1800000)
+    },
+    {
+      shopId: BigInt(839910244),
+      buyerUserId: BigInt(1003),
+      buyerUsername: "Le Van C",
+      senderType: "BUYER",
+      message: "Áo hoodie size L cao 1m75 nặng 70kg mặc vừa không shop?",
+      isRead: true,
+      readAt: new Date(Date.now() - 7200000),
+      createdAt: new Date(Date.now() - 7300000)
+    },
+    {
+      shopId: BigInt(839910244),
+      buyerUserId: BigInt(1003),
+      buyerUsername: "Le Van C",
+      senderType: "SELLER",
+      message: "Dạ size L mặc form rộng rãi chuẩn streetwear rất đẹp bạn nhé!",
+      isRead: true,
+      readAt: new Date(Date.now() - 7100000),
+      createdAt: new Date(Date.now() - 7200000)
+    },
+    {
+      shopId: BigInt(910283751),
+      buyerUserId: BigInt(1002),
+      buyerUsername: "Tran Thi B",
+      senderType: "BUYER",
+      message: "Bàn làm việc thông minh có giao lên chung cư không ạ?",
+      isRead: true,
+      readAt: new Date(Date.now() - 10800000),
+      createdAt: new Date(Date.now() - 10900000)
+    },
+    {
+      shopId: BigInt(910283751),
+      buyerUserId: BigInt(1002),
+      buyerUsername: "Tran Thi B",
+      senderType: "SELLER",
+      message: "Dạ shop hỗ trợ giao tận căn hộ và lắp đặt hoàn chỉnh luôn bạn nhé.",
+      isRead: true,
+      readAt: new Date(Date.now() - 10700000),
+      createdAt: new Date(Date.now() - 10800000)
+    }
+  ];
+
+  for (const c of sampleChats) {
+    const exists = await prisma.chatMessage.findFirst({
+      where: {
+        shopId: c.shopId,
+        buyerUserId: c.buyerUserId,
+        message: c.message
+      }
+    });
+    if (!exists) {
+      await prisma.chatMessage.create({ data: c });
+    }
+  }
+  console.log(`✓ Seeded sample buyer-seller chat conversations across 3 shops`);
+
+  // 8. Seed Completed Orders with Released Escrow and Product Reviews
+  const seedCompletedOrders = [
+    {
+      orderSn: "SEEDORD727720655",
+      shopId: BigInt(727720655),
+      itemSku: "SMART-EARBUDS-01",
+      buyerUserId: BigInt(1001),
+      buyerUsername: "Nguyen Van A",
+      totalAmount: 450000,
+      buyerPaidShippingFee: 15000,
+      actualShippingFee: 30000,
+      voucherFromShopee: 15000,
+      commissionFee: 9000,
+      serviceFee: 6750,
+      sellerTransactionFee: 11250,
+      escrowAmount: 423000,
+      escrowReleaseTime: new Date(Date.now() - 86400000),
+      review: {
+        ratingStar: 5,
+        comment: "Tai nghe chống ồn cực đỉnh, bass đập chắc nịch, pin dùng cả ngày không hết. Rất đáng tiền!",
+        reply: "Cảm ơn bạn Nguyen Van A đã ủng hộ SmartOmni! Chúc bạn có trải nghiệm nghe nhạc thật tuyệt vời ạ ❤️",
+        replyTime: new Date(Date.now() - 80000000)
+      }
+    },
+    {
+      orderSn: "SEEDORD839910244",
+      shopId: BigInt(839910244),
+      itemSku: "HN-TEE-260",
+      buyerUserId: BigInt(1003),
+      buyerUsername: "Le Van C",
+      totalAmount: 350000,
+      buyerPaidShippingFee: 15000,
+      actualShippingFee: 15000,
+      voucherFromShopee: 0,
+      commissionFee: 7000,
+      serviceFee: 0,
+      sellerTransactionFee: 8750,
+      escrowAmount: 334250,
+      escrowReleaseTime: new Date(Date.now() - 172800000),
+      review: {
+        ratingStar: 5,
+        comment: "Chất vải cotton dày dặn, form áo đứng chuẩn streetwear. Đóng gói cẩn thận 10/10.",
+        reply: "Hanoi Streetwear cảm ơn bạn nhiều nhé! Mong bạn tiếp tục ủng hộ các bộ sưu tập tiếp theo ạ!",
+        replyTime: new Date(Date.now() - 160000000)
+      }
+    },
+    {
+      orderSn: "SEEDORD910283751",
+      shopId: BigInt(910283751),
+      itemSku: "SG-MUG-CER",
+      buyerUserId: BigInt(1002),
+      buyerUsername: "Tran Thi B",
+      totalAmount: 1200000,
+      buyerPaidShippingFee: 35000,
+      actualShippingFee: 50000,
+      voucherFromShopee: 15000,
+      commissionFee: 24000,
+      serviceFee: 18000,
+      sellerTransactionFee: 30000,
+      escrowAmount: 1128000,
+      escrowReleaseTime: new Date(Date.now() - 259200000),
+      review: {
+        ratingStar: 5,
+        comment: "Ghế gỗ tự nhiên rất chắc chắn, màu vân gỗ sang trọng đúng ý mình. Giao hàng nhanh đóng thùng kỹ.",
+        reply: "Saigon Modern Living trân trọng cảm ơn đánh giá của bạn! Chúc bạn và gia đình luôn an khang ạ.",
+        replyTime: new Date(Date.now() - 240000000)
+      }
+    }
+  ];
+
+  for (const ord of seedCompletedOrders) {
+    const existingOrder = await prisma.order.findUnique({
+      where: { orderSn: ord.orderSn }
+    });
+
+    const targetProduct = await prisma.product.findFirst({
+      where: { shopId: ord.shopId, itemSku: ord.itemSku }
+    });
+
+    if (!existingOrder && targetProduct) {
+      await prisma.order.create({
+        data: {
+          orderSn: ord.orderSn,
+          shopId: ord.shopId,
+          orderStatus: "COMPLETED",
+          totalAmount: ord.totalAmount,
+          buyerPaidShippingFee: ord.buyerPaidShippingFee,
+          actualShippingFee: ord.actualShippingFee,
+          voucherFromShopee: ord.voucherFromShopee,
+          voucherFromSeller: 0,
+          commissionFee: ord.commissionFee,
+          serviceFee: ord.serviceFee,
+          sellerTransactionFee: ord.sellerTransactionFee,
+          escrowAmount: ord.escrowAmount,
+          escrowReleaseTime: ord.escrowReleaseTime,
+          buyerUserId: ord.buyerUserId,
+          buyerUsername: ord.buyerUsername,
+          recipientName: ord.buyerUsername,
+          payTime: new Date(ord.escrowReleaseTime.getTime() - 86400000),
+          shipByDate: new Date(ord.escrowReleaseTime.getTime() + 86400000),
+          items: {
+            create: {
+              itemId: targetProduct.itemId,
+              itemName: targetProduct.itemName,
+              modelName: "Standard",
+              modelSku: targetProduct.itemSku,
+              itemPrice: ord.totalAmount,
+              quantityPurchased: 1
+            }
+          }
+        }
+      });
+
+      // Add product review
+      await prisma.productComment.create({
+        data: {
+          shopId: ord.shopId,
+          itemId: targetProduct.itemId,
+          orderSn: ord.orderSn,
+          buyerUserId: ord.buyerUserId,
+          buyerUsername: ord.buyerUsername,
+          ratingStar: ord.review.ratingStar,
+          comment: ord.review.comment,
+          reply: ord.review.reply,
+          replyTime: ord.review.replyTime
+        }
+      });
+    }
+
+    // Recalculate Shop rating
+    const comments = await prisma.productComment.findMany({
+      where: { shopId: ord.shopId }
+    });
+    const ratingCount = comments.length;
+    const avgRating = ratingCount > 0
+      ? comments.reduce((acc, curr) => acc + curr.ratingStar, 0) / ratingCount
+      : 5.0;
+
+    await prisma.shop.update({
+      where: { shopId: ord.shopId },
+      data: {
+        rating: Math.round(avgRating * 10) / 10,
+        ratingCount
+      }
+    });
+  }
+  console.log(`✓ Seeded completed orders with released escrow and reviews for all shops`);
+
   console.log("Database seeding completed successfully!");
 }
 

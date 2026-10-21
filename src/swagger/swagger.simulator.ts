@@ -681,5 +681,105 @@ export const simulatorSwaggerPaths: Record<string, any> = {
       },
       responses: { "200": { description: "Webhook received acknowledgment" } }
     }
+  },
+  "/api/v2/simulator/return/request": {
+    post: {
+      tags: ["Simulator Control"],
+      summary: "Buyer Submit Return Request",
+      description: "Simulates a buyer requesting a return/refund for a delivered order. Supports both warehouse_validation (Shopee-First) and seller_validation flows.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["order_sn", "reason"],
+              properties: {
+                shop_id: { type: "integer" },
+                order_sn: { type: "string" },
+                reason: { type: "string" },
+                text_reason: { type: "string" },
+                refund_amount: { type: "number" },
+                solution: { type: "string", enum: ["RETURN_REFUND", "REFUND_ONLY"] },
+                proof_images: { type: "array", items: { type: "string" } },
+                flow_type: { type: "string", enum: ["warehouse_validation", "seller_validation"] }
+              }
+            }
+          }
+        }
+      },
+      responses: { "200": { description: "Created return object" } }
+    }
+  },
+  "/api/v2/simulator/return/warehouse_checkin": {
+    post: {
+      tags: ["Simulator Control"],
+      summary: "Shopee Warehouse Check-in / Item Verification",
+      description: "Simulates physical receipt and inspection of returned package at Shopee warehouse. Triggers refund completion.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["return_sn"],
+              properties: {
+                return_sn: { type: "string" },
+                condition: { type: "string", enum: ["DAMAGED", "INTACT", "WRONG_ITEM", "EMPTY_PARCEL"] },
+                note: { type: "string" }
+              }
+            }
+          }
+        }
+      },
+      responses: { "200": { description: "Updated return status" } }
+    }
+  },
+  "/api/v2/simulator/return/admin_arbitrate": {
+    post: {
+      tags: ["Simulator Control"],
+      summary: "Shopee Admin Dispute Arbitration",
+      description: "Simulates Shopee platform admin arbitrating a dispute between buyer and seller.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["return_sn", "decision"],
+              properties: {
+                return_sn: { type: "string" },
+                decision: {
+                  type: "string",
+                  enum: [
+                    "APPROVE_BUYER",
+                    "REJECT_BUYER",
+                    "APPROVE_COMPENSATION",
+                    "REJECT_COMPENSATION"
+                  ]
+                },
+                note: { type: "string" },
+                compensation_amount: { type: "number" }
+              }
+            }
+          }
+        }
+      },
+      responses: { "200": { description: "Arbitration result and updated return" } }
+    }
+  },
+  "/api/v2/simulator/return/list": {
+    get: {
+      tags: ["Simulator Control"],
+      summary: "Simulator Returns List",
+      description: "Public simulator endpoint for Web UI and admin arbitration dashboard to list returns by shop or status.",
+      parameters: [
+        { name: "shop_id", in: "query", schema: { type: "integer" } },
+        { name: "status", in: "query", schema: { type: "string" } },
+        { name: "page", in: "query", schema: { type: "integer" } },
+        { name: "pageSize", in: "query", schema: { type: "integer" } }
+      ],
+      responses: { "200": { description: "Paginated return records with items" } }
+    }
   }
 };

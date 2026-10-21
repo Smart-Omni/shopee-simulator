@@ -51,20 +51,21 @@ In TypeScript / Node.js, native `BigInt` (from PostgreSQL `BIGINT`) crashes `JSO
 
 ---
 
-## 3. Supported Modules (Phases 1 through 11 Complete)
+## 3. Supported Modules (Phases 1 through 12 Complete)
 
-The simulator currently supports 11 complete modules with 339 automated assertions passing (100%):
+The simulator currently supports 12 complete modules with 387 automated assertions passing (100%):
 - **Phase 1**: OAuth 2.0 Auth Kernel, Token Refresh with 5-Minute Dual-Token Grace Period, HMAC-SHA256 Guard.
 - **Phase 2**: Push Webhooks Engine (Codes 1, 2, 3, 4, 7, 8, 9, 15) with HMAC signatures & retry worker.
 - **Phase 3**: Product Catalog & Single/Basic Variations, Category trees, Stock/Price updates.
 - **Phase 4**: Complete 7-Stage Order Lifecycle (`UNPAID` through `COMPLETED`/`CANCELLED`), Buyer cancellations.
 - **Phase 5**: Airway Bill (AWB) Thermal PDF generation with SPX Barcodes and Code128.
-- **Phase 6**: Escrow Settlement & Payment Financial Ledger (`get_escrow_detail`, `get_escrow_list`).
+- **Phase 6**: Frontend Simulation UI & Developer Testbed (`/api/v2/simulator/*`).
 - **Phase 7**: Promotions & Marketing Center (12 Discount and 6 Voucher endpoints, Holiday Mode guard).
 - **Phase 8**: Dynamic Vietnam Shipping Fee Engine (SPX Express, Instant, Economy, Zone routing, Freeship Xtra).
 - **Phase 9**: 2-Tier Variations System (Fashion & Apparel Color + Size) with Cartesian model generator and 5:1 price ratio rule.
 - **Phase 10**: SKU Lifecycle & Order SLA Time Window (`v2.product.unlist_item`, cart item checkboxes, `shipByDate = now + 48h`, auto-cancellation engine for overdue orders).
 - **Phase 11**: Live Customer Chat (`ChatMessage` model, Buyer-Seller threads) & Post-Order Reviews (`ProductComment`, star ratings, store rating recalculation, official seller replies).
+- **Phase 12**: Payment & Escrow Reconciliation (`get_escrow_detail`, `get_escrow_detail_batch`, `get_escrow_list`, `get_income_overview`), financial reconciliation ledger, mathematical escrow formula, release tracking, and interactive breakdown modal.
 - **UI Platform**: Dual-Persona Interface (1-click fast login for 3 seeded shops & 3 buyers, slide-out integration console drawer, 100% `vi-VN` localization).
 
 ---
@@ -73,7 +74,7 @@ The simulator currently supports 11 complete modules with 339 automated assertio
 
 - **Repository**: `https://github.com/wishuponsirius/shopee-simulator.git`
 - **Branches**:
-  - `main`: Production release branch. Releases are tagged (e.g. `v1.6.0`).
+  - `main`: Production release branch. Releases are tagged (e.g. `v1.7.0`).
   - `develop`: Active development and integration branch. All work branches merge here.
 - **Commit Messages**: Must follow **Conventional Commits**:
   - Format: `<type>(<scope>): <short description>`
@@ -88,7 +89,7 @@ The simulator currently supports 11 complete modules with 339 automated assertio
 ## 5. Quality Gate & Session Resumption Invariant
 
 > [!IMPORTANT]
-> **Quality Gate:** Before starting any new task, run `npm test` in `shopee-simulator/`. Verify that all 339 assertions pass 100% with 0 regressions.
+> **Quality Gate:** Before starting any new task, run `npm test` in `shopee-simulator/`. Verify that all 387 assertions pass 100% with 0 regressions.
 >
 > When starting a new session:
 > 1. Check out `develop` branch.
@@ -116,7 +117,7 @@ The simulator currently supports 11 complete modules with 339 automated assertio
 > 1. Run `npm run build` on the host to compile `dist/`.
 > 2. Synchronize into the container:
 >    ```bash
->    docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker restart shopee-mock-server
+>    docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker cp prisma/schema.prisma shopee-mock-server:/app/prisma/schema.prisma && docker restart shopee-mock-server
 >    ```
 >    Or recreate the image: `docker compose up -d --build shopee-simulator`.
 > 3. Never allow the container's `/app/dist` to drift from `src/`.

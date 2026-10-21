@@ -14,6 +14,8 @@ import { simulatorRouter } from "./modules/simulator/simulator.router";
 import { discountRouter } from "./modules/discount/discount.router";
 import { voucherRouter } from "./modules/voucher/voucher.router";
 import { chatRouter } from "./modules/chat/chat.router";
+import { paymentRouter } from "./modules/payment/payment.router";
+import { returnsRouter } from "./modules/returns/returns.router";
 import { createShopeeErrorResponse } from "./common/utils/envelope";
 import path from "path";
 
@@ -64,6 +66,8 @@ app.use(webhookRouter);
 app.use(discountRouter);
 app.use(voucherRouter);
 app.use(chatRouter);
+app.use(paymentRouter);
+app.use(returnsRouter);
 app.use(simulatorRouter);
 
 // Global Error Handler (Shopee Envelope Format)

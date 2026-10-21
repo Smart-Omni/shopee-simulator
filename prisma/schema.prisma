@@ -53,7 +53,7 @@ model Shop {
   partner               Partner  @relation(fields: [partnerId], references: [partnerId], onDelete: Cascade)
   products              Product[]
   orders                Order[]
-  returns               ReturnRequest[]
+  returns               Return[]
   addresses             ShopAddress[]
   discounts             Discount[]
   vouchers              Voucher[]
@@ -229,16 +229,18 @@ model Order {
   note                 String?
   payTime              DateTime?
   shipByDate           DateTime?
+  escrowReleaseTime    DateTime?
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
 
   shop                 Shop        @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
   items                OrderItem[]
   packages             OrderPackage[]
-  returns              ReturnRequest[]
+  returns              Return[]
   comments             ProductComment[]
 
   @@index([shopId, orderStatus, createdAt])
+  @@index([shopId, escrowReleaseTime])
   @@map("orders")
 }
 
@@ -300,22 +302,84 @@ model PackageItem {
 // ----------------------------------------------------
 // 5. RETURNS & DISPUTES
 // ----------------------------------------------------
-model ReturnRequest {
-  returnSn             String   @id // e.g. "RET261019001"
-  orderSn              String
-  shopId               BigInt
-  returnReason         String
-  status               String   @default("REQUESTED") // REQUESTED, ACCEPTED, DISPUTED, REFUND_PAID, CANCELLED
-  refundAmount         Decimal  @db.Decimal(15, 2)
-  buyerImagesJson      Json?
-  sellerProofJson      Json?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+model Return {
+  returnSn              String       @id @map("return_sn") // e.g. "RET261020001"
+  orderSn               String       @map("order_sn")
+  shopId                BigInt       @map("shop_id")
+  buyerId               BigInt       @default(1001) @map("buyer_id")
+  validationType        String       @default("seller_validation") @map("validation_type") // seller_validation, warehouse_validation
+  returnRefundType      Int          @default(0) @map("return_refund_type") // 0: Normal RR, 1: In-Transit RR, 2: Return-on-the-Spot
+  refundAmount          Decimal      @map("refund_amount") @db.Decimal(15, 2)
+  currency              String       @default("VND")
+  status                String       @default("REQUESTED") // REQUESTED, JUDGING, PROCESSING, ACCEPTED, CANCELLED, CLOSED, SELLER_DISPUTE
+  reason                String       // NOT_RECEIPT, WRONG_ITEM, ITEM_DAMAGED, ITEM_MISSING, CHANGE_MIND, etc.
+  textReason            String?      @map("text_reason")
+  solution              String       @default("REFUND") // REFUND, RETURN_REFUND
+  needsLogistics        Boolean      @default(false) @map("needs_logistics")
+  reverseTrackingNumber String?      @map("reverse_tracking_number")
+  dueDate               DateTime?    @map("due_date")
+  reverseShippingFee    Decimal      @default(0) @map("reverse_shipping_fee") @db.Decimal(15, 2)
+  disputeDueDate        DateTime?    @map("dispute_due_date")
 
-  order                Order    @relation(fields: [orderSn], references: [orderSn], onDelete: Cascade)
-  shop                 Shop     @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+  // Negotiation State
+  negotiationStatus     String?      @map("negotiation_status") // PENDING_RESPOND, PENDING_BUYER_RESPOND, TERMINATED
+  offerAmount           Decimal?     @map("offer_amount") @db.Decimal(15, 2)
+  offerReason           String?      @map("offer_reason")
 
-  @@map("return_requests")
+  // Dispute & Proof
+  sellerProofStatus     String       @default("PENDING") @map("seller_proof_status") // PENDING, UPLOADED, OVERDUE
+  disputeReasonId       Int?         @map("dispute_reason_id")
+  disputeReason         String?      @map("dispute_reason")
+  disputeTextReason     String?      @map("dispute_text_reason")
+  disputeEmail          String?      @map("dispute_email")
+  compensationStatus    String       @default("COMPENSATION_NOT_APPLICABLE") @map("compensation_status") // COMPENSATION_NOT_APPLICABLE, COMPENSATION_REQUESTED, COMPENSATION_APPROVED, COMPENSATION_REJECTED
+  rulingNotes           String?      @map("ruling_notes")
+
+  // Optional Media Proof URLs
+  proofImages           String[]     @default([]) @map("proof_images")
+
+  createdAt             DateTime     @default(now()) @map("create_time")
+  updatedAt             DateTime     @updatedAt @map("update_time")
+
+  order                 Order        @relation(fields: [orderSn], references: [orderSn], onDelete: Cascade)
+  shop                  Shop         @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+  items                 ReturnItem[]
+  proofs                ReturnProof[]
+
+  @@index([shopId, status])
+  @@index([orderSn])
+  @@map("returns")
+}
+
+model ReturnItem {
+  id                    Int          @id @default(autoincrement())
+  returnSn              String       @map("return_sn")
+  itemId                BigInt       @map("item_id")
+  modelId               BigInt       @default(0) @map("model_id")
+  itemName              String       @map("item_name")
+  modelName             String?      @map("model_name")
+  quantity              Int          @default(1)
+  itemPrice             Decimal      @map("item_price") @db.Decimal(15, 2)
+  refundAmount          Decimal      @map("refund_amount") @db.Decimal(15, 2)
+
+  return                Return       @relation(fields: [returnSn], references: [returnSn], onDelete: Cascade)
+
+  @@index([returnSn])
+  @@map("return_items")
+}
+
+model ReturnProof {
+  id                    Int          @id @default(autoincrement())
+  returnSn              String       @map("return_sn")
+  uploaderType          String       @map("uploader_type") // BUYER, SELLER, SHOPEE
+  imageUrl              String       @map("image_url")
+  comment               String?      @map("comment")
+  createdAt             DateTime     @default(now()) @map("created_at")
+
+  return                Return       @relation(fields: [returnSn], references: [returnSn], onDelete: Cascade)
+
+  @@index([returnSn])
+  @@map("return_proofs")
 }
 
 // ----------------------------------------------------
