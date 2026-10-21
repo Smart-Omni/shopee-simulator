@@ -78,11 +78,12 @@ async function main() {
     });
 
     // Ensure pickup address
+    const defaultAddressId = s.shopId === BigInt(727720655) ? BigInt(1) : BigInt(Number(s.shopId) % 100000);
     await prisma.shopAddress.upsert({
-      where: { addressId: BigInt(Number(s.shopId) % 100000) },
+      where: { addressId: defaultAddressId },
       update: {},
       create: {
-        addressId: BigInt(Number(s.shopId) % 100000),
+        addressId: defaultAddressId,
         shopId: s.shopId,
         addressType: "DEFAULT",
         name: `${s.shopName} Fulfillment Hub`,
@@ -95,6 +96,26 @@ async function main() {
         zipcode: "700000"
       }
     });
+
+    if (s.shopId === BigInt(727720655)) {
+      await prisma.shopAddress.upsert({
+        where: { addressId: BigInt(20655) },
+        update: {},
+        create: {
+          addressId: BigInt(20655),
+          shopId: s.shopId,
+          addressType: "PICKUP",
+          name: `${s.shopName} Secondary Hub`,
+          phone: "+84901234567",
+          address: "123 Le Duan Street",
+          district: "District 1",
+          city: "Ho Chi Minh City",
+          state: "Ho Chi Minh",
+          region: "VN",
+          zipcode: "700000"
+        }
+      });
+    }
 
     console.log(`✓ Ensured Shop: ${s.shopName} (ID: ${s.shopId})`);
   }

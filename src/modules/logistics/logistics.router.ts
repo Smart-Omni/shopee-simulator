@@ -78,7 +78,8 @@ logisticsRouter.get("/api/v2/logistics/get_shipping_parameter", shopeeAuthGuard,
 
   // Fetch shop pickup addresses
   const addresses = await prisma.shopAddress.findMany({
-    where: { shopId }
+    where: { shopId },
+    orderBy: { addressId: "asc" }
   });
 
   const tomorrow = Math.floor(Date.now() / 1000) + 86400;
