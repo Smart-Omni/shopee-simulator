@@ -16,11 +16,15 @@ const testOrderSn2 = "ORD261020RET02";
 const testOrderSn3 = "ORD261020RET03";
 const testOrderSn4 = "ORD261020RET04";
 const testOrderSn5 = "ORD261020RET05";
+const testOrderSn6 = "ORD261020RET06";
+const testOrderSn7 = "ORD261020RET07";
 
 let retSn1 = "";
 let retSn2 = "";
 let retSn3 = "";
 let retSnOffer = "";
+let retSn6 = "";
+let retSn7 = "";
 
 function assert(condition: any, message: string) {
   if (!condition) {
@@ -104,7 +108,7 @@ async function runPhase13Tests() {
     }
     accessToken = shop.accessToken!;
 
-    const testOrders = [testOrderSn1, testOrderSn2, testOrderSn3, testOrderSn4, testOrderSn5];
+    const testOrders = [testOrderSn1, testOrderSn2, testOrderSn3, testOrderSn4, testOrderSn5, testOrderSn6, testOrderSn7];
 
     // Purge previous test returns and orders
     await prisma.returnProof.deleteMany({
@@ -136,7 +140,7 @@ async function runPhase13Tests() {
     if (!testProduct) throw new Error("No products found in shop");
 
     // Helper to create & deliver an order
-    async function createTestOrder(orderSn: string, deliver: boolean = true) {
+    async function createTestOrder(orderSn: string, deliver: boolean = true, channelId: number = 30001) {
       const res = await request("/api/v2/simulator/order/create", {
         method: "POST",
         body: {
@@ -147,7 +151,7 @@ async function runPhase13Tests() {
           recipient_phone: "+84912345678",
           recipient_address: "123 Vo Van Tan, Q3, HCMC",
           recipient_city: "Ho Chi Minh City",
-          channel_id: 30001,
+          channel_id: channelId,
           items: [
             {
               item_id: Number(testProduct!.itemId),
@@ -176,8 +180,10 @@ async function runPhase13Tests() {
     await createTestOrder(testOrderSn3, true);
     await createTestOrder(testOrderSn4, false); // NOT delivered (READY_TO_SHIP)
     await createTestOrder(testOrderSn5, true);
+    await createTestOrder(testOrderSn6, true, 30004); // SPX Instant
+    await createTestOrder(testOrderSn7, true, 30001); // Standard channel
 
-    console.log("  ✓ Test orders prepared (4 delivered, 1 ready-to-ship)\n");
+    console.log("  ✓ Test orders prepared (6 delivered, 1 ready-to-ship)\n");
 
     // -------------------------------------------------------------------------
     // TEST GROUP 1: Buyer Return Creation (Layer B) & Edge Cases
@@ -644,6 +650,109 @@ async function runPhase13Tests() {
     assert(simListRes.status === 200, "Simulator public return list returns HTTP 200");
     assert(Array.isArray(simListRes.json?.response?.returns), "Simulator returns is an array");
     assert(typeof simListRes.json?.response?.summary?.total === "number", "Simulator returns total count provided");
+
+    // -------------------------------------------------------------------------
+    // TEST GROUP 9: Shopee Vietnam Real-World Policy Verification
+    // -------------------------------------------------------------------------
+    console.log("\nTEST GROUP 9: Shopee Vietnam Real-World Policy (Official Reasons, Dual-Triage & Reverse Shipping)");
+
+    // 9.1 Buyer submits return with CHANGE_OF_MIND on Instant channel order (testOrderSn6)
+    const req6 = await request("/api/v2/simulator/returns/buyer_request", {
+      method: "POST",
+      body: {
+        shop_id: SHOP_ID,
+        order_sn: testOrderSn6,
+        reason: "CHANGE_OF_MIND",
+        text_reason: "Đổi ý không có nhu cầu sử dụng, còn nguyên tem",
+        solution: "RETURN_REFUND"
+      }
+    });
+    assert(req6.status === 200 && req6.json?.error === "", "Return with CHANGE_OF_MIND created");
+    assert(req6.json?.response?.status === "JUDGING", "Request starts in Shopee JUDGING triage");
+    retSn6 = req6.json?.response?.return_sn;
+
+    // 9.2 Shopee Admin approves with "Trả hàng & hoàn tiền" (APPROVE_RETURN_REFUND)
+    const adminApprove6 = await request("/api/v2/simulator/admin/returns/review", {
+      method: "POST",
+      body: {
+        return_sn: retSn6,
+        action: "APPROVE_RETURN_REFUND",
+        notes: "Shopee approved return of goods"
+      }
+    });
+    assert(adminApprove6.status === 200, "APPROVE_RETURN_REFUND returns HTTP 200");
+    assert(adminApprove6.json?.response?.status === "PROCESSING", "Return moved to PROCESSING with reverse tracking");
+
+    // 9.3 Shopee Warehouse Inbound check-in (PASS)
+    const inbound6 = await request("/api/v2/simulator/admin/returns/warehouse_inbound", {
+      method: "POST",
+      body: {
+        return_sn: retSn6,
+        inspection_result: "PASS"
+      }
+    });
+    assert(inbound6.status === 200, "Warehouse inbound check-in returns HTTP 200");
+    assert(inbound6.json?.response?.status === "ACCEPTED", "Return moved to ACCEPTED");
+
+    // 9.4 Verify reverse shipping fee capped at 20,000 VND for Instant channel and negative net escrow payout
+    const escrowUrl6 = makeSignedUrl("/api/v2/payment/get_escrow_detail");
+    const escrowRes6 = await request(escrowUrl6, {
+      method: "POST",
+      body: { order_sn: testOrderSn6 }
+    });
+    assert(escrowRes6.status === 200, "get_escrow_detail for order 6 returns HTTP 200");
+    const income6 = escrowRes6.json?.response?.order_income;
+    assert(income6?.reverse_shipping_fee === 20000, "Instant delivery reverse shipping fee is exactly 20,000 VND");
+    assert(income6?.seller_transaction_fee > 0, "Seller still charged transaction fee on CHANGE_OF_MIND return");
+    assert(income6?.escrow_amount < 0, `Net escrow payout is negative (${income6?.escrow_amount} VND) deducted from seller balance`);
+
+    // 9.5 Buyer submits return with NOT_RECEIVED on Standard order (testOrderSn7)
+    const req7 = await request("/api/v2/simulator/returns/buyer_request", {
+      method: "POST",
+      body: {
+        shop_id: SHOP_ID,
+        order_sn: testOrderSn7,
+        reason: "NOT_RECEIVED",
+        text_reason: "Chưa nhận được hàng từ đơn vị vận chuyển",
+        solution: "REFUND_ONLY"
+      }
+    });
+    assert(req7.status === 200 && req7.json?.error === "", "Return with NOT_RECEIVED created");
+    retSn7 = req7.json?.response?.return_sn;
+
+    // 9.6 Shopee Admin approves with "Hoàn tiền ngay" (APPROVE_REFUND_ONLY)
+    const adminApprove7 = await request("/api/v2/simulator/admin/returns/review", {
+      method: "POST",
+      body: {
+        return_sn: retSn7,
+        action: "APPROVE_REFUND_ONLY",
+        notes: "3PL confirmed delivery failure, refund only"
+      }
+    });
+    assert(adminApprove7.status === 200, "APPROVE_REFUND_ONLY returns HTTP 200");
+    assert(adminApprove7.json?.response?.status === "ACCEPTED", "Return moved to ACCEPTED immediately without return");
+
+    // 9.7 Verify NOT_RECEIVED exemptions: zero reverse shipping, zero platform fees, net escrow = 0
+    const escrowUrl7 = makeSignedUrl("/api/v2/payment/get_escrow_detail");
+    const escrowRes7 = await request(escrowUrl7, {
+      method: "POST",
+      body: { order_sn: testOrderSn7 }
+    });
+    assert(escrowRes7.status === 200, "get_escrow_detail for order 7 returns HTTP 200");
+    const income7 = escrowRes7.json?.response?.order_income;
+    assert(income7?.reverse_shipping_fee === 0, "Reverse shipping fee is 0 VND for NOT_RECEIVED");
+    assert(income7?.seller_transaction_fee === 0, "Seller transaction fee is waived (0 VND) for NOT_RECEIVED");
+    assert(income7?.commission_fee === 0, "Commission fee is 0 VND for NOT_RECEIVED");
+    assert(income7?.service_fee === 0, "Service fee is 0 VND for NOT_RECEIVED");
+    assert(income7?.escrow_amount === 0, "Net escrow payout is 0 VND (seller incurs no debt for NOT_RECEIVED)");
+
+    // 9.8 Verify 2-day dispute window on "Hoàn tiền ngay"
+    const detailUrl7 = makeSignedUrl("/api/v2/returns/get_return_detail");
+    const detRes7 = await request(detailUrl7, {
+      method: "POST",
+      body: { return_sn: retSn7 }
+    });
+    assert(detRes7.json?.response?.dispute_due_date > Math.floor(Date.now() / 1000), "2-day dispute deadline is populated for seller");
 
     console.log("\n=======================================================");
     console.log("   🎉 ALL PHASE 13 RETURNS & DISPUTES TESTS PASSED!   ");

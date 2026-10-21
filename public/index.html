@@ -1867,6 +1867,14 @@
             <span class="text-gray-600">(-) Phí thanh toán giao dịch (2.5%)</span>
             <span id="escrow-trans-fee" class="font-semibold text-red-600">-0 ₫</span>
           </div>
+          <div id="escrow-refund-row" class="flex justify-between py-1 border-b border-gray-200 hidden">
+            <span class="text-purple-700 font-semibold">(-) Hoàn tiền cho Người mua</span>
+            <span id="escrow-refund-val" class="font-semibold text-purple-700">-0 ₫</span>
+          </div>
+          <div id="escrow-reverse-shipping-row" class="flex justify-between py-1 border-b border-gray-200 hidden">
+            <span class="text-rose-700 font-semibold">(-) Phí vận chuyển trả hàng (tối đa 40.000 ₫)</span>
+            <span id="escrow-reverse-shipping-val" class="font-semibold text-rose-700">-0 ₫</span>
+          </div>
           
           <div class="flex justify-between pt-2 text-sm font-extrabold border-t-2 border-gray-300">
             <span class="text-emerald-700">(=) THỰC NHẬN CỦA SHOP (ESCROW)</span>
@@ -1917,15 +1925,13 @@
       <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
         <input type="hidden" id="buyer-return-ordersn">
 
-        <!-- Reason -->
+        <!-- Reason (Official Shopee Vietnam Categories) -->
         <div>
           <label class="block text-gray-700 font-bold mb-1">Lý do yêu cầu <span class="text-red-500">*</span></label>
           <select id="buyer-return-reason" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white font-medium focus:outline-none focus:border-[#ee4d2d]">
-            <option value="SP_DAMAGE">Hàng bị vỡ, hư hỏng trong quá trình vận chuyển</option>
-            <option value="SP_WRONG_ITEM">Người bán giao sai hàng, nhầm phân loại / kích thước</option>
-            <option value="SP_ITEM_MISSING">Thiếu hàng / Phụ kiện trong kiện hàng</option>
-            <option value="SP_COUNTERFEIT">Nghi ngờ hàng giả, hàng nhái kém chất lượng</option>
-            <option value="SP_CHANGE_MIND">Đổi ý không còn nhu cầu sử dụng</option>
+            <option value="NOT_RECEIVED">1. Không nhận được hàng / Nhận thiếu hàng</option>
+            <option value="DAMAGED_FAULTY" selected>2. Nhận được hàng nhưng hàng có vấn đề (bể vỡ, sai hàng, hàng lỗi, khác mô tả...)</option>
+            <option value="CHANGE_OF_MIND">3. Đổi ý (Sản phẩm còn nguyên tem, nhãn mác, bao bì)</option>
           </select>
         </div>
 
@@ -1956,28 +1962,15 @@
           </div>
         </div>
 
-        <!-- Validation Flow Radio (warehouse_validation vs seller_validation) -->
-        <div>
-          <label class="block text-gray-700 font-bold mb-1.5">Quy trình xử lý (Flow Type)</label>
-          <div class="space-y-2">
-            <label class="flex items-start p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-purple-50/50 has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50/60">
-              <input type="radio" name="buyer-return-flow" value="warehouse_validation" checked class="text-purple-600 focus:ring-purple-500 mt-0.5 mr-2">
-              <div>
-                <div class="font-bold text-purple-900 flex items-center">
-                  <i class="fa-solid fa-bolt text-purple-600 mr-1 text-[11px]"></i> Shopee Trọng Tài & Kiểm Định Kho (Khuyên dùng)
-                </div>
-                <div class="text-[10px] text-gray-500 mt-0.5">Shopee CS xét duyệt sơ bộ & bưu tá nhận hàng gửi về kho Shopee kiểm tra trước khi hoàn tiền.</div>
-              </div>
-            </label>
-            <label class="flex items-start p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-orange-50/50 has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50/60">
-              <input type="radio" name="buyer-return-flow" value="seller_validation" class="text-orange-600 focus:ring-orange-500 mt-0.5 mr-2">
-              <div>
-                <div class="font-bold text-gray-800 flex items-center">
-                  <i class="fa-solid fa-store text-orange-500 mr-1 text-[11px]"></i> Người Bán Tự Xử Lý
-                </div>
-                <div class="text-[10px] text-gray-500 mt-0.5">Yêu cầu gửi thẳng cho Shop. Shop có 48h để đồng ý hoàn tiền hoặc đề xuất phương án khác.</div>
-              </div>
-            </label>
+        <!-- Shopee Triage Policy Notice -->
+        <div class="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-xs text-amber-900">
+          <div class="font-bold flex items-center mb-1 text-amber-900">
+            <i class="fa-solid fa-shield-halved text-orange-600 mr-1.5"></i> Quy trình xét duyệt bởi Shopee
+          </div>
+          <div class="text-[11px] text-amber-800 leading-relaxed">
+            Yêu cầu sẽ được Shopee trực tiếp tiếp nhận và xử lý. Shopee sẽ quyết định <span class="font-bold">Hoàn tiền ngay</span> (không cần gửi hàng) hoặc <span class="font-bold">Trả hàng & hoàn tiền</span> (bưu tá tiếp nhận gửi về kho).
+          </div>
+        </div>
           </div>
         </div>
 
@@ -5932,7 +5925,11 @@
 
         let statusBadge = '';
         if (isReturned) {
-          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 flex items-center inline-flex"><i class="fa-solid fa-rotate-left mr-1"></i>Đã trả hàng/Hoàn tiền</span>';
+          if (Number(item.escrow_amount || 0) < 0) {
+            statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 flex items-center inline-flex" title="Đơn THHT phát sinh chi phí cấn trừ số dư Shop"><i class="fa-solid fa-triangle-exclamation mr-1"></i>THHT (Cấn trừ số dư)</span>';
+          } else {
+            statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 flex items-center inline-flex"><i class="fa-solid fa-rotate-left mr-1"></i>Đã trả hàng/Hoàn tiền</span>';
+          }
         } else if (isReturning) {
           statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center inline-flex"><i class="fa-solid fa-hourglass-half mr-1"></i>Đang khiếu nại trả hàng</span>';
         } else if (isCompleted) {
@@ -5956,7 +5953,14 @@
 
         let escrowCol = '';
         if (isReturned) {
-          escrowCol = `<div class="font-extrabold text-purple-700">${formatCurrency(item.escrow_amount)}</div><div class="text-[10px] text-gray-400 font-normal">(Hoàn -${formatCurrency(item.refund_amount)})</div>`;
+          const isNeg = Number(item.escrow_amount || 0) < 0;
+          let subDetails = [];
+          if (item.refund_amount > 0) subDetails.push(`Hoàn: -${formatCurrency(item.refund_amount)}`);
+          if (item.reverse_shipping_fee > 0) subDetails.push(`Phí trả: -${formatCurrency(item.reverse_shipping_fee)}`);
+          escrowCol = `
+            <div class="font-extrabold ${isNeg ? 'text-red-600' : 'text-purple-700'}">${formatCurrency(item.escrow_amount)}</div>
+            <div class="text-[10px] text-gray-400 font-normal mt-0.5">${subDetails.join(' • ')}</div>
+          `;
         } else if (isCompleted) {
           escrowCol = `<div class="font-extrabold text-emerald-600">${formatCurrency(item.escrow_amount)}</div>`;
         } else {
@@ -6013,17 +6017,54 @@
         document.getElementById('escrow-comm-fee').textContent = `-${formatCurrency(income.commission_fee || 0)}`;
         document.getElementById('escrow-service-fee').textContent = `-${formatCurrency(income.service_fee || 0)}`;
         document.getElementById('escrow-trans-fee').textContent = `-${formatCurrency(income.seller_transaction_fee || 0)}`;
-        document.getElementById('escrow-final-payout').textContent = formatCurrency(income.escrow_amount || 0);
+
+        const refundRow = document.getElementById('escrow-refund-row');
+        const refundVal = document.getElementById('escrow-refund-val');
+        if (income.seller_return_refund && Number(income.seller_return_refund) < 0) {
+          refundRow.classList.remove('hidden');
+          refundVal.textContent = formatCurrency(income.seller_return_refund);
+        } else {
+          refundRow.classList.add('hidden');
+        }
+
+        const revRow = document.getElementById('escrow-reverse-shipping-row');
+        const revVal = document.getElementById('escrow-reverse-shipping-val');
+        if (income.reverse_shipping_fee && Number(income.reverse_shipping_fee) > 0) {
+          revRow.classList.remove('hidden');
+          revVal.textContent = `-${formatCurrency(income.reverse_shipping_fee)}`;
+        } else {
+          revRow.classList.add('hidden');
+        }
+
+        const finalEscrow = Number(income.escrow_amount || 0);
+        const payoutEl = document.getElementById('escrow-final-payout');
+        payoutEl.textContent = formatCurrency(finalEscrow);
+        if (finalEscrow < 0) {
+          payoutEl.className = 'text-red-600 text-base font-extrabold';
+        } else {
+          payoutEl.className = 'text-emerald-700 text-base font-extrabold';
+        }
 
         const banner = document.getElementById('escrow-modal-status-banner');
-        banner.className = 'p-3 rounded-xl flex items-center justify-between font-medium bg-emerald-50 text-emerald-800 border border-emerald-200';
-        banner.innerHTML = `
-          <div class="flex items-center space-x-2">
-            <i class="fa-solid fa-circle-check text-emerald-600"></i>
-            <span>Trạng thái thanh toán: <strong>Thực nhận về ví người bán</strong></span>
-          </div>
-          <span class="font-mono font-bold text-emerald-700">${formatCurrency(income.escrow_amount || 0)}</span>
-        `;
+        if (finalEscrow < 0) {
+          banner.className = 'p-3 rounded-xl flex items-center justify-between font-medium bg-rose-50 text-rose-800 border border-rose-200';
+          banner.innerHTML = `
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-triangle-exclamation text-rose-600"></i>
+              <span>Trạng thái: <strong>Đơn THHT phát sinh chi phí cấn trừ số dư Shop</strong></span>
+            </div>
+            <span class="font-mono font-bold text-red-700">${formatCurrency(finalEscrow)}</span>
+          `;
+        } else {
+          banner.className = 'p-3 rounded-xl flex items-center justify-between font-medium bg-emerald-50 text-emerald-800 border border-emerald-200';
+          banner.innerHTML = `
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-circle-check text-emerald-600"></i>
+              <span>Trạng thái thanh toán: <strong>Thực nhận về ví người bán</strong></span>
+            </div>
+            <span class="font-mono font-bold text-emerald-700">${formatCurrency(finalEscrow)}</span>
+          `;
+        }
 
         document.getElementById('escrow-modal').classList.remove('hidden');
       } catch (err) {
@@ -6156,7 +6197,13 @@
           </button>
         `;
 
-        if (r.status === 'REQUESTED') {
+        if (r.status === 'JUDGING') {
+          actionBtns += `
+            <span class="px-2 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded text-[11px] font-bold flex items-center shadow-xs">
+              <i class="fa-solid fa-hourglass-half mr-1 text-amber-500"></i> Shopee đang xét duyệt
+            </span>
+          `;
+        } else if (r.status === 'REQUESTED') {
           actionBtns += `
             <button onclick="confirmReturn('${r.return_sn}')" class="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center">
               <i class="fa-solid fa-check mr-1"></i> Đồng ý hoàn tiền
@@ -6169,6 +6216,12 @@
             </button>
           `;
         } else if (r.status === 'ACCEPTED') {
+          let disputeTimer = '';
+          if (r.dispute_due_date) {
+            const hoursLeft = Math.max(0, Math.round((r.dispute_due_date - Date.now() / 1000) / 3600));
+            disputeTimer = `<div class="text-[9px] text-red-600 font-bold mt-0.5"><i class="fa-regular fa-clock mr-0.5"></i>Hạn khiếu nại: còn ${hoursLeft}h</div>`;
+          }
+
           if (r.compensation_status === 'COMPENSATION_REQUESTED') {
             actionBtns += `
               <span class="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded text-[10px] font-bold">
@@ -6183,9 +6236,12 @@
             `;
           } else {
             actionBtns += `
-              <button onclick="openSellerDisputeModal('${r.return_sn}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-xs font-bold transition flex items-center shadow-xs">
-                <i class="fa-solid fa-shield-halved mr-1"></i> Khiếu nại bồi thường
-              </button>
+              <div class="flex flex-col items-end">
+                <button onclick="openSellerDisputeModal('${r.return_sn}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-xs font-bold transition flex items-center shadow-xs">
+                  <i class="fa-solid fa-shield-halved mr-1"></i> Khiếu nại Shopee
+                </button>
+                ${disputeTimer}
+              </div>
             `;
           }
         } else if (r.status === 'SELLER_DISPUTE') {
@@ -6196,9 +6252,15 @@
           `;
         } else if (r.status === 'PROCESSING') {
           actionBtns += `
-            <span class="text-[11px] text-gray-500 font-mono flex items-center">
-              <i class="fa-solid fa-truck mr-1 text-blue-500"></i> ${r.reverse_tracking_number || 'Chờ gửi hàng'}
-            </span>
+            <button onclick="confirmReturn('${r.return_sn}')" class="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Đã nhận hàng gửi trả & chấp thuận hoàn tiền">
+              <i class="fa-solid fa-box-open mr-1"></i> Nhận hàng & Hoàn tiền
+            </button>
+            <button onclick="openSellerOfferModal('${r.return_sn}', ${r.refund_amount})" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Đề xuất hoàn một phần tiền cho người mua mà không cần trả hàng">
+              <i class="fa-solid fa-handshake mr-1"></i> Hoàn 1 phần
+            </button>
+            <button onclick="openSellerDisputeModal('${r.return_sn}')" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Khiếu nại nếu hàng trả về bị hỏng/thiếu/sai">
+              <i class="fa-solid fa-gavel mr-1"></i> Khiếu nại
+            </button>
           `;
         }
 
@@ -6368,8 +6430,11 @@
 
         if (r.status === 'JUDGING') {
           arbitrateBtns += `
-            <button onclick="adminReviewReturn('${r.return_sn}', 'APPROVE_RETURN')" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Chấp thuận yêu cầu trả hàng, chuyển sang chờ khách gửi hàng">
-              <i class="fa-solid fa-check mr-1"></i> Duyệt trả hàng
+            <button onclick="adminReviewReturn('${r.return_sn}', 'APPROVE_REFUND_ONLY')" class="px-2 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Hoàn tiền ngay cho người mua mà không cần trả hàng">
+              <i class="fa-solid fa-bolt mr-1"></i> Hoàn Tiền Ngay
+            </button>
+            <button onclick="adminReviewReturn('${r.return_sn}', 'APPROVE_RETURN_REFUND')" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Yêu cầu người mua gửi trả hàng về kho Shopee">
+              <i class="fa-solid fa-box mr-1"></i> Trả Hàng & Hoàn Tiền
             </button>
             <button onclick="adminReviewReturn('${r.return_sn}', 'REJECT')" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Bác bỏ yêu cầu của người mua">
               <i class="fa-solid fa-ban mr-1"></i> Bác bỏ

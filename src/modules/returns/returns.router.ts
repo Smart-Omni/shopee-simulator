@@ -4,6 +4,7 @@ import { prisma } from "../../common/prisma";
 import { shopeeAuthGuard } from "../../common/middleware/auth-guard";
 import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../common/utils/envelope";
 import { WebhookService } from "../webhook/webhook.service";
+import { calculateReverseShippingFee } from "../payment/payment.router";
 import {
   SHOPEE_DISPUTE_REASONS,
   VALID_RETURN_STATUSES,
@@ -97,7 +98,9 @@ async function handleGetReturnList(req: Request, res: Response): Promise<void> {
     validation_type: r.validationType,
     negotiation_status: r.negotiationStatus || "TERMINATED",
     seller_proof_status: r.sellerProofStatus,
-    seller_compensation_status: r.compensationStatus
+    seller_compensation_status: r.compensationStatus,
+    reverse_shipping_fee: Number(r.reverseShippingFee || 0),
+    dispute_due_date: r.disputeDueDate ? Math.floor(r.disputeDueDate.getTime() / 1000) : null
   }));
 
   const more = (pageNo * pageSize) < totalCount;
@@ -185,6 +188,8 @@ async function handleGetReturnDetail(req: Request, res: Response): Promise<void>
     seller_proof_status: r.sellerProofStatus,
     seller_compensation_status: r.compensationStatus,
     compensation_status: r.compensationStatus,
+    reverse_shipping_fee: Number(r.reverseShippingFee || 0),
+    dispute_due_date: r.disputeDueDate ? Math.floor(r.disputeDueDate.getTime() / 1000) : null,
     amount_before_discount: Number(r.order.totalAmount),
     user,
     item: items,
@@ -230,26 +235,37 @@ returnsRouter.post("/api/v2/returns/confirm", shopeeAuthGuard, async (req: Reque
   }
 
   const oldStatus = r.status;
-  const refundAmount = Number(r.refundAmount);
+  const isFullRefund = Number(r.refundAmount) >= Number(r.order.totalAmount);
+  const revFee = calculateReverseShippingFee(r.order, r);
+  const isNotReceived = r.reason === "NOT_RECEIVED" || r.reason === "NOT_RECEIPT";
+  const tran = Number(r.order.sellerTransactionFee || Math.round(Number(r.order.totalAmount) * 0.025));
 
-  // Update return status
+  let newEscrow: number;
+  if (isFullRefund) {
+    newEscrow = isNotReceived ? 0 : -(tran + revFee);
+  } else {
+    const currentEscrow = Number(r.order.escrowAmount || 0);
+    newEscrow = Math.max(0, currentEscrow - Number(r.refundAmount));
+  }
+
+  // Update return status & reverse shipping fee
   const updatedReturn = await prisma.return.update({
     where: { returnSn },
     data: {
       status: "ACCEPTED",
+      reverseShippingFee: revFee,
       negotiationStatus: "TERMINATED"
     }
   });
-
-  // Adjust order escrow: deduct refund amount (cannot drop below 0)
-  const currentEscrow = Number(r.order.escrowAmount || 0);
-  const newEscrow = Math.max(0, currentEscrow - refundAmount);
 
   await prisma.order.update({
     where: { orderSn: r.orderSn },
     data: {
       escrowAmount: newEscrow,
-      orderStatus: newEscrow === 0 ? OrderStatus.TO_RETURN : r.order.orderStatus
+      commissionFee: isNotReceived || isFullRefund ? 0 : r.order.commissionFee,
+      serviceFee: isNotReceived || isFullRefund ? 0 : r.order.serviceFee,
+      sellerTransactionFee: isNotReceived ? 0 : tran,
+      orderStatus: isFullRefund ? OrderStatus.TO_RETURN : r.order.orderStatus
     }
   });
 
@@ -370,6 +386,7 @@ returnsRouter.post("/api/v2/returns/accept_offer", shopeeAuthGuard, async (req: 
     data: {
       status: "ACCEPTED",
       refundAmount: agreedRefund,
+      reverseShippingFee: 0,
       negotiationStatus: "TERMINATED"
     }
   });

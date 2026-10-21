@@ -318,6 +318,8 @@ model Return {
   needsLogistics        Boolean      @default(false) @map("needs_logistics")
   reverseTrackingNumber String?      @map("reverse_tracking_number")
   dueDate               DateTime?    @map("due_date")
+  reverseShippingFee    Decimal      @default(0) @map("reverse_shipping_fee") @db.Decimal(15, 2)
+  disputeDueDate        DateTime?    @map("dispute_due_date")
 
   // Negotiation State
   negotiationStatus     String?      @map("negotiation_status") // PENDING_RESPOND, PENDING_BUYER_RESPOND, TERMINATED

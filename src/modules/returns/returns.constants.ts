@@ -81,7 +81,67 @@ export const VALID_RETURN_SOLUTIONS = [
   "RETURN_REFUND"
 ];
 
+export interface ShopeeOfficialReturnReason {
+  reason: string;
+  displayName: string;
+  description: string;
+  isNotReceived: boolean;
+}
+
+export const SHOPEE_OFFICIAL_RETURN_REASONS: ShopeeOfficialReturnReason[] = [
+  {
+    reason: "NOT_RECEIVED",
+    displayName: "Không nhận được hàng / Nhận thiếu hàng",
+    description: "Đơn hàng chưa giao tới tay người mua hoặc kiện hàng bị thiếu sản phẩm.",
+    isNotReceived: true
+  },
+  {
+    reason: "DAMAGED_FAULTY",
+    displayName: "Nhận được hàng nhưng hàng có vấn đề (bể vỡ, sai hàng, hàng lỗi, khác mô tả...)",
+    description: "Nhận được hàng nhưng hàng bị vỡ, rách bao bì, sai phân loại hoặc không hoạt động.",
+    isNotReceived: false
+  },
+  {
+    reason: "CHANGE_OF_MIND",
+    displayName: "Đổi ý (Sản phẩm còn nguyên tem, nhãn mác, bao bì)",
+    description: "Người mua đổi ý không còn nhu cầu, cam kết sản phẩm còn nguyên vẹn chưa qua sử dụng.",
+    isNotReceived: false
+  }
+];
+
+export function normalizeReturnReason(rawReason: string): string {
+  if (!rawReason) return "DAMAGED_FAULTY";
+  const upper = rawReason.trim().toUpperCase();
+
+  // 1. Not received category
+  if (
+    upper === "NOT_RECEIVED" ||
+    upper === "NOT_RECEIPT" ||
+    upper === "SP_NOT_RECEIVED" ||
+    upper.includes("NON_RECEIPT") ||
+    upper.includes("CHUA_NHAN")
+  ) {
+    return "NOT_RECEIVED";
+  }
+
+  // 2. Change of mind category
+  if (
+    upper === "CHANGE_OF_MIND" ||
+    upper === "CHANGE_MIND" ||
+    upper === "SP_CHANGE_MIND" ||
+    upper.includes("DOI_Y")
+  ) {
+    return "CHANGE_OF_MIND";
+  }
+
+  // 3. Damaged / faulty / wrong item / missing / different description
+  return "DAMAGED_FAULTY";
+}
+
 export const VALID_RETURN_REASONS = [
+  "NOT_RECEIVED",
+  "DAMAGED_FAULTY",
+  "CHANGE_OF_MIND",
   "NOT_RECEIPT",
   "WRONG_ITEM",
   "ITEM_DAMAGED",
@@ -94,5 +154,10 @@ export const VALID_RETURN_REASONS = [
   "EXPECTATION_FAILED",
   "ITEM_FAKE",
   "PHYSICAL_DMG",
-  "FUNCTIONAL_DMG"
+  "FUNCTIONAL_DMG",
+  "SP_DAMAGE",
+  "SP_WRONG_ITEM",
+  "SP_ITEM_MISSING",
+  "SP_COUNTERFEIT",
+  "SP_CHANGE_MIND"
 ];

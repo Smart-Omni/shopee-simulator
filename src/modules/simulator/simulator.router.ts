@@ -4,6 +4,8 @@ import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../co
 import { WebhookService } from "../webhook/webhook.service";
 import { generateShopeeAwbPdf } from "../../common/utils/pdf";
 import { OrderStatus, PromotionStatus } from "@prisma/client";
+import { normalizeReturnReason } from "../returns/returns.constants";
+import { calculateReverseShippingFee } from "../payment/payment.router";
 import * as crypto from "crypto";
 
 export const simulatorRouter = Router();
@@ -1821,10 +1823,11 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", async (req: Requ
       return;
     }
 
-    const valType = validation_type === "warehouse_validation" ? "warehouse_validation" : "seller_validation";
+    const normalizedReason = normalizeReturnReason(reason);
+    const valType = validation_type === "seller_validation" ? "seller_validation" : "warehouse_validation";
     // Shopee-First flow starts in JUDGING; Seller-First starts in REQUESTED
-    const initialStatus = valType === "warehouse_validation" ? "JUDGING" : "REQUESTED";
-    const sol = solution === "RETURN_REFUND" ? "RETURN_REFUND" : "REFUND";
+    const initialStatus = valType === "seller_validation" ? "REQUESTED" : "JUDGING";
+    const sol = solution === "REFUND_ONLY" || solution === "REFUND" ? "REFUND" : "RETURN_REFUND";
     const needsLogistics = sol === "RETURN_REFUND";
 
     const returnSn = "RET" + Date.now().toString().slice(-8) + Math.floor(100 + Math.random() * 900);
@@ -1842,7 +1845,7 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", async (req: Requ
         refundAmount: requestedRefund,
         currency: order.currency,
         status: initialStatus,
-        reason,
+        reason: normalizedReason,
         textReason: text_reason || "",
         solution: sol,
         needsLogistics,
@@ -2180,16 +2183,26 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_accept_offer", async (req:
       data: {
         status: "ACCEPTED",
         refundAmount: agreedRefund,
+        reverseShippingFee: 0,
         negotiationStatus: "TERMINATED"
       }
     });
 
-    // Deduct agreed refund amount from order escrow
-    const currentEscrow = Number(r.order.escrowAmount || 0);
-    const newEscrow = Math.max(0, currentEscrow - agreedRefund);
+    // When buyer accepts partial refund, goods are not returned (reverseShippingFee = 0)
+    const buyerTotal = Number(r.order.totalAmount);
+    const retainedAmount = Math.max(0, buyerTotal - agreedRefund);
+    const tran = Number(r.order.sellerTransactionFee || Math.round(buyerTotal * 0.025));
+    const comm = Math.round(retainedAmount * 0.02);
+    const serv = Math.round(retainedAmount * 0.015);
+    const newEscrow = Math.max(0, retainedAmount - tran - comm - serv);
+
     await prisma.order.update({
       where: { orderSn: r.orderSn },
-      data: { escrowAmount: newEscrow }
+      data: {
+        escrowAmount: newEscrow,
+        commissionFee: comm,
+        serviceFee: serv
+      }
     });
 
     await WebhookService.dispatchReturnUpdate({
@@ -2371,39 +2384,71 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/review", async (req: Reque
     const oldStatus = r.status;
     let newStatus = r.status;
     let sellerProofStatus = r.sellerProofStatus;
+    let updateData: any = {};
 
-    if (action === "APPROVE_RETURN") {
-      // If Refund Only -> immediately ACCEPTED; if Return & Refund -> PROCESSING for return shipment
-      newStatus = r.solution === "REFUND" ? "ACCEPTED" : "PROCESSING";
-      if (newStatus === "ACCEPTED") {
-        // Deduct escrow
-        const currentEscrow = Number(r.order.escrowAmount || 0);
-        const newEscrow = Math.max(0, currentEscrow - Number(r.refundAmount));
-        await prisma.order.update({
-          where: { orderSn: r.orderSn },
-          data: { escrowAmount: newEscrow }
-        });
-      }
+    if (action === "APPROVE_REFUND_ONLY") {
+      // "Hoàn tiền ngay": no parcel returned, 2-day dispute window for seller
+      newStatus = "ACCEPTED";
+      const disputeDueDate = new Date(Date.now() + 48 * 3600 * 1000);
+      const isNotReceived = r.reason === "NOT_RECEIVED" || r.reason === "NOT_RECEIPT";
+      const tran = Number(r.order.sellerTransactionFee || Math.round(Number(r.order.totalAmount) * 0.025));
+      const newEscrow = isNotReceived ? 0 : -tran;
+
+      await prisma.order.update({
+        where: { orderSn: r.orderSn },
+        data: {
+          escrowAmount: newEscrow,
+          commissionFee: 0,
+          serviceFee: 0,
+          sellerTransactionFee: isNotReceived ? 0 : tran
+        }
+      });
+
+      updateData = {
+        status: "ACCEPTED",
+        solution: "REFUND",
+        needsLogistics: false,
+        reverseShippingFee: 0,
+        disputeDueDate,
+        rulingNotes: notes || "Shopee approved instant refund (Hoàn tiền ngay - không trả hàng)"
+      };
+    } else if (action === "APPROVE_RETURN_REFUND" || action === "APPROVE_RETURN") {
+      // "Trả hàng & hoàn tiền": parcel must be shipped back by buyer
+      newStatus = "PROCESSING";
+      const carrierPrefix = r.order.shippingCarrier ? r.order.shippingCarrier.slice(0, 3).toUpperCase() : "SPX";
+      const reverseTracking = "RET-" + carrierPrefix + Date.now().toString().slice(-8);
+
+      updateData = {
+        status: "PROCESSING",
+        solution: "RETURN_REFUND",
+        needsLogistics: true,
+        reverseTrackingNumber: reverseTracking,
+        rulingNotes: notes || "Shopee approved return & refund (Chờ người mua gửi trả hàng)"
+      };
     } else if (action === "REQUEST_SELLER_PROOF") {
       sellerProofStatus = "PENDING";
+      updateData = {
+        sellerProofStatus: "PENDING",
+        rulingNotes: notes || "Shopee requested proof from seller"
+      };
     } else if (action === "REJECT") {
       newStatus = "CLOSED";
       await prisma.order.update({
         where: { orderSn: r.orderSn },
         data: { orderStatus: OrderStatus.COMPLETED }
       });
+      updateData = {
+        status: "CLOSED",
+        rulingNotes: notes || `Shopee Admin rejected return: ${notes || "Claim rejected"}`
+      };
     } else {
-      res.json(createShopeeErrorResponse("error_param", "Invalid action. Use APPROVE_RETURN, REQUEST_SELLER_PROOF, or REJECT"));
+      res.json(createShopeeErrorResponse("error_param", "Invalid action. Use APPROVE_REFUND_ONLY, APPROVE_RETURN_REFUND, APPROVE_RETURN, REQUEST_SELLER_PROOF, or REJECT"));
       return;
     }
 
     const updated = await prisma.return.update({
       where: { returnSn: return_sn },
-      data: {
-        status: newStatus,
-        sellerProofStatus,
-        rulingNotes: notes || `Shopee Admin review: ${action}`
-      }
+      data: updateData
     });
 
     await WebhookService.dispatchReturnUpdate({
@@ -2449,13 +2494,30 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/warehouse_inbound", async 
     const isPass = inspection_result !== "FAIL";
     const newStatus = isPass ? "ACCEPTED" : "SELLER_DISPUTE";
     const oldStatus = r.status;
+    let revFee = 0;
 
     if (isPass) {
-      const currentEscrow = Number(r.order.escrowAmount || 0);
-      const newEscrow = Math.max(0, currentEscrow - Number(r.refundAmount));
+      const isFullRefund = Number(r.refundAmount) >= Number(r.order.totalAmount);
+      revFee = calculateReverseShippingFee(r.order, r);
+      const isNotReceived = r.reason === "NOT_RECEIVED" || r.reason === "NOT_RECEIPT";
+      const tran = Number(r.order.sellerTransactionFee || Math.round(Number(r.order.totalAmount) * 0.025));
+
+      let newEscrow: number;
+      if (isFullRefund) {
+        newEscrow = isNotReceived ? 0 : -(tran + revFee);
+      } else {
+        const currentEscrow = Number(r.order.escrowAmount || 0);
+        newEscrow = Math.max(0, currentEscrow - Number(r.refundAmount));
+      }
+
       await prisma.order.update({
         where: { orderSn: r.orderSn },
-        data: { escrowAmount: newEscrow }
+        data: {
+          escrowAmount: newEscrow,
+          commissionFee: isNotReceived || isFullRefund ? 0 : r.order.commissionFee,
+          serviceFee: isNotReceived || isFullRefund ? 0 : r.order.serviceFee,
+          sellerTransactionFee: isNotReceived ? 0 : tran
+        }
       });
     }
 
@@ -2463,6 +2525,7 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/warehouse_inbound", async 
       where: { returnSn: return_sn },
       data: {
         status: newStatus,
+        reverseShippingFee: revFee,
         rulingNotes: `Warehouse inspection: ${isPass ? 'PASSED - item verified' : 'FAILED - item damaged/incorrect'}`
       }
     });
@@ -2608,6 +2671,8 @@ simulatorRouter.get("/api/v2/simulator/returns", async (req: Request, res: Respo
       needs_logistics: r.needsLogistics,
       reverse_tracking_number: r.reverseTrackingNumber || "",
       due_date: r.dueDate ? Math.floor(r.dueDate.getTime() / 1000) : null,
+      dispute_due_date: r.disputeDueDate ? Math.floor(r.disputeDueDate.getTime() / 1000) : null,
+      reverse_shipping_fee: Number(r.reverseShippingFee || 0),
       negotiation_status: r.negotiationStatus || "TERMINATED",
       offer_amount: r.offerAmount ? Number(r.offerAmount) : null,
       seller_proof_status: r.sellerProofStatus,

@@ -7,9 +7,46 @@ import { OrderStatus } from "@prisma/client";
 export const paymentRouter = Router();
 
 // ============================================================================
+// ============================================================================
+// REVERSE SHIPPING FEE POLICY (Official Shopee Vietnam Policy from 01/04/2025)
+// ============================================================================
+export function calculateReverseShippingFee(order: any, returnReq: any): number {
+  if (!returnReq) return 0;
+
+  // 1. Exemption: NOT_RECEIVED reason (Chưa nhận được hàng)
+  if (returnReq.reason === "NOT_RECEIVED" || returnReq.reason === "NOT_RECEIPT") {
+    return 0;
+  }
+
+  // 2. Exemption: Refund Only (Hoàn tiền ngay, không yêu cầu trả hàng)
+  if (returnReq.solution === "REFUND" || returnReq.needsLogistics === false) {
+    return 0;
+  }
+
+  // 3. Exemption: Carrier or Platform compensation
+  if (returnReq.compensationStatus === "COMPENSATION_APPROVED") {
+    return 0;
+  }
+
+  // 4. Exemption: Partial return (Shopee waives/reimburses return shipping fee for partial returns)
+  if (returnReq.refundAmount && order.totalAmount && Number(returnReq.refundAmount) < Number(order.totalAmount)) {
+    return 0;
+  }
+
+  // Channel rate cap:
+  // - Instant / Same-Day (channelId 30004 or carrier SPX Instant): max 20,000 VND
+  // - Standard shipping (all other channels): max 40,000 VND
+  const isInstant =
+    order.channelId === BigInt(30004) ||
+    (order.shippingCarrier && order.shippingCarrier.toLowerCase().includes("instant"));
+
+  return isInstant ? 20000 : 40000;
+}
+
+// ============================================================================
 // HELPER: BUILD ITEMIZED ORDER INCOME BREAKDOWN
 // ============================================================================
-function buildOrderIncomeBreakdown(order: any) {
+export function buildOrderIncomeBreakdown(order: any) {
   const itemsSubtotal = order.items.reduce(
     (sum: number, it: any) => sum + Number(it.itemPrice) * it.quantityPurchased,
     0
@@ -21,22 +58,54 @@ function buildOrderIncomeBreakdown(order: any) {
   const buyerShipping = Number(order.buyerPaidShippingFee || 0);
   const actualShipping = Number(order.actualShippingFee || 0);
 
-  const commissionFee = Number(order.commissionFee || Math.round(itemsSubtotal * 0.02));
-  const serviceFee = Number(order.serviceFee || (voucherShopee > 0 ? Math.round(itemsSubtotal * 0.015) : 0));
-  const transactionFee = Number(order.sellerTransactionFee || Math.round(buyerTotal * 0.025));
+  const acceptedReturns = (order.returns || []).filter((r: any) => r.status === "ACCEPTED");
+  const totalReturnRefund = acceptedReturns.reduce((sum: number, r: any) => sum + Number(r.refundAmount || 0), 0);
+  const sellerReturnRefund = totalReturnRefund > 0 ? -totalReturnRefund : 0;
+
+  // Calculate reverse shipping fees:
+  const totalReverseShippingFee = acceptedReturns.reduce((sum: number, r: any) => {
+    const fee = r.reverseShippingFee !== undefined && r.reverseShippingFee !== null
+      ? Number(r.reverseShippingFee)
+      : calculateReverseShippingFee(order, r);
+    return sum + fee;
+  }, 0);
+
+  const hasNotReceivedReturn = acceptedReturns.some(
+    (r: any) => r.reason === "NOT_RECEIVED" || r.reason === "NOT_RECEIPT"
+  );
+
+  let commissionFee = Number(order.commissionFee || Math.round(itemsSubtotal * 0.02));
+  let serviceFee = Number(order.serviceFee || (voucherShopee > 0 ? Math.round(itemsSubtotal * 0.015) : 0));
+  let transactionFee = Number(order.sellerTransactionFee || Math.round(buyerTotal * 0.025));
+
+  if (acceptedReturns.length > 0) {
+    if (hasNotReceivedReturn) {
+      // Reason: "Chưa nhận được hàng" -> Seller NOT charged service fee, fixed fee, or transaction fee!
+      commissionFee = 0;
+      serviceFee = 0;
+      transactionFee = 0;
+    } else {
+      // Reason: "Hàng có vấn đề" or "Đổi ý":
+      // Seller still bears transaction fee for the order!
+      // Fixed fee and service fee apply only to retained value (0 if 100% refunded)
+      const retainedSubtotal = Math.max(0, itemsSubtotal - totalReturnRefund);
+      commissionFee = Math.round(retainedSubtotal * 0.02);
+      serviceFee = voucherShopee > 0 ? Math.round(retainedSubtotal * 0.015) : 0;
+    }
+  }
 
   const calculatedEscrow = Number(
     order.escrowAmount !== null && order.escrowAmount !== undefined
       ? order.escrowAmount
-      : Math.max(
-          0,
-          itemsSubtotal - voucherSeller + buyerShipping - actualShipping + voucherShopee - commissionFee - serviceFee - transactionFee
+      : (
+          itemsSubtotal - voucherSeller + buyerShipping - actualShipping + voucherShopee
+          - totalReturnRefund
+          - totalReverseShippingFee
+          - commissionFee
+          - serviceFee
+          - transactionFee
         )
   );
-
-  const acceptedReturns = (order.returns || []).filter((r: any) => r.status === "ACCEPTED");
-  const totalReturnRefund = acceptedReturns.reduce((sum: number, r: any) => sum + Number(r.refundAmount || 0), 0);
-  const sellerReturnRefund = totalReturnRefund > 0 ? -totalReturnRefund : 0;
 
   const itemsBreakdown = order.items.map((it: any) => ({
     item_id: Number(it.itemId),
@@ -99,6 +168,8 @@ function buildOrderIncomeBreakdown(order: any) {
       original_cost_of_goods_sold: itemsSubtotal,
       original_shopee_discount: 0,
       seller_return_refund: sellerReturnRefund,
+      reverse_shipping_fee: totalReverseShippingFee,
+      final_return_to_seller_shipping_fee: totalReverseShippingFee,
       buyer_payment_method: order.paymentMethod || "ShopeePay",
       items: itemsBreakdown
     }
@@ -343,6 +414,7 @@ paymentRouter.get("/api/v2/simulator/payment/overview", async (req: Request, res
   let totalCommissionFees = 0;
   let totalServiceFees = 0;
   let totalTransactionFees = 0;
+  let totalReverseShippingFees = 0;
   let settledOrdersCount = 0;
   let returnedOrdersCount = 0;
 
@@ -357,13 +429,29 @@ paymentRouter.get("/api/v2/simulator/payment/overview", async (req: Request, res
     const totalRefundAmount = acceptedReturns.reduce((sum: number, r: any) => sum + Number(r.refundAmount || 0), 0);
     const isFullyRefunded = hasAcceptedReturn && (totalRefundAmount >= Number(o.totalAmount) || Number(o.escrowAmount || 0) <= 0);
 
-    const escrow = Number(o.escrowAmount || 0);
+    const totalReverseShippingFee = acceptedReturns.reduce((sum: number, r: any) => {
+      const fee = r.reverseShippingFee !== undefined && r.reverseShippingFee !== null
+        ? Number(r.reverseShippingFee)
+        : calculateReverseShippingFee(o, r);
+      return sum + fee;
+    }, 0);
+
+    const hasNotReceivedReturn = acceptedReturns.some(
+      (r: any) => r.reason === "NOT_RECEIVED" || r.reason === "NOT_RECEIPT"
+    );
+
+    const escrow = Number(o.escrowAmount !== null && o.escrowAmount !== undefined ? o.escrowAmount : 0);
     const comm = Number(o.commissionFee || 0);
     const serv = Number(o.serviceFee || 0);
     const tran = Number(o.sellerTransactionFee || 0);
 
+    const orderPlatformFees = isFullyRefunded
+      ? (hasNotReceivedReturn ? 0 : tran)
+      : (comm + serv + tran);
+
     if (hasAcceptedReturn) {
       returnedOrdersCount += 1;
+      totalReverseShippingFees += totalReverseShippingFee;
     }
 
     // Only count as settled sold order if COMPLETED and NOT fully refunded!
@@ -389,7 +477,9 @@ paymentRouter.get("/api/v2/simulator/payment/overview", async (req: Request, res
       commission_fee: comm,
       service_fee: serv,
       seller_transaction_fee: tran,
-      total_platform_fees: isFullyRefunded ? 0 : (comm + serv + tran),
+      total_platform_fees: orderPlatformFees,
+      reverse_shipping_fee: totalReverseShippingFee,
+      has_not_received_return: hasNotReceivedReturn,
       escrow_amount: escrow,
       escrow_release_time: o.escrowReleaseTime ? Math.floor(o.escrowReleaseTime.getTime() / 1000) : null,
       created_at: Math.floor(o.createdAt.getTime() / 1000),
@@ -409,6 +499,7 @@ paymentRouter.get("/api/v2/simulator/payment/overview", async (req: Request, res
       released_amount: releasedAmount,
       pending_amount: pendingAmount,
       total_platform_fees: totalCommissionFees + totalServiceFees + totalTransactionFees,
+      total_reverse_shipping_fees: totalReverseShippingFees,
       settled_orders_count: settledOrdersCount,
       returned_orders_count: returnedOrdersCount,
       total_orders_count: orders.length
@@ -433,7 +524,8 @@ paymentRouter.get("/api/v2/simulator/payment/escrow_detail", async (req: Request
           productModel: true
         }
       },
-      shop: true
+      shop: true,
+      returns: true
     }
   });
 
