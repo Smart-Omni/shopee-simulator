@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-teal.svg)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Test Suite](https://img.shields.io/badge/Tests-464%2F464%20Passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/Tests-509%2F509%20Passing-brightgreen.svg)]()
 [![Shopee Open API](https://img.shields.io/badge/Shopee%20Open%20API-v2%20Standard-orange.svg)]()
 
 > High-fidelity, contractually conforming **Shopee Open API v2 Mock Server** and interactive web testbed built for **SmartOmni Channel** integration, multi-merchant e-commerce synchronization, automated testing, and development without sandbox rate limits or dependency on live Shopee seller accounts.
@@ -69,7 +69,7 @@ The simulator implements a **Two-Layer Dual Architecture**:
 
 ## 🚀 Supported Modules & Capabilities
 
-The simulator has completed **Phases 1 through 13** with **464 automated assertions passing (100%)**:
+The simulator has completed **Phases 1 through 14** with **509 automated assertions passing (100%)**:
 
 ### 1. Authentication & Dual-Token Grace Period (OAuth 2.0)
 - `POST /api/v2/public/get_token_by_resend_code`: Exchange authorization code for initial `access_token` and `refresh_token`.
@@ -181,6 +181,25 @@ The simulator has completed **Phases 1 through 13** with **464 automated asserti
   - Shopee Admin Arbitration view with real-time status tabs and binding ruling controls (*Phê duyệt*, *Yêu cầu Shop bổ sung bằng chứng*, *Bác bỏ*, *Nhập kho Shopee*, *Ban hành phán quyết Trọng tài*).
 - **Outbound Webhook Dispatching (Code 29)**: Real-time `RETURN_STATUS_UPDATE` push notifications on all status transitions.
 
+### 11. Cloud Media Storage, CI/CD Pipeline & Marketplace Extensions (Phase 14)
+- **Cloud Media Storage Engine (`src/common/storage/`)**:
+  - **Google Drive Storage Provider**: OAuth2 User Credentials authorization with zero service-account quota blocks, direct upload to designated folder (`GOOGLE_DRIVE_FOLDER_ID`), and high-speed public CDN URLs (`https://lh3.googleusercontent.com/d/{fileId}`) that embed directly in HTML/React `<img>` and `<video>` tags.
+  - **Local Filesystem Fallback**: In-memory and local disk (`public/uploads/`) fallback provider.
+  - `POST /api/v2/simulator/media/upload`: Single photo (up to 10MB) or video clip (up to 50MB) upload.
+  - `POST /api/v2/simulator/media/upload_multiple`: Multi-file batch upload (up to 10 files).
+  - `POST /api/v2/media_space/upload_image`: Layer A official Shopee MediaSpace image upload connected to storage providers.
+  - **Test Suite Spam Protection**: Automated skip in `npm test` prevents uploading dummy files to Google Drive while permitting live testing via `TEST_DRIVE_UPLOAD=true`.
+- **Automated CI/CD Pipeline (`.github/workflows/ci.yml`)**:
+  - Full GitHub Actions workflow with PostgreSQL 16 container service.
+  - Automatically verifies `npm ci`, `npx prisma db push`, `npm run prisma:seed`, `npm run build`, and `npm test` across all 14 phases.
+  - Automated cloud CD deploy hook dispatch on merges to `main`.
+- **Marketplace & Simulator Backend Extensions (Shopiz Layer B)**:
+  - **Buyer Auth**: `POST /api/v2/simulator/auth/login`, `register` (salted `crypto.scryptSync` hashing), `forgot_password`, and profile lookup/update.
+  - **Shipping Addresses**: Full CRUD + `set_default` primary address selection.
+  - **Marketplace Catalog & Search**: `categories` tree, keyword search (`?q=...`), category filtering, price/sales sorting, rich product detail with variations and reviews, and shop storefronts.
+  - **Multi-Shop Checkout & Settlement**: `logistics/channels` quotes, voucher validation, `batch_checkout` (creating distinct orders per shop), and `confirm_delivery` (transitioning to `COMPLETED` and releasing escrow).
+  - **Seller Analytics**: Order volumes, gross merchandise value, conversion rates, and SVG chart curves.
+
 ---
 
 ## 📚 Official Shopee Documentation & API Index
@@ -283,17 +302,61 @@ npm run build
 
 ---
 
+## ☁️ Cloud Deployment & Production Hosting (Free Tier)
+
+The simulator is production-ready for deployment on free cloud infrastructure:
+
+```mermaid
+flowchart LR
+    subgraph Repo["GitHub Repository"]
+        src["wishuponsirius/shopee-simulator"]
+    end
+    subgraph CI["GitHub Actions CI/CD"]
+        ci["ci.yml: 14 Phases Test & Build"]
+    end
+    subgraph Cloud["Free Cloud Infrastructure"]
+        neon[("Neon.tech PostgreSQL 16<br/>(0.5 GB Free Serverless DB)")]
+        render["Render.com Web Service<br/>(Free Tier, Auto-SSL, Docker)"]
+    end
+    subgraph Clients["Frontend Clients"]
+        shopiz["Shopiz Marketplace / Seller Center"]
+        omni["SmartOmni Channel Integration"]
+    end
+
+    src -->|Push / PR| ci
+    ci -->|On Merge to main| render
+    render <-->|DATABASE_URL| neon
+    shopiz -->|REST API /api/v2/simulator/*| render
+    omni -->|HMAC OpenAPI /api/v2/*| render
+```
+
+### Free Stack Recommendation
+1. **Database**: [Neon.tech](https://neon.tech) Serverless PostgreSQL 16
+   - 0.5 GB permanent storage, zero credit card required, serverless auto-scaling.
+2. **Web Service**: [Render.com](https://render.com) Web Service
+   - Connects directly to GitHub repo, auto-detects `Dockerfile`, and provisions free SSL (`https://...`).
+3. **Environment Variables on Cloud**:
+   - `DATABASE_URL`: Connection string from Neon (`postgresql://user:pass@ep-...neon.tech/neondb?sslmode=require`).
+   - `NODE_ENV`: `production`
+   - *(Optional)* `GOOGLE_DRIVE_*`: For live cloud media uploads.
+
+---
+
 ## 🧪 Testing & Quality Assurance
 
-The simulator includes comprehensive automated test suites covering all 12 phases:
+The simulator includes comprehensive automated test suites covering all 14 phases:
 
 ```bash
 npm test
 ```
 
 ### Test Suite Invariants
-- **100% Pass Rate**: All 464 assertions must pass.
-- **Zero Regressions**: Any modification to existing modules must not break backward compatibility tests (Phases 1–12).
+- **100% Pass Rate**: All 509 assertions must pass.
+- **Zero Regressions**: Any modification to existing modules must not break backward compatibility tests (Phases 1–14).
+- **Google Drive Protection**: Automated skip in `npm test` prevents uploading test images to Google Drive. To run live upload verification:
+  ```bash
+  TEST_DRIVE_UPLOAD=true npm run test:phase14
+  ```
 - **Network Note**: Because PostgreSQL operates on `localhost:5432`, ensure commands running the test suite have network socket access (`BypassSandbox: true` if using AI sandboxed terminals).
 
 ---
@@ -302,7 +365,7 @@ npm test
 
 When an AI coding agent begins a task in this repository:
 
-1. **Check Baseline**: Run `npm test` immediately. Verify that all 464 assertions pass before touching code.
+1. **Check Baseline**: Run `npm test` immediately. Verify that all 509 assertions pass before touching code.
 2. **Review Spec & Official Docs**:
    - Locate the target endpoint documentation in `../api-reference/<Module>/v2.<module>.<action>.md`.
    - Check webhook payloads in `../push-mechanism/`.
@@ -331,6 +394,6 @@ To safely transition to a new coding session while preserving maximum efficiency
 3. **Leverage the Workspace Skill**: The simulator has a dedicated skill at `.agents/skills/shopee-simulator/SKILL.md`. In Antigravity, workspace skills persist across conversation sessions and load automatically into any new agent prompt.
 4. **Kickoff Prompt for New Sessions**: Use the prompt template in [`PROMPT_NEXT_SESSION.md`](./PROMPT_NEXT_SESSION.md) when starting a fresh session:
 
-> *"We are continuing development on the Shopee Open API v2 Simulator in `shopee-simulator/`. Please activate the `shopee-simulator` skill, check the `develop` branch, review `README.md` and `CHANGELOG.md` (currently at v1.8.0, 464/464 tests passing), run `npm test` to verify baseline health, and proceed with [YOUR NEXT TASK]."*
+> *"We are continuing development on the Shopee Open API v2 Simulator in `shopee-simulator/`. Please activate the `shopee-simulator` skill, check the `develop` or feature branch, review `README.md` and `CHANGELOG.md` (currently at v1.9.0, 509/509 tests passing), run `npm test` to verify baseline health, and proceed with [YOUR NEXT TASK]."*
 
 This ensures zero context decay, zero hallucinated regressions, and immediate productive pairing.

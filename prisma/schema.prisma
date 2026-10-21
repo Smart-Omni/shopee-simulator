@@ -584,3 +584,44 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
+// ----------------------------------------------------
+// 9. BUYER USERS & ADDRESS BOOK (FOR SHOPIZ FRONTEND)
+// ----------------------------------------------------
+model BuyerUser {
+  id           BigInt         @id @default(autoincrement()) @map("buyer_id")
+  username     String         @unique
+  email        String?        @unique
+  phone        String?        @unique
+  passwordHash String         @map("password_hash")
+  name         String
+  avatarUrl    String?        @map("avatar_url")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  addresses    BuyerAddress[]
+
+  @@map("buyer_users")
+}
+
+model BuyerAddress {
+  id             String     @id @default(uuid())
+  buyerId        BigInt     @map("buyer_id")
+  recipientName  String     @map("recipient_name")
+  recipientPhone String     @map("recipient_phone")
+  addressLine    String     @map("address_line")
+  ward           String?
+  district       String
+  city           String
+  state          String?
+  zipcode        String?
+  isDefault      Boolean    @default(false) @map("is_default")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  buyer          BuyerUser  @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  @@index([buyerId])
+  @@map("buyer_addresses")
+}
+
+

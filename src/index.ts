@@ -16,6 +16,7 @@ import { voucherRouter } from "./modules/voucher/voucher.router";
 import { chatRouter } from "./modules/chat/chat.router";
 import { paymentRouter } from "./modules/payment/payment.router";
 import { returnsRouter } from "./modules/returns/returns.router";
+import { buyerRouter } from "./modules/simulator/buyer.router";
 import { createShopeeErrorResponse } from "./common/utils/envelope";
 import path from "path";
 
@@ -69,6 +70,7 @@ app.use(chatRouter);
 app.use(paymentRouter);
 app.use(returnsRouter);
 app.use(simulatorRouter);
+app.use(buyerRouter);
 
 // Global Error Handler (Shopee Envelope Format)
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
