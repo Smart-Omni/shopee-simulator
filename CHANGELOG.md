@@ -4,6 +4,73 @@ All notable changes, bug fixes, architecture evolution, and feature enhancements
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-10-21
+
+### 🎯 Overview
+Implemented **Phase 14: Cloud Media Storage, CI/CD Automation & Marketplace Extensions**, adding real cloud storage for photos and videos (Google Drive OAuth2 with direct high-speed CDN URLs and local storage fallback), an automated GitHub Actions CI/CD pipeline, and public REST API extensions enabling seamless integration with client frontends (such as Shopiz marketplace and seller center). The test baseline now stands at **509 passing assertions (100% pass rate)** across 14 test suites.
+
+### ☁️ Cloud Media Storage Engine (`src/common/storage/`)
+- **Google Drive Storage Provider (`src/common/storage/google-drive.provider.ts`):**
+  - Connects to Google Drive API v3 using **OAuth2 User Credentials** (`GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, `GOOGLE_DRIVE_REFRESH_TOKEN`), enabling direct uploads under personal 15GB drive quotas without service account restrictions.
+  - Automatically targets user's designated Google Drive folder (`GOOGLE_DRIVE_FOLDER_ID`).
+  - Automatically applies public reader permissions (`role: reader, type: anyone`) to uploaded files.
+  - Generates direct high-speed Google CDN URLs: `https://lh3.googleusercontent.com/d/{fileId}` for zero-redirect inline embedding in `<img>` and `<video>` tags.
+- **Local Filesystem Storage Fallback (`src/common/storage/local-storage.provider.ts`):**
+  - Seamless fallback saving files to `public/uploads/` when offline or without Google Drive credentials.
+- **Provider Manager & Service (`src/common/storage/storage.service.ts`):**
+  - Dynamic credential detection, runtime provider switching via `setProvider()`, and intelligent test skipping via `SKIP_DRIVE_UPLOAD=true`.
+- **Media Upload Endpoints (`src/modules/media/media.router.ts`):**
+  - `POST /api/v2/simulator/media/upload`: Multipart upload for single image (up to 10MB) or video clip (up to 50MB).
+  - `POST /api/v2/simulator/media/upload_multiple`: Multi-file batch upload (up to 10 files).
+  - `POST /api/v2/media_space/upload_image`: Layer A official Shopee MediaSpace image upload connected to storage providers.
+- **Test Suite Drive Spam Protection:**
+  - Automated detection in `test/phase14_shopiz_integration.spec.ts` skips live Google Drive uploads during `npm test` runs, preventing clutter in user's Drive folder while allowing optional live tests via `TEST_DRIVE_UPLOAD=true`.
+  - Phase 2 MediaSpace tests configured with `LocalStorageProvider` to run in memory without network calls.
+
+### 🚀 CI/CD Pipeline & Cloud Deployment Automation
+- **GitHub Actions Workflow (`.github/workflows/ci.yml`):**
+  - Automated testing on push and pull requests to `main`, `develop`, and `feature/*`.
+  - Spawns isolated PostgreSQL 16 container service (`postgres:16-alpine`, port 5432).
+  - Executes `npm ci`, `npx prisma db push`, `npm run prisma:seed`, and `npm run build`.
+  - Runs full 14-phase test suite hermetically (`SKIP_DRIVE_UPLOAD=true`).
+  - Automated deployment trigger (CD): Dispatches webhook deployment call to cloud host on merge to `main` when `CLOUD_DEPLOY_HOOK_URL` secret is configured.
+- **Cloud Hosting Runbook:**
+  - Database: [Neon.tech](https://neon.tech) Serverless PostgreSQL 16 (0.5 GB permanent free tier, zero credit card required).
+  - Web Service: [Render.com](https://render.com) Docker Web Service (Free tier, auto-SSL, auto-builds multi-stage `Dockerfile`).
+
+### 🛍 Marketplace & Simulator Backend Extensions (Shopiz Layer B)
+- **Buyer Authentication & User Accounts (`src/modules/simulator/buyer.router.ts`):**
+  - `POST /api/v2/simulator/auth/login`: Authenticates with username, email, or phone number.
+  - `POST /api/v2/simulator/auth/register`: Validates uniqueness, hashes password with cryptographic salt using native `crypto.scryptSync`.
+  - `POST /api/v2/simulator/auth/forgot_password`: OTP verification simulation.
+  - `GET & PUT /api/v2/simulator/buyer/profile`: Buyer profile lookup and update.
+- **Buyer Shipping Address Book:**
+  - `GET /api/v2/simulator/buyer/addresses`: Retrieves all saved shipping addresses.
+  - `POST /api/v2/simulator/buyer/addresses`: Creates new address with optional default flag.
+  - `PUT /api/v2/simulator/buyer/addresses/:id`: Updates existing address.
+  - `DELETE /api/v2/simulator/buyer/addresses/:id`: Soft/hard removes address.
+  - `POST /api/v2/simulator/buyer/addresses/:id/set_default`: Atomically sets target address as primary.
+- **Catalog, Storefront & Seller Analytics (`src/modules/simulator/simulator.router.ts`):**
+  - `GET /api/v2/simulator/categories`: Full category hierarchy tree with attributes and item counts.
+  - `GET /api/v2/simulator/products`: Enhanced with text search (`?q=...`), category filtering (`?category_id=...`), price/sales sorting (`?sort=price_asc|price_desc|sales`), and pagination (`?page=&page_size=`).
+  - `GET /api/v2/simulator/product/detail`: Rich single-product view with models/variations, seller snapshot, rating average, and review comments.
+  - `GET /api/v2/simulator/shop/detail`: Returns shop storefront profile (followers, response rate, rating, story, active products).
+  - `GET /api/v2/simulator/seller/analytics`: Revenue, orders, visitors, conversion rate, and SVG curve series for Seller Center.
+- **Logistics, Checkout & Delivery Confirmation (`src/modules/order/order.router.ts`, `voucher.router.ts`):**
+  - `GET /api/v2/simulator/logistics/channels`: Returns enabled shipping carriers and rates.
+  - `POST /api/v2/simulator/voucher/validate`: Basket spend and discount calculator.
+  - `POST /api/v2/simulator/order/batch_checkout`: Atomic multi-shop cart checkout creating distinct orders per seller.
+  - `POST /api/v2/simulator/order/confirm_delivery`: Buyer delivery confirmation transitioning order to `COMPLETED` and releasing escrow.
+
+### 🗄 Prisma Schema & Database Models (`prisma/schema.prisma`)
+- Added `BuyerUser` (`buyer_users`): id, username, email, phone, passwordHash, salt, fullName, avatarUrl, createdAt, updatedAt.
+- Added `BuyerAddress` (`buyer_addresses`): id, buyerId, recipientName, phone, streetAddress, ward, district, city, isDefault, createdAt, updatedAt.
+- Extended `prisma/seed.ts` with demo buyer accounts: `demo` (ID 1001) and `alex` (ID 1002) with password `Shopiz@123` and shipping addresses in Ho Chi Minh City and Hanoi.
+
+### 🧪 Automated Verification
+- Added `test/phase14_shopiz_integration.spec.ts` with 32 automated assertions across 6 test groups.
+- Total simulator test suite now stands at **509/509 passing assertions (100% pass rate)** across all 14 test suites.
+
 ## [1.8.0] - 2026-10-20
 
 ### 🎯 Overview

@@ -40,7 +40,7 @@ async function request(path: string, options: { method?: string; body?: any; hea
 
 async function runTests() {
   console.log("================================================================================");
-  console.log("🧪 PHASE 14 TEST SUITE: SHOPIZ FRONTEND INTEGRATION & BACKEND EXTENSION");
+  console.log("🧪 PHASE 14 TEST SUITE: CLOUD MEDIA STORAGE, CI/CD PIPELINE & MARKETPLACE EXTENSIONS");
   console.log("================================================================================\n");
 
   await new Promise<void>((resolve) => {
