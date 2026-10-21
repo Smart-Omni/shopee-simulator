@@ -506,3 +506,66 @@ voucherRouter.post("/api/v2/voucher/end_voucher", shopeeAuthGuard, async (req: R
     voucher_id: Number(voucherId)
   }));
 });
+
+// ============================================================================
+// 7. PUBLIC SIMULATOR VOUCHER VALIDATE: POST /api/v2/simulator/voucher/validate
+// ============================================================================
+voucherRouter.post("/api/v2/simulator/voucher/validate", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { voucher_code, shop_id, basket_amount = 0 } = req.body || {};
+    if (!voucher_code) {
+      res.json(createShopeeErrorResponse("error_param", "Missing voucher_code"));
+      return;
+    }
+
+    const now = new Date();
+    const whereClause: any = {
+      voucherCode: voucher_code.trim(),
+      status: { not: PromotionStatus.DELETED },
+      startTime: { lte: now },
+      endTime: { gte: now }
+    };
+    if (shop_id) {
+      whereClause.shopId = BigInt(shop_id);
+    }
+
+    const voucher = await prisma.voucher.findFirst({
+      where: whereClause,
+      include: { shop: true }
+    });
+
+    if (!voucher) {
+      res.json(createShopeeErrorResponse("error_not_found", "Voucher is invalid or has expired"));
+      return;
+    }
+
+    const minBasket = Number(voucher.minBasketPrice);
+    const basket = Number(basket_amount);
+    if (basket < minBasket) {
+      res.json(createShopeeErrorResponse("error_business", `Minimum spend of ${minBasket} VND not reached`));
+      return;
+    }
+
+    let discountAmount = 0;
+    if (voucher.rewardType === 1 || voucher.discountAmount) {
+      discountAmount = Math.min(Number(voucher.discountAmount || 0), basket);
+    } else if (voucher.percentage) {
+      const computed = (basket * Number(voucher.percentage)) / 100;
+      discountAmount = voucher.maxPrice ? Math.min(computed, Number(voucher.maxPrice)) : computed;
+    }
+
+    res.json(createShopeeSuccessResponse({
+      valid: true,
+      voucher_id: Number(voucher.voucherId),
+      voucher_code: voucher.voucherCode,
+      voucher_name: voucher.voucherName,
+      voucher_type: voucher.voucherType,
+      discount_amount: Math.round(discountAmount),
+      shop_id: Number(voucher.shopId),
+      shop_name: voucher.shop.shopName,
+      min_basket_price: minBasket
+    }));
+  } catch (err: any) {
+    res.status(500).json(createShopeeErrorResponse("error_server", err.message));
+  }
+});

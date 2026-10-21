@@ -117,11 +117,16 @@ simulatorRouter.post("/api/v2/simulator/shop/refresh_token", async (req: Request
 });
 
 // ============================================================================
-// 4. GET ALL PRODUCTS FOR SIMULATOR UI
+// 4. GET ALL PRODUCTS FOR SIMULATOR UI (WITH SEARCH & FILTER)
 // ============================================================================
 simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Response): Promise<void> => {
   const shopIdStr = req.query.shop_id as string | undefined;
   const viewMode = req.query.view_mode as string | undefined;
+  const searchQuery = (req.query.q as string | undefined)?.trim();
+  const categoryIdStr = req.query.category_id as string | undefined;
+  const sort = req.query.sort as string | undefined;
+  const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+  const pageSize = req.query.page_size ? parseInt(req.query.page_size as string, 10) : undefined;
 
   const whereClause: any = { itemStatus: { not: "DELETED" } };
   if (viewMode === "buyer") {
@@ -130,9 +135,26 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
   if (shopIdStr && shopIdStr.toUpperCase() !== "ALL") {
     whereClause.shopId = BigInt(shopIdStr);
   }
+  if (categoryIdStr) {
+    whereClause.categoryId = BigInt(categoryIdStr);
+  }
+  if (searchQuery) {
+    whereClause.OR = [
+      { itemName: { contains: searchQuery, mode: "insensitive" } },
+      { description: { contains: searchQuery, mode: "insensitive" } }
+    ];
+  }
+
+  let orderBy: any = { itemId: "desc" };
+  if (sort === "price_asc") {
+    orderBy = { originalPrice: "asc" };
+  } else if (sort === "price_desc") {
+    orderBy = { originalPrice: "desc" };
+  }
 
   const now = new Date();
-  const [products, activeDiscounts] = await Promise.all([
+  const [totalCount, products, activeDiscounts] = await Promise.all([
+    prisma.product.count({ where: whereClause }),
     prisma.product.findMany({
       where: whereClause,
       include: {
@@ -140,7 +162,8 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
         category: true,
         models: true
       },
-      orderBy: { itemId: "desc" }
+      orderBy,
+      ...(page && pageSize ? { skip: (page - 1) * pageSize, take: pageSize } : {})
     }),
     prisma.discount.findMany({
       where: {
@@ -167,51 +190,186 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
     }
   }
 
-  res.json(createShopeeSuccessResponse({
-    products: products.map((p: any) => {
-      const discItem = discountItemMap.get(p.itemId.toString());
-      let hasDiscount = false;
-      let promoPrice: number | null = null;
-      let discountPct: number | null = null;
+  const mappedProducts = products.map((p: any) => {
+    const discItem = discountItemMap.get(p.itemId.toString());
+    let hasDiscount = false;
+    let promoPrice: number | null = null;
+    let discountPct: number | null = null;
 
-      if (discItem) {
-        if (p.hasModel && discItem.models && discItem.models.length > 0) {
-          const mPromoPrices = discItem.models.map((m: any) => Number(m.modelPromotionPrice));
-          if (mPromoPrices.length > 0) {
-            hasDiscount = true;
-            promoPrice = Math.min(...mPromoPrices);
-          }
-        } else if (discItem.itemPromotionPrice !== null) {
+    if (discItem) {
+      if (p.hasModel && discItem.models && discItem.models.length > 0) {
+        const mPromoPrices = discItem.models.map((m: any) => Number(m.modelPromotionPrice));
+        if (mPromoPrices.length > 0) {
           hasDiscount = true;
-          promoPrice = Number(discItem.itemPromotionPrice);
+          promoPrice = Math.min(...mPromoPrices);
         }
-
-        if (hasDiscount && promoPrice !== null && Number(p.originalPrice) > 0) {
-          discountPct = Math.round((1 - (promoPrice / Number(p.originalPrice))) * 100);
-        }
+      } else if (discItem.itemPromotionPrice !== null) {
+        hasDiscount = true;
+        promoPrice = Number(discItem.itemPromotionPrice);
       }
 
-      return {
+      if (hasDiscount && promoPrice !== null && Number(p.originalPrice) > 0) {
+        discountPct = Math.round((1 - (promoPrice / Number(p.originalPrice))) * 100);
+      }
+    }
+
+    return {
+      item_id: Number(p.itemId),
+      shop_id: Number(p.shopId),
+      shop_name: p.shop?.shopName || `Shop ${p.shopId}`,
+      shop_rating: p.shop?.rating ? Number(p.shop.rating) : 5.0,
+      is_vacation: Boolean(p.shop?.isVacation),
+      item_name: p.itemName,
+      item_status: p.itemStatus,
+      description: p.description,
+      category_name: p.category?.categoryName || "General",
+      original_price: Number(p.originalPrice),
+      current_price: promoPrice !== null ? promoPrice : Number(p.originalPrice),
+      has_discount: hasDiscount,
+      promotion_price: promoPrice,
+      discount_percentage: discountPct,
+      currency: p.currency,
+      weight: Number(p.weight || 0.5),
+      dimensions: p.dimensionsJson,
+      has_model: p.hasModel,
+      images: p.imagesJson,
+      tier_variation: p.tierVariationJson,
+      models: (p.models || []).map((m: any) => {
+        let mPromoPrice: number | null = null;
+        if (discItem && discItem.models) {
+          const mPromo = discItem.models.find((dim: any) => dim.modelId.toString() === m.modelId.toString());
+          if (mPromo) {
+            mPromoPrice = Number(mPromo.modelPromotionPrice);
+          }
+        }
+        const mCurrentPrice = mPromoPrice !== null ? mPromoPrice : Number(m.originalPrice);
+        return {
+          model_id: Number(m.modelId),
+          model_name: m.modelName,
+          model_sku: m.modelSku,
+          tier_index: m.tierIndex,
+          original_price: Number(m.originalPrice),
+          current_price: mCurrentPrice,
+          promotion_price: mPromoPrice,
+          seller_stock: m.sellerStock
+        };
+      })
+    };
+  });
+
+  res.json(createShopeeSuccessResponse({
+    products: mappedProducts,
+    ...(page && pageSize ? { total: totalCount, page, page_size: pageSize } : {})
+  }));
+});
+
+// ============================================================================
+// 4B. GET PRODUCT DETAIL (RICH VIEW FOR SHOPIZ PRODUCT PAGE)
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/product/detail", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const itemIdStr = req.query.item_id as string;
+    if (!itemIdStr) {
+      res.json(createShopeeErrorResponse("error_param", "Missing item_id"));
+      return;
+    }
+
+    const itemId = BigInt(itemIdStr);
+    const p = await prisma.product.findUnique({
+      where: { itemId },
+      include: {
+        shop: true,
+        category: true,
+        models: true,
+        comments: {
+          orderBy: { createdAt: "desc" },
+          take: 10
+        }
+      }
+    });
+
+    if (!p) {
+      res.json(createShopeeErrorResponse("error_not_found", "Product not found"));
+      return;
+    }
+
+    const now = new Date();
+    const activeDiscount = await prisma.discount.findFirst({
+      where: {
+        shopId: p.shopId,
+        status: { not: "DELETED" as any },
+        startTime: { lte: now },
+        endTime: { gte: now },
+        items: { some: { itemId: p.itemId } }
+      },
+      include: {
+        items: {
+          where: { itemId: p.itemId },
+          include: { models: true }
+        }
+      }
+    });
+
+    const discItem = activeDiscount?.items[0];
+    let hasDiscount = false;
+    let promoPrice: number | null = null;
+    let discountPct: number | null = null;
+
+    if (discItem) {
+      if (p.hasModel && discItem.models && discItem.models.length > 0) {
+        const mPromoPrices = discItem.models.map((m: any) => Number(m.modelPromotionPrice));
+        if (mPromoPrices.length > 0) {
+          hasDiscount = true;
+          promoPrice = Math.min(...mPromoPrices);
+        }
+      } else if (discItem.itemPromotionPrice !== null) {
+        hasDiscount = true;
+        promoPrice = Number(discItem.itemPromotionPrice);
+      }
+      if (hasDiscount && promoPrice !== null && Number(p.originalPrice) > 0) {
+        discountPct = Math.round((1 - (promoPrice / Number(p.originalPrice))) * 100);
+      }
+    }
+
+    const totalComments = await prisma.productComment.count({ where: { itemId: p.itemId } });
+    const allComments = await prisma.productComment.findMany({
+      where: { itemId: p.itemId },
+      select: { ratingStar: true }
+    });
+    const avgRating = allComments.length > 0
+      ? allComments.reduce((acc, c) => acc + c.ratingStar, 0) / allComments.length
+      : 5.0;
+
+    res.json(createShopeeSuccessResponse({
+      product: {
         item_id: Number(p.itemId),
-        shop_id: Number(p.shopId),
-        shop_name: p.shop?.shopName || `Shop ${p.shopId}`,
-        shop_rating: p.shop?.rating ? Number(p.shop.rating) : 5.0,
-        is_vacation: Boolean(p.shop?.isVacation),
         item_name: p.itemName,
         item_status: p.itemStatus,
         description: p.description,
-        category_name: p.category?.categoryName || "General",
         original_price: Number(p.originalPrice),
         current_price: promoPrice !== null ? promoPrice : Number(p.originalPrice),
-        has_discount: hasDiscount,
         promotion_price: promoPrice,
         discount_percentage: discountPct,
+        has_discount: hasDiscount,
         currency: p.currency,
         weight: Number(p.weight || 0.5),
         dimensions: p.dimensionsJson,
-        has_model: p.hasModel,
         images: p.imagesJson,
+        has_model: p.hasModel,
         tier_variation: p.tierVariationJson,
+        category: {
+          category_id: Number(p.categoryId),
+          category_name: p.category?.categoryName || "General"
+        },
+        seller: {
+          shop_id: Number(p.shopId),
+          shop_name: p.shop?.shopName,
+          rating: Number(p.shop?.rating || 5.0),
+          rating_count: p.shop?.ratingCount || 0,
+          is_vacation: Boolean(p.shop?.isVacation),
+          response_rate: "98%",
+          joined: "2 years ago"
+        },
         models: (p.models || []).map((m: any) => {
           let mPromoPrice: number | null = null;
           if (discItem && discItem.models) {
@@ -220,21 +378,128 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
               mPromoPrice = Number(mPromo.modelPromotionPrice);
             }
           }
-          const mCurrentPrice = mPromoPrice !== null ? mPromoPrice : Number(m.originalPrice);
           return {
             model_id: Number(m.modelId),
             model_name: m.modelName,
             model_sku: m.modelSku,
             tier_index: m.tierIndex,
             original_price: Number(m.originalPrice),
-            current_price: mCurrentPrice,
+            current_price: mPromoPrice !== null ? mPromoPrice : Number(m.originalPrice),
             promotion_price: mPromoPrice,
             seller_stock: m.sellerStock
           };
-        })
-      };
-    })
-  }));
+        }),
+        reviews: {
+          average_rating: Math.round(avgRating * 10) / 10,
+          rating_count: totalComments,
+          items: p.comments.map((c) => ({
+            comment_id: Number(c.commentId),
+            buyer_username: c.buyerUsername,
+            rating_star: c.ratingStar,
+            comment: c.comment,
+            reply: c.reply,
+            reply_time: c.replyTime,
+            created_at: c.createdAt
+          }))
+        }
+      }
+    }));
+  } catch (error: any) {
+    res.json(createShopeeErrorResponse("error_server", error.message || "Failed to retrieve product details"));
+  }
+});
+
+// ============================================================================
+// 4C. GET CATEGORIES FOR SHOPIZ DISCOVERY
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/categories", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const categories = await prisma.category.findMany({
+      include: {
+        attributes: true,
+        _count: {
+          select: { products: true }
+        }
+      },
+      orderBy: { categoryId: "asc" }
+    });
+
+    res.json(createShopeeSuccessResponse({
+      categories: categories.map((c) => ({
+        category_id: Number(c.categoryId),
+        parent_category_id: Number(c.parentId),
+        category_name: c.categoryName,
+        has_children: c.hasChildren,
+        product_count: c._count.products,
+        attributes: c.attributes.map((a) => ({
+          attribute_id: Number(a.attributeId),
+          name: a.name,
+          is_mandatory: a.isMandatory,
+          input_type: a.inputType,
+          values: a.valueListJson
+        }))
+      }))
+    }));
+  } catch (error: any) {
+    res.json(createShopeeErrorResponse("error_server", error.message || "Failed to retrieve categories"));
+  }
+});
+
+// ============================================================================
+// 4D. GET SHOP STOREFRONT DETAILS
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/shop/detail", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const shopIdStr = req.query.shop_id as string;
+    if (!shopIdStr) {
+      res.json(createShopeeErrorResponse("error_param", "Missing shop_id"));
+      return;
+    }
+
+    const shopId = BigInt(shopIdStr);
+    const shop = await prisma.shop.findUnique({
+      where: { shopId },
+      include: {
+        products: {
+          where: { itemStatus: "NORMAL" },
+          include: { models: true },
+          take: 20
+        }
+      }
+    });
+
+    if (!shop) {
+      res.json(createShopeeErrorResponse("error_not_found", "Shop not found"));
+      return;
+    }
+
+    res.json(createShopeeSuccessResponse({
+      shop: {
+        shop_id: Number(shop.shopId),
+        shop_name: shop.shopName,
+        region: shop.region,
+        status: shop.status,
+        is_vacation: shop.isVacation,
+        rating: Number(shop.rating || 5.0),
+        rating_count: shop.ratingCount || 0,
+        followers: 12800,
+        response_rate: "98%",
+        joined: "2 years ago",
+        tagline: "Official Flagship Store",
+        story: `${shop.shopName} provides authentic, premium merchandise with full manufacturer warranty and instant Shopee delivery.`,
+        products: shop.products.map((p) => ({
+          item_id: Number(p.itemId),
+          item_name: p.itemName,
+          original_price: Number(p.originalPrice),
+          current_price: Number(p.originalPrice),
+          images: p.imagesJson,
+          seller_stock: p.models.reduce((sum, m) => sum + m.sellerStock, 0)
+        }))
+      }
+    }));
+  } catch (error: any) {
+    res.json(createShopeeErrorResponse("error_server", error.message || "Failed to retrieve shop details"));
+  }
 });
 
 // ============================================================================
@@ -2716,5 +2981,68 @@ simulatorRouter.get("/api/v2/simulator/returns", async (req: Request, res: Respo
     }));
   } catch (err: any) {
     res.json(createShopeeErrorResponse("server_error", err.message || "Failed to load returns list"));
+  }
+});
+
+// ============================================================================
+// 27. GET SELLER ANALYTICS TIME-SERIES (FOR SHOPIZ SELLER CENTER OVERVIEW)
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/seller/analytics", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const shopIdStr = (req.query.shop_id as string) || "727720655";
+    const shopId = BigInt(shopIdStr);
+    const period = (req.query.period as string) || "today";
+
+    const now = new Date();
+    const periodStartTime = new Date();
+    if (period === "today") {
+      periodStartTime.setHours(0, 0, 0, 0);
+    } else {
+      periodStartTime.setDate(now.getDate() - 7);
+      periodStartTime.setHours(0, 0, 0, 0);
+    }
+
+    const completedOrders = await prisma.order.findMany({
+      where: {
+        shopId,
+        orderStatus: { in: [OrderStatus.COMPLETED, OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED] },
+        createdAt: { gte: periodStartTime }
+      }
+    });
+
+    const totalRevenue = completedOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+    const totalOrders = completedOrders.length;
+    const uniqueBuyers = new Set(completedOrders.map((o) => o.buyerUserId.toString())).size;
+    const estimatedVisitors = Math.max(uniqueBuyers * 12, totalOrders > 0 ? totalOrders * 8 : 120);
+    const conversionRate = estimatedVisitors > 0
+      ? `${((totalOrders / estimatedVisitors) * 100).toFixed(2)}%`
+      : "0.00%";
+
+    res.json(createShopeeSuccessResponse({
+      shop_id: Number(shopId),
+      period,
+      metrics: {
+        revenue: totalRevenue,
+        orders_count: totalOrders,
+        visitors: estimatedVisitors,
+        conversion_rate: conversionRate
+      },
+      chart: {
+        labels: period === "today"
+          ? ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"]
+          : ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"],
+        values: [
+          0,
+          Math.round(totalRevenue * 0.15),
+          Math.round(totalRevenue * 0.3),
+          Math.round(totalRevenue * 0.55),
+          Math.round(totalRevenue * 0.75),
+          Math.round(totalRevenue * 0.9),
+          totalRevenue
+        ]
+      }
+    }));
+  } catch (err: any) {
+    res.status(500).json(createShopeeErrorResponse("error_server", err.message));
   }
 });

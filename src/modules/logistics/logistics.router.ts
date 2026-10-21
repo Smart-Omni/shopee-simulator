@@ -35,6 +35,26 @@ logisticsRouter.get("/api/v2/logistics/get_channel_list", shopeeAuthGuard, async
 });
 
 // ============================================================================
+// 1B. PUBLIC SIMULATOR CHANNELS: GET /api/v2/simulator/logistics/channels
+// ============================================================================
+logisticsRouter.get("/api/v2/simulator/logistics/channels", async (_req: Request, res: Response): Promise<void> => {
+  const channels = await prisma.logisticsChannel.findMany({
+    orderBy: { channelId: "asc" }
+  });
+
+  res.json(createShopeeSuccessResponse({
+    channels: channels.map((ch) => ({
+      channel_id: Number(ch.channelId),
+      channel_name: ch.channelName,
+      cod_enabled: ch.codEnabled,
+      enabled: ch.enabled,
+      estimated_shipping_fee: ch.channelId === BigInt(30004) ? 40000 : 21500,
+      fee_type: ch.feeType
+    }))
+  }));
+});
+
+// ============================================================================
 // 2. GET SHIPPING PARAMETER: GET /api/v2/logistics/get_shipping_parameter
 // ============================================================================
 logisticsRouter.get("/api/v2/logistics/get_shipping_parameter", shopeeAuthGuard, async (req: Request, res: Response): Promise<void> => {

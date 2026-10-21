@@ -429,65 +429,66 @@ orderRouter.post("/api/v2/order/handle_buyer_cancellation", shopeeAuthGuard, asy
 // ============================================================================
 // SIMULATOR CONTROL / HELPER ENDPOINTS
 // ============================================================================
-// Mock Buyer Order Checkout: Directly seeds an order with items & initial package
-orderRouter.post("/api/v2/simulator/order/create", async (req: Request, res: Response): Promise<void> => {
+// Internal core single order creation helper
+export async function createSingleOrderRecord(body: any): Promise<{ success: boolean; data?: any; error?: string; message?: string }> {
   try {
     const {
-      shop_id = 727720655,
-      order_sn,
-      order_status = "READY_TO_SHIP",
-      total_amount,
-      shipping_fee,
-      channel_id,
-      recipient_city,
-      shipping_carrier,
-      recipient_name = "Nguyen Van A",
-      recipient_phone = "+84901234567",
-      recipient_address = "123 Le Loi, District 1, Ho Chi Minh City",
-      buyer_user_id,
-      buyer_username,
-      voucher_code,
-      items = []
-    } = req.body || {};
+    shop_id = 727720655,
+    order_sn,
+    order_status = "READY_TO_SHIP",
+    total_amount,
+    shipping_fee,
+    channel_id,
+    recipient_city,
+    shipping_carrier,
+    recipient_name = "Nguyen Van A",
+    recipient_phone = "+84901234567",
+    recipient_address = "123 Le Loi, District 1, Ho Chi Minh City",
+    buyer_user_id,
+    buyer_username,
+    voucher_code,
+    items = []
+  } = body || {};
 
-    const shopId = BigInt(shop_id);
+  const shopId = BigInt(shop_id);
 
-    const shop = await prisma.shop.findUnique({
-      where: { shopId },
-      include: { addresses: true }
-    });
-    if (!shop) {
-      res.json(createShopeeErrorResponse("error_param", "Shop not found"));
-      return;
-    }
-    if (shop.isVacation) {
-      res.json(createShopeeErrorResponse("error_business", `Shop "${shop.shopName}" is currently on Holiday Mode (Vacation). Orders cannot be placed.`));
-      return;
-    }
+  const shop = await prisma.shop.findUnique({
+    where: { shopId },
+    include: { addresses: true }
+  });
+  if (!shop) {
+    return { success: false, error: "error_param", message: "Shop not found" };
+  }
+  if (shop.isVacation) {
+    return { success: false, error: "error_business", message: `Shop "${shop.shopName}" is currently on Holiday Mode (Vacation). Orders cannot be placed.` };
+  }
 
-    // Verify item shops if items are provided
-    if (Array.isArray(items) && items.length > 0) {
-      const itemIds = items.map((i: any) => i.item_id ? BigInt(i.item_id) : null).filter(Boolean) as bigint[];
-      if (itemIds.length > 0) {
-        const products = await prisma.product.findMany({
-          where: { itemId: { in: itemIds } },
-          include: { shop: true }
-        });
-        for (const p of products) {
-          if (p.shopId !== shopId) {
-            res.json(createShopeeErrorResponse(
-              "error_param",
-              `Item ${p.itemId} ("${p.itemName}") belongs to Shop ${p.shopId} ("${p.shop?.shopName || p.shopId}"), but order is requested for Shop ${shopId}. Cross-shop items cannot be placed in a single Shopee order.`
-            ));
-            return;
-          }
-          if (p.shop?.isVacation) {
-            res.json(createShopeeErrorResponse("error_business", `Shop "${p.shop.shopName}" is currently on Holiday Mode (Vacation). Orders cannot be placed for its products.`));
-            return;
-          }
+  // Verify item shops if items are provided
+  if (Array.isArray(items) && items.length > 0) {
+    const itemIds = items.map((i: any) => i.item_id ? BigInt(i.item_id) : null).filter(Boolean) as bigint[];
+    if (itemIds.length > 0) {
+      const products = await prisma.product.findMany({
+        where: { itemId: { in: itemIds } },
+        include: { shop: true }
+      });
+      for (const p of products) {
+        if (p.shopId !== shopId) {
+          return {
+            success: false,
+            error: "error_param",
+            message: `Item ${p.itemId} ("${p.itemName}") belongs to Shop ${p.shopId} ("${p.shop?.shopName || p.shopId}"), but order is requested for Shop ${shopId}. Cross-shop items cannot be placed in a single Shopee order.`
+          };
+        }
+        if (p.shop?.isVacation) {
+          return {
+            success: false,
+            error: "error_business",
+            message: `Shop "${p.shop.shopName}" is currently on Holiday Mode (Vacation). Orders cannot be placed for its products.`
+          };
         }
       }
     }
+  }
 
     const sn = order_sn || `261019${Date.now().toString(36).toUpperCase()}`;
     const now = new Date();
@@ -690,8 +691,7 @@ orderRouter.post("/api/v2/simulator/order/create", async (req: Request, res: Res
       const quote = LogisticsEngine.calculateChannelFee(chosenChannelId, zone, weightCalc.chargeableWeightGram);
 
       if (!quote.enabled) {
-        res.json(createShopeeErrorResponse("error_param", quote.disabledReason || "Selected logistics channel is not available for this package."));
-        return;
+        return { success: false, error: "error_param", message: quote.disabledReason || "Selected logistics channel is not available for this package." };
       }
 
       actualShippingFee = quote.actualFee;
@@ -812,14 +812,173 @@ orderRouter.post("/api/v2/simulator/order/create", async (req: Request, res: Res
       }).catch(err => console.warn("[WebhookTrigger] order_created push failed:", err.message));
     }
 
+    return {
+      success: true,
+      data: {
+        order_sn: sn,
+        order_status: order.orderStatus,
+        package_number: pkgNum,
+        chargeable_weight_gram: weightCalc.chargeableWeightGram,
+        buyer_paid_shipping_fee: buyerPaidShippingFee,
+        actual_shipping_fee: actualShippingFee,
+        shopee_shipping_rebate: shopeeShippingRebate,
+        total_amount: Number(order.totalAmount),
+        escrow_amount: Number(order.escrowAmount || 0),
+        shop_id: Number(order.shopId)
+      }
+    };
+  } catch (err: any) {
+    return { success: false, error: "error_server", message: err.message };
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Mock Buyer Order Checkout: Directly seeds an order with items & initial package
+orderRouter.post("/api/v2/simulator/order/create", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await createSingleOrderRecord(req.body);
+    if (!result.success) {
+      res.json(createShopeeErrorResponse(result.error || "error_param", result.message || "Order creation failed"));
+      return;
+    }
+    res.json(createShopeeSuccessResponse(result.data));
+  } catch (err: any) {
+    res.status(500).json(createShopeeErrorResponse("error_server", err.message));
+  }
+});
+
+// ----------------------------------------------------------------------------
+// Batch Multi-Shop Checkout: Creates separate orders per shop from cart
+orderRouter.post("/api/v2/simulator/order/batch_checkout", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      buyer_user_id = 1001,
+      buyer_username = "demo",
+      recipient_name = "Nguyen Van A",
+      recipient_phone = "+84901234567",
+      recipient_address = "123 Le Loi, District 1, Ho Chi Minh City",
+      recipient_district = "District 1",
+      recipient_city = "Ho Chi Minh City",
+      payment_method = "ShopeePay",
+      orders = []
+    } = req.body || {};
+
+    if (!Array.isArray(orders) || orders.length === 0) {
+      res.json(createShopeeErrorResponse("error_param", "Orders array cannot be empty"));
+      return;
+    }
+
+    const createdOrders: any[] = [];
+
+    for (const shopOrder of orders) {
+      const orderPayload = {
+        shop_id: shopOrder.shop_id,
+        order_status: shopOrder.order_status || "READY_TO_SHIP",
+        channel_id: shopOrder.channel_id,
+        shipping_carrier: shopOrder.shipping_carrier,
+        shipping_fee: shopOrder.shipping_fee,
+        recipient_name: shopOrder.recipient_name || recipient_name,
+        recipient_phone: shopOrder.recipient_phone || recipient_phone,
+        recipient_address: shopOrder.recipient_address || recipient_address,
+        recipient_district: shopOrder.recipient_district || recipient_district,
+        recipient_city: shopOrder.recipient_city || recipient_city,
+        buyer_user_id: shopOrder.buyer_user_id || buyer_user_id,
+        buyer_username: shopOrder.buyer_username || buyer_username,
+        payment_method: shopOrder.payment_method || payment_method,
+        voucher_code: shopOrder.voucher_code,
+        message_to_seller: shopOrder.message_to_seller,
+        items: shopOrder.items
+      };
+
+      const result = await createSingleOrderRecord(orderPayload);
+      if (!result.success) {
+        res.json(createShopeeErrorResponse(result.error || "error_param", result.message || "Failed to create order for shop"));
+        return;
+      }
+      createdOrders.push(result.data);
+    }
+
     res.json(createShopeeSuccessResponse({
-      order_sn: sn,
-      order_status: order.orderStatus,
-      package_number: pkgNum,
-      chargeable_weight_gram: weightCalc.chargeableWeightGram,
-      buyer_paid_shipping_fee: buyerPaidShippingFee,
-      actual_shipping_fee: actualShippingFee,
-      shopee_shipping_rebate: shopeeShippingRebate
+      total_orders: createdOrders.length,
+      orders: createdOrders
+    }));
+  } catch (err: any) {
+    res.status(500).json(createShopeeErrorResponse("error_server", err.message));
+  }
+});
+
+// ----------------------------------------------------------------------------
+// Buyer Confirm Order Delivery: Transitions to COMPLETED and releases escrow
+orderRouter.post("/api/v2/simulator/order/confirm_delivery", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { order_sn, buyer_user_id } = req.body || {};
+    if (!order_sn) {
+      res.json(createShopeeErrorResponse("error_param", "Missing order_sn"));
+      return;
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { orderSn: order_sn },
+      include: { shop: true }
+    });
+
+    if (!order) {
+      res.json(createShopeeErrorResponse("error_not_found", "Order not found"));
+      return;
+    }
+
+    if (buyer_user_id && BigInt(buyer_user_id) !== order.buyerUserId) {
+      res.json(createShopeeErrorResponse("error_permission", "Order does not belong to buyer"));
+      return;
+    }
+
+    if (order.orderStatus === OrderStatus.COMPLETED) {
+      res.json(createShopeeErrorResponse("error_business", "Order is already completed"));
+      return;
+    }
+
+    if (order.orderStatus === OrderStatus.CANCELLED) {
+      res.json(createShopeeErrorResponse("error_business", "Cancelled orders cannot be completed"));
+      return;
+    }
+
+    const now = new Date();
+    const updated = await prisma.order.update({
+      where: { orderSn: order_sn },
+      data: {
+        orderStatus: OrderStatus.COMPLETED,
+        escrowReleaseTime: now
+      }
+    });
+
+    await prisma.orderPackage.updateMany({
+      where: { orderSn: order_sn },
+      data: { logisticsStatus: "LOGISTICS_DELIVERY_DONE" }
+    });
+
+    if (order.shop?.partnerId) {
+      WebhookService.dispatch({
+        partnerId: order.shop.partnerId,
+        pushCode: 3,
+        shopId: order.shopId,
+        ordersn: order.orderSn,
+        payload: {
+          shop_id: Number(order.shopId),
+          code: 3,
+          timestamp: Math.floor(now.getTime() / 1000),
+          data: {
+            ordersn: order.orderSn,
+            status: OrderStatus.COMPLETED,
+            update_time: Math.floor(now.getTime() / 1000)
+          }
+        }
+      }).catch(err => console.warn("[WebhookTrigger] order_completed push failed:", err.message));
+    }
+
+    res.json(createShopeeSuccessResponse({
+      order_sn: updated.orderSn,
+      order_status: updated.orderStatus,
+      escrow_release_time: updated.escrowReleaseTime
     }));
   } catch (err: any) {
     res.status(500).json(createShopeeErrorResponse("error_server", err.message));
