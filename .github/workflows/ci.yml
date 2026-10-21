@@ -57,7 +57,6 @@ jobs:
           DATABASE_URL: postgresql://shopee:shopee_mock_password@localhost:5432/shopee_mock_db?schema=public
           SKIP_DRIVE_UPLOAD: "true"
           PORT: 8080
-          AUTH_SECRET: shopee_mock_secret_key_2026
         run: npm test
 
   deploy:
