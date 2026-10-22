@@ -1270,6 +1270,30 @@
           <textarea id="add-prod-desc" rows="2" placeholder="Mô tả chi tiết đặc tính, chất liệu và công năng sản phẩm..." class="w-full p-2 border border-gray-300 rounded"></textarea>
         </div>
 
+        <!-- Product Media Upload (Images & Video) -->
+        <div class="pt-2 border-t border-gray-100">
+          <label class="block font-semibold text-gray-700 mb-1 flex items-center justify-between">
+            <span><i class="fa-solid fa-photo-film text-[#ee4d2d] mr-1"></i> Hình Ảnh & Video Sản Phẩm</span>
+            <span id="add-prod-media-count" class="text-[10px] text-gray-400 font-normal">0/9 tệp</span>
+          </label>
+          <div class="border-2 border-dashed border-gray-300 hover:border-[#ee4d2d] rounded-xl p-3 text-center cursor-pointer bg-gray-50/50 hover:bg-orange-50/30 transition" onclick="document.getElementById('add-prod-media-input').click()">
+            <input type="file" id="add-prod-media-input" multiple accept="image/*,video/*" class="hidden" onchange="handleProductMediaSelect(event)">
+            <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-400 mb-1"></i>
+            <p class="text-[11px] font-semibold text-gray-700">Tải ảnh hoặc video sản phẩm</p>
+            <p class="text-[10px] text-gray-400">Định dạng JPG, PNG, WEBP, MP4 (Tối đa 9 ảnh, 1 video)</p>
+          </div>
+          <div class="mt-2 flex space-x-1.5">
+            <input type="text" id="add-prod-media-url" placeholder="Hoặc dán liên kết ảnh/video (https://...)" class="flex-1 p-1.5 border border-gray-300 rounded text-xs">
+            <button type="button" onclick="addProductMediaUrl()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded border border-gray-300">
+              Thêm
+            </button>
+          </div>
+          <div id="add-prod-media-loading" class="hidden mt-2 text-center text-xs text-[#ee4d2d] font-semibold">
+            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang tải tệp lên máy chủ...
+          </div>
+          <div id="add-prod-media-preview" class="grid grid-cols-4 gap-2 mt-2 empty:hidden"></div>
+        </div>
+
         <div class="pt-2 border-t border-gray-100">
           <label class="block font-semibold text-gray-700 mb-1">Phân Loại Hàng (Biến Thể 2 Tầng Shopee)</label>
           <div class="grid grid-cols-2 gap-2 mb-2">
@@ -1981,11 +2005,29 @@
           <p id="buyer-return-max-note" class="text-[10px] text-gray-400 mt-1">Tối đa giá trị đơn hàng</p>
         </div>
 
-        <!-- Proof URL (Optional) -->
+        <!-- Proof Media (Images / Videos) -->
         <div>
-          <label class="block text-gray-700 font-bold mb-1">Bằng chứng hình ảnh / video (Tùy chọn)</label>
-          <input type="text" id="buyer-return-proof" placeholder="https://example.com/evidence_photo.jpg" class="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#ee4d2d]">
-          <p class="text-[10px] text-gray-400 mt-0.5">Dán link ảnh chụp bưu kiện bị hỏng hoặc sản phẩm lỗi</p>
+          <label class="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+            <span><i class="fa-solid fa-camera text-[#ee4d2d] mr-1"></i> Bằng chứng hình ảnh / video (Tùy chọn)</span>
+            <span id="buyer-return-media-count" class="text-[10px] text-gray-400 font-normal">0/5 tệp</span>
+          </label>
+          <div class="border-2 border-dashed border-gray-300 hover:border-[#ee4d2d] rounded-xl p-3 text-center cursor-pointer bg-gray-50/50 hover:bg-orange-50/30 transition" onclick="document.getElementById('buyer-return-media-input').click()">
+            <input type="file" id="buyer-return-media-input" multiple accept="image/*,video/*" class="hidden" onchange="handleBuyerReturnMediaSelect(event)">
+            <i class="fa-solid fa-cloud-arrow-up text-xl text-gray-400 mb-1"></i>
+            <p class="text-[11px] font-semibold text-gray-700">Tải ảnh sản phẩm lỗi hoặc video mở hộp</p>
+            <p class="text-[10px] text-gray-400">Định dạng JPG, PNG, MP4 (Tối đa 5 tệp, tối đa 50MB/tệp)</p>
+          </div>
+          <div class="mt-2 flex space-x-1.5">
+            <input type="text" id="buyer-return-proof-url" placeholder="Hoặc dán liên kết bằng chứng (https://...)" class="flex-1 p-1.5 border border-gray-300 rounded text-xs">
+            <button type="button" onclick="addBuyerReturnMediaUrl()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded border border-gray-300">
+              Thêm
+            </button>
+          </div>
+          <div id="buyer-return-media-loading" class="hidden mt-2 text-center text-xs text-[#ee4d2d] font-semibold">
+            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang tải tệp bằng chứng lên...
+          </div>
+          <div id="buyer-return-media-preview" class="grid grid-cols-5 gap-2 mt-2 empty:hidden"></div>
+          <input type="hidden" id="buyer-return-proof" value="">
         </div>
       </div>
 
@@ -2096,10 +2138,29 @@
           <input type="email" id="seller-dispute-email" value="seller@smartomni.vn" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-red-500">
         </div>
 
-        <!-- Proof Images (Optional) -->
+        <!-- Proof Media (Images / Videos) -->
         <div>
-          <label class="block text-gray-700 font-bold mb-1">Hình ảnh bằng chứng đóng gói / mở hộp (Tùy chọn)</label>
-          <input type="text" id="seller-dispute-proof-url" placeholder="https://example.com/packing_video.jpg" class="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-red-500">
+          <label class="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+            <span><i class="fa-solid fa-shield-halved text-red-600 mr-1"></i> Bằng chứng đóng gói / mở hộp (Tùy chọn)</span>
+            <span id="seller-dispute-media-count" class="text-[10px] text-gray-400 font-normal">0/5 tệp</span>
+          </label>
+          <div class="border-2 border-dashed border-gray-300 hover:border-red-500 rounded-xl p-3 text-center cursor-pointer bg-gray-50/50 hover:bg-red-50/30 transition" onclick="document.getElementById('seller-dispute-media-input').click()">
+            <input type="file" id="seller-dispute-media-input" multiple accept="image/*,video/*" class="hidden" onchange="handleSellerDisputeMediaSelect(event)">
+            <i class="fa-solid fa-cloud-arrow-up text-xl text-gray-400 mb-1"></i>
+            <p class="text-[11px] font-semibold text-gray-700">Tải ảnh/video bưu phẩm niêm phong hoặc video bóc hàng</p>
+            <p class="text-[10px] text-gray-400">Định dạng JPG, PNG, MP4 (Tối đa 5 tệp, tối đa 50MB/tệp)</p>
+          </div>
+          <div class="mt-2 flex space-x-1.5">
+            <input type="text" id="seller-dispute-proof-input-url" placeholder="Hoặc dán liên kết bằng chứng (https://...)" class="flex-1 p-1.5 border border-gray-300 rounded text-xs">
+            <button type="button" onclick="addSellerDisputeMediaUrl()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded border border-gray-300">
+              Thêm
+            </button>
+          </div>
+          <div id="seller-dispute-media-loading" class="hidden mt-2 text-center text-xs text-red-600 font-semibold">
+            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang tải tệp bằng chứng lên...
+          </div>
+          <div id="seller-dispute-media-preview" class="grid grid-cols-5 gap-2 mt-2 empty:hidden"></div>
+          <input type="hidden" id="seller-dispute-proof-url" value="">
         </div>
       </div>
 
@@ -2282,6 +2343,28 @@
     function changeAdminReturnsPage(p) {
       adminReturnsPage = p;
       renderAdminReturnsTable();
+    }
+
+    // ------------------------------------------------------------------------
+    // MEDIA & FILE UPLOAD HELPERS
+    // ------------------------------------------------------------------------
+    function isVideoUrl(url) {
+      if (!url || typeof url !== 'string') return false;
+      return /\.(mp4|webm|mov|avi|mkv)($|\?)/i.test(url);
+    }
+
+    async function uploadMediaFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/v2/simulator/media/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.error) {
+        throw new Error(data.message || data.error);
+      }
+      return data.response?.url;
     }
 
     // Helper to format Date for <input type="datetime-local">
@@ -2685,12 +2768,30 @@
           ? '<span class="bg-gray-100 text-gray-600 font-bold px-2 py-0.5 rounded text-[11px] border border-gray-200">Unlisted</span>'
           : '<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[11px] border border-emerald-300">Listed</span>';
 
+        const thumbUrl = p.images?.image_url_list?.[0] || '';
+        const isVid = isVideoUrl(thumbUrl);
+
         models.forEach((m) => {
           html += `
             <tr class="hover:bg-gray-50 transition">
               <td class="py-3 px-4">
-                <div class="font-bold text-gray-900">${p.item_name}</div>
-                <div class="text-[11px] text-gray-400 font-mono">ID: ${p.item_id}</div>
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                    ${thumbUrl ? (isVid ? `
+                      <div class="w-full h-full bg-gray-900 text-white flex items-center justify-center text-[10px]">
+                        <i class="fa-solid fa-video text-orange-400"></i>
+                      </div>
+                    ` : `
+                      <img src="${escapeHtml(thumbUrl)}" class="w-full h-full object-cover">
+                    `) : `
+                      <i class="fa-solid fa-box text-gray-400"></i>
+                    `}
+                  </div>
+                  <div>
+                    <div class="font-bold text-gray-900">${p.item_name}</div>
+                    <div class="text-[11px] text-gray-400 font-mono">ID: ${p.item_id}</div>
+                  </div>
+                </div>
               </td>
               <td class="py-3 px-4 text-xs">
                 <span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium">${p.category_name}</span>
@@ -2767,12 +2868,96 @@
       }
     }
 
-    // Add Product Modal
+    // Add Product Modal & Media State
+    let addProductMediaList = [];
+
     function openAddProductModal() {
+      addProductMediaList = [];
+      renderProductMediaPreview();
+      const urlInput = document.getElementById('add-prod-media-url');
+      if (urlInput) urlInput.value = '';
       document.getElementById('add-product-modal').classList.remove('hidden');
     }
+
     function closeAddProductModal() {
+      addProductMediaList = [];
       document.getElementById('add-product-modal').classList.add('hidden');
+    }
+
+    function handleProductMediaSelect(event) {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+      uploadFilesToProductList(files);
+    }
+
+    async function uploadFilesToProductList(files) {
+      const loadingEl = document.getElementById('add-prod-media-loading');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      try {
+        for (const file of files) {
+          if (addProductMediaList.length >= 9) {
+            showToast('Tối đa 9 tệp hình ảnh/video cho mỗi sản phẩm!', true);
+            break;
+          }
+          const url = await uploadMediaFile(file);
+          if (url) {
+            addProductMediaList.push(url);
+          }
+        }
+        renderProductMediaPreview();
+      } catch (err) {
+        showToast(`Tải tệp thất bại: ${err.message}`, true);
+      } finally {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        const input = document.getElementById('add-prod-media-input');
+        if (input) input.value = '';
+      }
+    }
+
+    function addProductMediaUrl() {
+      const input = document.getElementById('add-prod-media-url');
+      const url = input.value.trim();
+      if (!url) return;
+      if (addProductMediaList.length >= 9) {
+        showToast('Tối đa 9 tệp hình ảnh/video cho mỗi sản phẩm!', true);
+        return;
+      }
+      addProductMediaList.push(url);
+      input.value = '';
+      renderProductMediaPreview();
+    }
+
+    function removeProductMedia(index) {
+      addProductMediaList.splice(index, 1);
+      renderProductMediaPreview();
+    }
+
+    function renderProductMediaPreview() {
+      const container = document.getElementById('add-prod-media-preview');
+      const countEl = document.getElementById('add-prod-media-count');
+      if (countEl) countEl.textContent = `${addProductMediaList.length}/9 tệp`;
+      if (!container) return;
+
+      container.innerHTML = addProductMediaList.map((url, idx) => `
+        <div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100 flex items-center justify-center">
+          ${isVideoUrl(url) ? `
+            <video src="${escapeHtml(url)}" class="w-full h-full object-cover"></video>
+            <span class="absolute top-1 left-1 bg-black/70 text-white text-[9px] px-1 rounded flex items-center">
+              <i class="fa-solid fa-video mr-0.5"></i> Video
+            </span>
+          ` : `
+            <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+          `}
+          ${idx === 0 ? `
+            <span class="absolute bottom-1 left-1 bg-[#ee4d2d] text-white text-[8px] px-1 font-bold rounded">
+              Ảnh bìa
+            </span>
+          ` : ''}
+          <button type="button" onclick="removeProductMedia(${idx})" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] opacity-80 hover:opacity-100 transition shadow">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `).join('');
     }
 
     async function submitAddProduct() {
@@ -2843,7 +3028,8 @@
             weight,
             item_sku: sku || undefined,
             tier_variation: tierVariation,
-            models
+            models,
+            image_url_list: addProductMediaList
           })
         });
         const data = await res.json();
@@ -3858,10 +4044,19 @@
             `;
           }
 
+          const firstImg = p.images?.image_url_list?.[0] || '';
+          const isCardVid = isVideoUrl(firstImg);
+
           html += `
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition flex flex-col justify-between ${isVacation ? 'opacity-85' : ''}">
-              <div class="h-44 bg-gradient-to-tr from-gray-100 to-gray-50 flex items-center justify-center p-4 border-b border-gray-100 relative">
-                <i class="fa-solid fa-box-open text-gray-300 text-6xl"></i>
+              <div class="h-44 bg-gradient-to-tr from-gray-100 to-gray-50 flex items-center justify-center border-b border-gray-100 relative overflow-hidden">
+                ${firstImg ? (isCardVid ? `
+                  <video src="${escapeHtml(firstImg)}" class="w-full h-full object-cover" controls></video>
+                ` : `
+                  <img src="${escapeHtml(firstImg)}" alt="${escapeHtml(p.item_name)}" class="w-full h-full object-cover">
+                `) : `
+                  <i class="fa-solid fa-box-open text-gray-300 text-6xl"></i>
+                `}
                 ${vacationBadge}
                 <span class="absolute top-3 right-3 text-[10px] font-bold text-gray-700 bg-white/95 px-2 py-0.5 rounded shadow-sm border border-gray-100 flex items-center">
                   <i class="fa-solid fa-store mr-1 text-[#ee4d2d]"></i>${p.shop_name || 'Store'}
@@ -4966,9 +5161,13 @@
             <div class="mt-2 flex items-center space-x-2">
               <span class="text-[11px] text-gray-500 font-medium">Bằng chứng:</span>
               <div class="flex items-center space-x-1.5">
-                ${allProofs.map(img => `
-                  <a href="${escapeHtml(img)}" target="_blank" class="block w-9 h-9 rounded border border-gray-200 overflow-hidden hover:opacity-80 transition">
-                    <img src="${escapeHtml(img)}" alt="proof" class="w-full h-full object-cover">
+                ${allProofs.map(url => isVideoUrl(url) ? `
+                  <a href="${escapeHtml(url)}" target="_blank" class="block w-9 h-9 rounded border border-gray-200 bg-gray-900 text-white flex items-center justify-center text-[10px] hover:opacity-80 transition relative" title="Xem video bằng chứng">
+                    <i class="fa-solid fa-play text-orange-400"></i>
+                  </a>
+                ` : `
+                  <a href="${escapeHtml(url)}" target="_blank" class="block w-9 h-9 rounded border border-gray-200 overflow-hidden hover:opacity-80 transition">
+                    <img src="${escapeHtml(url)}" alt="proof" class="w-full h-full object-cover">
                   </a>
                 `).join('')}
               </div>
@@ -6264,6 +6463,33 @@
           `;
         }
 
+        if (r.seller_proof_status === 'PENDING') {
+          actionBtns += `
+            <button onclick="openSellerDisputeModal('${r.return_sn}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Shopee yêu cầu bổ sung chứng cứ">
+              <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Bổ sung bằng chứng
+            </button>
+          `;
+        }
+
+        const proofsList = [...(r.proof_images || []), ...(r.proofs || []).map(p => p.image_url)].filter(Boolean);
+        let proofThumbnails = '';
+        if (proofsList.length > 0) {
+          proofThumbnails = `
+            <div class="mt-1 flex items-center space-x-1">
+              ${proofsList.slice(0, 3).map(url => isVideoUrl(url) ? `
+                <a href="${escapeHtml(url)}" target="_blank" class="w-6 h-6 rounded border border-gray-200 bg-gray-900 text-white flex items-center justify-center text-[8px]" title="Xem video bằng chứng">
+                  <i class="fa-solid fa-play"></i>
+                </a>
+              ` : `
+                <a href="${escapeHtml(url)}" target="_blank" class="w-6 h-6 rounded border border-gray-200 overflow-hidden block" title="Xem ảnh bằng chứng">
+                  <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+                </a>
+              `).join('')}
+              ${proofsList.length > 3 ? `<span class="text-[9px] text-gray-400 font-bold">+${proofsList.length - 3}</span>` : ''}
+            </div>
+          `;
+        }
+
         html += `
           <tr class="hover:bg-gray-50/80 transition">
             <td class="px-6 py-4 whitespace-nowrap">
@@ -6279,6 +6505,7 @@
             </td>
             <td class="px-6 py-4">
               <div class="font-medium text-gray-800 text-xs">${r.text_reason || r.reason}</div>
+              ${proofThumbnails}
               <div class="mt-1 flex items-center space-x-1.5">
                 <span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold">
                   ${r.solution === 'RETURN_REFUND' ? '📦 Trả hàng & hoàn tiền' : '💰 Hoàn tiền ngay'}
@@ -6535,7 +6762,13 @@
     }
 
     // Modal & Action Controllers
+    let buyerReturnMediaList = [];
+
     function openBuyerReturnModal(orderSn, maxAmount) {
+      buyerReturnMediaList = [];
+      renderBuyerReturnMediaPreview();
+      const urlInput = document.getElementById('buyer-return-proof-url');
+      if (urlInput) urlInput.value = '';
       document.getElementById('buyer-return-ordersn').value = orderSn;
       document.getElementById('buyer-return-ordersn-label').textContent = `Đơn hàng: ${orderSn}`;
       document.getElementById('buyer-return-amount').value = maxAmount;
@@ -6546,12 +6779,84 @@
     }
 
     function closeBuyerReturnModal() {
+      buyerReturnMediaList = [];
       const submitBtn = document.getElementById('buyer-return-submit-btn');
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1.5"></i> Gửi Yêu Cầu';
       }
       document.getElementById('buyer-return-modal').classList.add('hidden');
+    }
+
+    function handleBuyerReturnMediaSelect(event) {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+      uploadFilesToBuyerReturn(files);
+    }
+
+    async function uploadFilesToBuyerReturn(files) {
+      const loadingEl = document.getElementById('buyer-return-media-loading');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      try {
+        for (const file of files) {
+          if (buyerReturnMediaList.length >= 5) {
+            showToast('Tối đa 5 tệp bằng chứng cho mỗi yêu cầu!', true);
+            break;
+          }
+          const url = await uploadMediaFile(file);
+          if (url) {
+            buyerReturnMediaList.push(url);
+          }
+        }
+        renderBuyerReturnMediaPreview();
+      } catch (err) {
+        showToast(`Tải bằng chứng thất bại: ${err.message}`, true);
+      } finally {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        const input = document.getElementById('buyer-return-media-input');
+        if (input) input.value = '';
+      }
+    }
+
+    function addBuyerReturnMediaUrl() {
+      const input = document.getElementById('buyer-return-proof-url');
+      const url = input.value.trim();
+      if (!url) return;
+      if (buyerReturnMediaList.length >= 5) {
+        showToast('Tối đa 5 tệp bằng chứng!', true);
+        return;
+      }
+      buyerReturnMediaList.push(url);
+      input.value = '';
+      renderBuyerReturnMediaPreview();
+    }
+
+    function removeBuyerReturnMedia(index) {
+      buyerReturnMediaList.splice(index, 1);
+      renderBuyerReturnMediaPreview();
+    }
+
+    function renderBuyerReturnMediaPreview() {
+      const container = document.getElementById('buyer-return-media-preview');
+      const countEl = document.getElementById('buyer-return-media-count');
+      if (countEl) countEl.textContent = `${buyerReturnMediaList.length}/5 tệp`;
+      if (!container) return;
+
+      container.innerHTML = buyerReturnMediaList.map((url, idx) => `
+        <div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100 flex items-center justify-center">
+          ${isVideoUrl(url) ? `
+            <video src="${escapeHtml(url)}" class="w-full h-full object-cover"></video>
+            <span class="absolute top-1 left-1 bg-black/70 text-white text-[9px] px-1 rounded flex items-center">
+              <i class="fa-solid fa-video mr-0.5"></i> Video
+            </span>
+          ` : `
+            <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+          `}
+          <button type="button" onclick="removeBuyerReturnMedia(${idx})" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] opacity-80 hover:opacity-100 transition shadow">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `).join('');
     }
 
     async function submitBuyerReturn() {
@@ -6574,6 +6879,11 @@
         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Đang gửi...';
       }
 
+      const allProofs = [...buyerReturnMediaList];
+      if (proofUrl && !allProofs.includes(proofUrl)) {
+        allProofs.push(proofUrl);
+      }
+
       try {
         const body = {
           order_sn: orderSn,
@@ -6582,7 +6892,7 @@
           solution,
           refund_amount: refundAmount,
           validation_type: validationType,
-          proof_images: proofUrl ? [proofUrl] : []
+          proof_images: allProofs
         };
 
         const res = await fetch('/api/v2/simulator/returns/buyer_request', {
@@ -6682,7 +6992,13 @@
       }
     }
 
+    let sellerDisputeMediaList = [];
+
     function openSellerDisputeModal(returnSn) {
+      sellerDisputeMediaList = [];
+      renderSellerDisputeMediaPreview();
+      const urlInput = document.getElementById('seller-dispute-proof-input-url');
+      if (urlInput) urlInput.value = '';
       document.getElementById('seller-dispute-return-sn').value = returnSn;
       document.getElementById('seller-dispute-return-label').textContent = `Yêu cầu: ${returnSn}`;
       document.getElementById('seller-dispute-text').value = '';
@@ -6691,7 +7007,79 @@
     }
 
     function closeSellerDisputeModal() {
+      sellerDisputeMediaList = [];
       document.getElementById('seller-dispute-modal').classList.add('hidden');
+    }
+
+    function handleSellerDisputeMediaSelect(event) {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+      uploadFilesToSellerDispute(files);
+    }
+
+    async function uploadFilesToSellerDispute(files) {
+      const loadingEl = document.getElementById('seller-dispute-media-loading');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      try {
+        for (const file of files) {
+          if (sellerDisputeMediaList.length >= 5) {
+            showToast('Tối đa 5 tệp bằng chứng cho mỗi khiếu nại!', true);
+            break;
+          }
+          const url = await uploadMediaFile(file);
+          if (url) {
+            sellerDisputeMediaList.push(url);
+          }
+        }
+        renderSellerDisputeMediaPreview();
+      } catch (err) {
+        showToast(`Tải bằng chứng thất bại: ${err.message}`, true);
+      } finally {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        const input = document.getElementById('seller-dispute-media-input');
+        if (input) input.value = '';
+      }
+    }
+
+    function addSellerDisputeMediaUrl() {
+      const input = document.getElementById('seller-dispute-proof-input-url');
+      const url = input.value.trim();
+      if (!url) return;
+      if (sellerDisputeMediaList.length >= 5) {
+        showToast('Tối đa 5 tệp bằng chứng!', true);
+        return;
+      }
+      sellerDisputeMediaList.push(url);
+      input.value = '';
+      renderSellerDisputeMediaPreview();
+    }
+
+    function removeSellerDisputeMedia(index) {
+      sellerDisputeMediaList.splice(index, 1);
+      renderSellerDisputeMediaPreview();
+    }
+
+    function renderSellerDisputeMediaPreview() {
+      const container = document.getElementById('seller-dispute-media-preview');
+      const countEl = document.getElementById('seller-dispute-media-count');
+      if (countEl) countEl.textContent = `${sellerDisputeMediaList.length}/5 tệp`;
+      if (!container) return;
+
+      container.innerHTML = sellerDisputeMediaList.map((url, idx) => `
+        <div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100 flex items-center justify-center">
+          ${isVideoUrl(url) ? `
+            <video src="${escapeHtml(url)}" class="w-full h-full object-cover"></video>
+            <span class="absolute top-1 left-1 bg-black/70 text-white text-[9px] px-1 rounded flex items-center">
+              <i class="fa-solid fa-video mr-0.5"></i> Video
+            </span>
+          ` : `
+            <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+          `}
+          <button type="button" onclick="removeSellerDisputeMedia(${idx})" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] opacity-80 hover:opacity-100 transition shadow">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `).join('');
     }
 
     async function submitSellerDispute() {
@@ -6706,6 +7094,11 @@
         return;
       }
 
+      const allProofs = [...sellerDisputeMediaList];
+      if (proofUrl && !allProofs.includes(proofUrl)) {
+        allProofs.push(proofUrl);
+      }
+
       try {
         const res = await fetch('/api/v2/simulator/returns/seller_dispute', {
           method: 'POST',
@@ -6715,7 +7108,8 @@
             dispute_reason_id: reasonId,
             dispute_text_reason: textReason,
             email,
-            proof_url: proofUrl
+            proof_url: allProofs[0] || '',
+            proof_urls: allProofs
           })
         });
         const data = await res.json();
@@ -6867,11 +7261,29 @@
         <div class="p-3 bg-white rounded-xl border border-gray-200">
           <div class="text-gray-500 font-bold mb-1">Lý do từ người mua:</div>
           <div class="text-gray-900 font-medium">${r.text_reason || r.reason}</div>
-          ${r.proof_images && r.proof_images.length > 0 ? `
-            <div class="mt-2 flex space-x-2">
-              ${r.proof_images.map(img => `<a href="${img}" target="_blank" class="block w-16 h-16 rounded-lg border border-gray-200 overflow-hidden bg-gray-100"><img src="${img}" class="w-full h-full object-cover"></a>`).join('')}
-            </div>
-          ` : ''}
+          ${(() => {
+            const bProofs = [...(r.proof_images || []), ...(r.proofs || []).filter(p => p.uploader_type === 'BUYER').map(p => p.image_url)].filter(Boolean);
+            const uniqueBProofs = Array.from(new Set(bProofs));
+            if (uniqueBProofs.length === 0) return '';
+            return `
+              <div class="mt-2.5 pt-2 border-t border-gray-100">
+                <div class="text-[11px] font-bold text-gray-700 mb-1 flex items-center">
+                  <i class="fa-solid fa-photo-film text-[#ee4d2d] mr-1"></i> Bằng chứng Người Mua cung cấp (${uniqueBProofs.length} tệp):
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  ${uniqueBProofs.map(url => isVideoUrl(url) ? `
+                    <div class="w-20 h-20 rounded-lg border border-gray-200 bg-gray-900 overflow-hidden relative shadow-xs">
+                      <video src="${escapeHtml(url)}" class="w-full h-full object-cover" controls></video>
+                    </div>
+                  ` : `
+                    <a href="${escapeHtml(url)}" target="_blank" class="block w-16 h-16 rounded-lg border border-gray-200 overflow-hidden bg-gray-100 hover:scale-105 transition shadow-xs">
+                      <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+                    </a>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          })()}
         </div>
 
         ${r.dispute_reason_id ? `
@@ -6880,6 +7292,28 @@
             <div class="font-bold text-red-900 text-xs">${disputeReasonMap[r.dispute_reason_id] || `Mã ${r.dispute_reason_id}`}</div>
             <div class="text-red-800 mt-1">${r.dispute_text_reason || ''}</div>
             <div class="text-[10px] text-red-500 mt-1">Trạng thái bồi thường: <strong>${r.compensation_status}</strong></div>
+            ${(() => {
+              const sProofs = (r.proofs || []).filter(p => p.uploader_type === 'SELLER');
+              if (sProofs.length === 0) return '';
+              return `
+                <div class="mt-2.5 pt-2 border-t border-red-200">
+                  <div class="text-[11px] font-bold text-red-900 mb-1 flex items-center">
+                    <i class="fa-solid fa-shield-halved mr-1"></i> Bằng chứng Người Bán cung cấp (${sProofs.length} tệp):
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    ${sProofs.map(p => isVideoUrl(p.image_url) ? `
+                      <div class="w-20 h-20 rounded-lg border border-red-300 bg-gray-900 overflow-hidden relative shadow-xs">
+                        <video src="${escapeHtml(p.image_url)}" class="w-full h-full object-cover" controls></video>
+                      </div>
+                    ` : `
+                      <a href="${escapeHtml(p.image_url)}" target="_blank" class="block w-16 h-16 rounded-lg border border-red-300 overflow-hidden bg-white hover:scale-105 transition shadow-xs" title="${escapeHtml(p.comment || '')}">
+                        <img src="${escapeHtml(p.image_url)}" class="w-full h-full object-cover">
+                      </a>
+                    `).join('')}
+                  </div>
+                </div>
+              `;
+            })()}
           </div>
         ` : ''}
 

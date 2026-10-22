@@ -754,6 +754,105 @@ async function runPhase13Tests() {
     });
     assert(detRes7.json?.response?.dispute_due_date > Math.floor(Date.now() / 1000), "2-day dispute deadline is populated for seller");
 
+    // =========================================================================
+    // TEST GROUP 10: MEDIA UPLOAD SUPPORT FOR RETURNS & DISPUTES
+    // =========================================================================
+    console.log("\nTEST GROUP 10: Media Upload Support for Returns, Disputes & Evidence");
+
+    const testOrderSn8 = `ORD_RET_MEDIA_${Date.now()}`;
+    await createTestOrder(testOrderSn8, true);
+
+    // 10.1 Buyer return request with multiple proof media (photos and videos)
+    const buyerProofList = [
+      "https://cf.shopee.vn/file/buyer_proof_photo_1.jpg",
+      "https://cf.shopee.vn/file/buyer_proof_photo_2.png",
+      "https://cf.shopee.vn/file/buyer_unboxing_video.mp4"
+    ];
+
+    const req8 = await request("/api/v2/simulator/returns/buyer_request", {
+      method: "POST",
+      body: {
+        shop_id: SHOP_ID,
+        order_sn: testOrderSn8,
+        reason: "DAMAGED_FAULTY",
+        text_reason: "Hàng bị vỡ màng loa và xước thân máy",
+        solution: "RETURN_REFUND",
+        proof_images: buyerProofList
+      }
+    });
+    assert(req8.status === 200 && req8.json?.error === "", "Buyer return request with multiple media returns HTTP 200");
+    const retSn8 = req8.json?.response?.return_sn;
+    assert(typeof retSn8 === "string" && retSn8.startsWith("RET"), "Valid return_sn returned");
+
+    // 10.2 Verify proofs are stored in Return.proofImages and ReturnProof table with uploaderType: 'BUYER'
+    const dbReturn8 = await prisma.return.findUnique({
+      where: { returnSn: retSn8 },
+      include: { proofs: true }
+    });
+    assert(Array.isArray(dbReturn8?.proofImages) && dbReturn8.proofImages.length === 3, "proofImages array preserved in Return record");
+    const buyerProofsInDb = dbReturn8?.proofs.filter(p => p.uploaderType === "BUYER") || [];
+    assert(buyerProofsInDb.length === 3, "Created 3 ReturnProof records with uploaderType: BUYER");
+    assert(buyerProofsInDb.some(p => p.imageUrl === "https://cf.shopee.vn/file/buyer_unboxing_video.mp4"), "Video proof URL recorded in ReturnProof table");
+
+    // 10.3 Seller disputes return with multiple evidence media
+    const sellerProofList = [
+      "https://cf.shopee.vn/file/seller_packing_photo.jpg",
+      "https://cf.shopee.vn/file/seller_packing_video.mp4"
+    ];
+
+    const dispute8 = await request("/api/v2/simulator/returns/seller_dispute", {
+      method: "POST",
+      body: {
+        return_sn: retSn8,
+        dispute_reason_id: 50,
+        dispute_text_reason: "Shop có video đóng gói sản phẩm nguyên vẹn, bọt chống sốc 3 lớp",
+        proof_urls: sellerProofList
+      }
+    });
+    assert(dispute8.status === 200 && dispute8.json?.error === "", "Seller dispute with multiple media proofs returns HTTP 200");
+    assert(dispute8.json?.response?.status === "SELLER_DISPUTE", "Return status transitioned to SELLER_DISPUTE");
+
+    // 10.4 Verify seller proofs in database
+    const dbReturn8AfterDispute = await prisma.return.findUnique({
+      where: { returnSn: retSn8 },
+      include: { proofs: true }
+    });
+    const sellerProofsInDb = dbReturn8AfterDispute?.proofs.filter(p => p.uploaderType === "SELLER") || [];
+    assert(sellerProofsInDb.length === 2, "Created 2 ReturnProof records with uploaderType: SELLER");
+    assert(sellerProofsInDb.some(p => p.imageUrl === "https://cf.shopee.vn/file/seller_packing_video.mp4"), "Seller video proof recorded in ReturnProof table");
+
+    // 10.5 Seller uploads additional proof via seller_upload_proof
+    const addProofRes = await request("/api/v2/simulator/returns/seller_upload_proof", {
+      method: "POST",
+      body: {
+        return_sn: retSn8,
+        comment: "Biên bản bàn giao cho bưu tá SPX",
+        proof_url: "https://cf.shopee.vn/file/spx_handover_slip.jpg"
+      }
+    });
+    assert(addProofRes.status === 200 && addProofRes.json?.error === "", "seller_upload_proof returns HTTP 200");
+    assert(addProofRes.json?.response?.seller_proof_status === "UPLOADED", "seller_proof_status confirmed UPLOADED");
+
+    // 10.6 Layer A upload_proof official endpoint with multiple URLs
+    const layerAUploadUrl = makeSignedUrl("/api/v2/returns/upload_proof");
+    const layerAUploadRes = await request(layerAUploadUrl, {
+      method: "POST",
+      body: {
+        return_sn: retSn8,
+        image_url_list: ["https://cf.shopee.vn/file/layer_a_proof_1.jpg", "https://cf.shopee.vn/file/layer_a_proof_2.jpg"],
+        comment: "Additional official proof"
+      }
+    });
+    assert(layerAUploadRes.status === 200 && layerAUploadRes.json?.error === "", "Layer A upload_proof returns HTTP 200");
+    assert(layerAUploadRes.json?.response?.proof_count === 2, "Reported 2 proofs uploaded in Layer A");
+
+    // 10.7 Layer A query_proof returns all seller proofs
+    const queryProofUrl8 = makeSignedUrl("/api/v2/returns/query_proof", { return_sn: retSn8 });
+    const queryProofRes8 = await request(queryProofUrl8);
+    assert(queryProofRes8.status === 200 && queryProofRes8.json?.error === "", "Layer A query_proof returns HTTP 200");
+    const queryProofList = queryProofRes8.json?.response?.proof_list || [];
+    assert(queryProofList.length >= 5, "query_proof returns all seller proofs recorded across dispute and uploads");
+
     console.log("\n=======================================================");
     console.log("   🎉 ALL PHASE 13 RETURNS & DISPUTES TESTS PASSED!   ");
     console.log("=======================================================\n");
