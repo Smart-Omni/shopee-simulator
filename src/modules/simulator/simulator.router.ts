@@ -1040,13 +1040,30 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
     image_url_list: effectiveUrls
   };
 
+  // Enforce Shopee 5:1 variation price ratio guard if variations are provided
+  let effectiveBasePrice = Number(original_price);
+  if (hasModel) {
+    const modelPrices = parsedModels
+      .map((m: any) => Number(m.original_price ?? original_price))
+      .filter((p: number) => !isNaN(p) && p > 0);
+    if (modelPrices.length > 1) {
+      const minPrice = Math.min(...modelPrices);
+      const maxPrice = Math.max(...modelPrices);
+      if (minPrice > 0 && maxPrice / minPrice > 5.0) {
+        res.json(createShopeeErrorResponse("error_param", "The price ratio between variations exceeds limit"));
+        return;
+      }
+      effectiveBasePrice = minPrice;
+    }
+  }
+
   const product = await prisma.product.create({
     data: {
       shopId,
       categoryId: catId,
       itemName: item_name,
       description,
-      originalPrice: Number(original_price),
+      originalPrice: effectiveBasePrice,
       currency: "VND",
       weight: Number(weight),
       itemSku: item_sku || `SKU-${Date.now()}`,
@@ -1064,8 +1081,8 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
           modelName: m.model_name || "Standard",
           modelSku: m.model_sku || `${product.itemSku}-VAR`,
           tierIndex: m.tier_index || [0],
-          originalPrice: Number(m.original_price || original_price),
-          sellerStock: Number(m.seller_stock || 100)
+          originalPrice: Number(m.original_price ?? original_price),
+          sellerStock: Number(m.seller_stock ?? 100)
         }
       });
     }

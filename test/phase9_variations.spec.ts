@@ -208,7 +208,73 @@ async function runPhase9Tests() {
     assert(create2TierRes.json.error === "", "2-Tier simulator product creation succeeds");
     assert(create2TierRes.json.response.item_id > 0, "Created product has valid item_id");
 
-    console.log("\n✅ ALL 16 PHASE 9 ASSERTIONS PASSED!\n");
+    // -------------------------------------------------------------
+    // Test 5: Distinct Model Pricing per Variation in Simulator Creation
+    // -------------------------------------------------------------
+    console.log("\n[Test 5] Individual Pricing per Variation Model");
+    const customPriceRes = await request("/api/v2/simulator/product/create", {
+      method: "POST",
+      body: {
+        shop_id: SHOP_ID,
+        category_id: 100001,
+        item_name: "Silk Polo Shirt with Distinct Tier Pricing",
+        description: "Polo shirt with different prices per size",
+        original_price: 250000,
+        weight: 0.3,
+        tier_variation: [
+          { name: "Size", option_list: [{ option: "M" }, { option: "XL" }] }
+        ],
+        models: [
+          { model_name: "M", tier_index: [0], original_price: 240000, seller_stock: 50 },
+          { model_name: "XL", tier_index: [1], original_price: 280000, seller_stock: 30 }
+        ]
+      }
+    });
+    assert(customPriceRes.json.error === "", "Product with distinct variation prices created successfully");
+    const customItemId = customPriceRes.json.response.item_id;
+    const customModels = await prisma.productModel.findMany({
+      where: { itemId: BigInt(customItemId) },
+      orderBy: { modelId: "asc" }
+    });
+    assert(customModels.length === 2, "2 distinct variation models created in database");
+    assert(Number(customModels[0].originalPrice) === 240000, "Model M has individual price 240,000 VND");
+    assert(Number(customModels[1].originalPrice) === 280000, "Model XL has individual price 280,000 VND");
+
+    const customProductDb = await prisma.product.findUnique({
+      where: { itemId: BigInt(customItemId) }
+    });
+    assert(Number(customProductDb?.originalPrice) === 240000, "Base item price set to minimum variation price (240,000 VND)");
+
+    // Clean up Test 5 product
+    await prisma.productModel.deleteMany({ where: { itemId: BigInt(customItemId) } }).catch(() => {});
+    await prisma.product.delete({ where: { itemId: BigInt(customItemId) } }).catch(() => {});
+
+    // -------------------------------------------------------------
+    // Test 6: Simulator Enforces Shopee 5:1 Price Ratio Guard
+    // -------------------------------------------------------------
+    console.log("\n[Test 6] Simulator Rejects Price Ratio Exceeding 5:1");
+    const ratioExceedRes = await request("/api/v2/simulator/product/create", {
+      method: "POST",
+      body: {
+        shop_id: SHOP_ID,
+        category_id: 100001,
+        item_name: "Illegal Price Ratio Product",
+        description: "Product violating Shopee 5:1 price ratio rule",
+        original_price: 100000,
+        weight: 0.2,
+        tier_variation: [
+          { name: "Edition", option_list: [{ option: "Standard" }, { option: "Collector" }] }
+        ],
+        models: [
+          { model_name: "Standard", tier_index: [0], original_price: 100000, seller_stock: 10 },
+          { model_name: "Collector", tier_index: [1], original_price: 600000, seller_stock: 5 } // 600k / 100k = 6.0 > 5.0
+        ]
+      }
+    });
+    assert(ratioExceedRes.json.error === "error_param", "Rejects variation models when max/min > 5.0");
+    assert(ratioExceedRes.json.message.includes("ratio"), "Error message specifies price ratio violation");
+
+    console.log("\n✅ ALL 23 PHASE 9 ASSERTIONS PASSED!\n");
   } finally {
     if (testProduct) {
       await prisma.productModel.deleteMany({ where: { itemId: testProduct.itemId } }).catch(() => {});

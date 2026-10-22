@@ -1221,7 +1221,7 @@
   <!-- MODAL 1: ADD PRODUCT MODAL (SELLER)                                    -->
   <!-- ======================================================================= -->
   <div id="add-product-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
       <button onclick="closeAddProductModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-lg">
         <i class="fa-solid fa-xmark"></i>
       </button>
@@ -1252,13 +1252,13 @@
           </div>
           <div>
             <label class="block font-semibold text-gray-700 mb-1">SKU</label>
-            <input type="text" id="add-prod-sku" placeholder="e.g. PROD-SKU-01" class="w-full p-2 border border-gray-300 rounded">
+            <input type="text" id="add-prod-sku" placeholder="VD: PROD-SKU-01" oninput="renderVariationMatrix()" class="w-full p-2 border border-gray-300 rounded">
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block font-semibold text-gray-700 mb-1">Giá Bán (VNĐ)</label>
-            <input type="number" id="add-prod-price" value="250000" class="w-full p-2 border border-gray-300 rounded">
+            <label class="block font-semibold text-gray-700 mb-1">Giá Bán Tiêu Chuẩn (VNĐ)</label>
+            <input type="number" id="add-prod-price" value="250000" oninput="renderVariationMatrix()" class="w-full p-2 border border-gray-300 rounded">
           </div>
           <div>
             <label class="block font-semibold text-gray-700 mb-1">Khối Lượng (kg)</label>
@@ -1299,24 +1299,75 @@
           <div class="grid grid-cols-2 gap-2 mb-2">
             <div>
               <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Nhóm Phân Loại 1 (VD: Màu sắc)</label>
-              <input type="text" id="add-prod-tier1-name" value="Color" class="w-full p-1.5 border border-gray-300 rounded text-xs">
+              <input type="text" id="add-prod-tier1-name" value="Màu sắc" oninput="renderVariationMatrix()" class="w-full p-1.5 border border-gray-300 rounded text-xs">
             </div>
             <div>
               <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Phân Loại 1 (Cách nhau dấu phẩy: Đen, Trắng, Be)</label>
-              <input type="text" id="add-prod-tier1-options" placeholder="e.g. Black, White, Beige" class="w-full p-1.5 border border-gray-300 rounded text-xs">
+              <input type="text" id="add-prod-tier1-options" placeholder="VD: Đen, Trắng, Be" oninput="renderVariationMatrix()" class="w-full p-1.5 border border-gray-300 rounded text-xs">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Nhóm Phân Loại 2 (VD: Kích thước)</label>
-              <input type="text" id="add-prod-tier2-name" value="Size" class="w-full p-1.5 border border-gray-300 rounded text-xs">
+              <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Nhóm Phân Loại 2 (VD: Kích cỡ)</label>
+              <input type="text" id="add-prod-tier2-name" value="Kích cỡ" oninput="renderVariationMatrix()" class="w-full p-1.5 border border-gray-300 rounded text-xs">
             </div>
             <div>
               <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Phân Loại 2 (Tùy chọn: S, M, L, XL)</label>
-              <input type="text" id="add-prod-tier2-options" placeholder="e.g. S, M, L, XL" class="w-full p-1.5 border border-gray-300 rounded text-xs">
+              <input type="text" id="add-prod-tier2-options" placeholder="VD: S, M, L, XL" oninput="renderVariationMatrix()" class="w-full p-1.5 border border-gray-300 rounded text-xs">
             </div>
           </div>
           <p class="text-[10px] text-gray-400 mt-1.5">Để trống cả 2 nhóm phân loại sẽ tạo 1 sản phẩm tiêu chuẩn đơn lẻ.</p>
+        </div>
+
+        <!-- Bảng Phân Loại Hàng & Thiết Lập Giá (Shopee Tier Variation Grid) -->
+        <div id="add-prod-variants-section" class="pt-3 border-t border-gray-100 hidden">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <span class="font-bold text-gray-800 text-xs flex items-center">
+                <i class="fa-solid fa-layer-group text-[#ee4d2d] mr-1.5"></i> Danh Sách Phân Loại Hàng & Thiết Lập Giá
+              </span>
+              <p class="text-[11px] text-gray-500">Shopee cho phép định giá riêng cho từng phân loại (quy định chênh lệch tối đa 5:1 giữa giá cao nhất và thấp nhất).</p>
+            </div>
+            <span id="var-matrix-count" class="text-[10px] bg-orange-50 text-[#ee4d2d] px-2 py-0.5 rounded-full font-bold border border-orange-200">
+              0 phân loại
+            </span>
+          </div>
+
+          <!-- Áp Dụng Nhanh Hàng Loạt -->
+          <div class="bg-orange-50/70 p-2.5 rounded-xl border border-orange-200 mb-3 text-xs">
+            <span class="block text-[11px] font-bold text-gray-700 mb-1.5 flex items-center">
+              <i class="fa-solid fa-wand-magic-sparkles text-[#ee4d2d] mr-1"></i> Áp dụng nhanh cho tất cả phân loại:
+            </span>
+            <div class="grid grid-cols-3 gap-2">
+              <input type="number" id="batch-var-price" placeholder="Giá bán chung (₫)" class="p-1.5 border border-gray-300 rounded text-xs bg-white focus:ring-1 focus:ring-[#ee4d2d]">
+              <input type="number" id="batch-var-stock" placeholder="Kho hàng chung" class="p-1.5 border border-gray-300 rounded text-xs bg-white focus:ring-1 focus:ring-[#ee4d2d]">
+              <button type="button" onclick="batchApplyVariationValues()" class="bg-[#ee4d2d] hover:bg-orange-600 text-white font-bold text-xs rounded px-2 py-1.5 shadow-sm transition">
+                Áp Dụng Tất Cả
+              </button>
+            </div>
+          </div>
+
+          <!-- Bảng Chi Tiết Từng Phân Loại -->
+          <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm max-h-60 overflow-y-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-gray-50 text-gray-600 font-semibold sticky top-0 z-10 border-b border-gray-200">
+                <tr>
+                  <th class="p-2">Tên Phân Loại</th>
+                  <th class="p-2 w-36">Giá Bán (₫) <span class="text-[#ee4d2d]">*</span></th>
+                  <th class="p-2 w-28">Kho Hàng <span class="text-[#ee4d2d]">*</span></th>
+                  <th class="p-2 w-36">SKU Phân Loại</th>
+                </tr>
+              </thead>
+              <tbody id="add-prod-variants-tbody" class="divide-y divide-gray-100 bg-white">
+                <!-- Tự động kết xuất từng dòng phân loại -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Thanh Cảnh Báo Quy Tắc Tỷ Lệ Giá 5:1 Của Shopee -->
+          <div id="var-price-ratio-banner" class="mt-2.5 p-2 rounded-lg text-[11px] flex items-start space-x-2 border transition">
+            <!-- Tự động cập nhật trạng thái hợp lệ hoặc cảnh báo đỏ -->
+          </div>
         </div>
       </div>
 
@@ -2870,17 +2921,21 @@
 
     // Add Product Modal & Media State
     let addProductMediaList = [];
+    let currentVariationMatrix = [];
 
     function openAddProductModal() {
       addProductMediaList = [];
       renderProductMediaPreview();
       const urlInput = document.getElementById('add-prod-media-url');
       if (urlInput) urlInput.value = '';
+      currentVariationMatrix = [];
+      renderVariationMatrix();
       document.getElementById('add-product-modal').classList.remove('hidden');
     }
 
     function closeAddProductModal() {
       addProductMediaList = [];
+      currentVariationMatrix = [];
       document.getElementById('add-product-modal').classList.add('hidden');
     }
 
@@ -2960,21 +3015,208 @@
       `).join('');
     }
 
+    // Shopee Multi-Tier Variation Matrix & Pricing Logic
+    function renderVariationMatrix() {
+      const container = document.getElementById('add-prod-variants-section');
+      const tbody = document.getElementById('add-prod-variants-tbody');
+      const countBadge = document.getElementById('var-matrix-count');
+      if (!container || !tbody) return;
+
+      const t1Name = (document.getElementById('add-prod-tier1-name')?.value || 'Màu sắc').trim();
+      const t1Raw = (document.getElementById('add-prod-tier1-options')?.value || '').trim();
+      const t2Name = (document.getElementById('add-prod-tier2-name')?.value || 'Kích cỡ').trim();
+      const t2Raw = (document.getElementById('add-prod-tier2-options')?.value || '').trim();
+      const basePrice = parseFloat(document.getElementById('add-prod-price')?.value) || 250000;
+      const baseSku = (document.getElementById('add-prod-sku')?.value || 'SKU').trim();
+
+      const t1Opts = t1Raw ? t1Raw.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const t2Opts = t2Raw ? t2Raw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+      if (t1Opts.length === 0 && t2Opts.length === 0) {
+        container.classList.add('hidden');
+        currentVariationMatrix = [];
+        return;
+      }
+
+      container.classList.remove('hidden');
+
+      // Preserve previously typed values by model name
+      const existingMap = new Map();
+      currentVariationMatrix.forEach(row => {
+        existingMap.set(row.name, { price: row.price, stock: row.stock, sku: row.sku });
+      });
+
+      const newMatrix = [];
+
+      if (t1Opts.length > 0 && t2Opts.length > 0) {
+        // 2-Tier Variation
+        t1Opts.forEach((opt1, i) => {
+          t2Opts.forEach((opt2, j) => {
+            const modelName = `${opt1}, ${opt2}`;
+            const defaultSku = `${baseSku}-${opt1.toUpperCase().replace(/[\s,]+/g, '_')}-${opt2.toUpperCase().replace(/[\s,]+/g, '_')}`;
+            const existing = existingMap.get(modelName);
+            newMatrix.push({
+              name: modelName,
+              tierIndex: [i, j],
+              price: existing !== undefined ? existing.price : basePrice,
+              stock: existing !== undefined ? existing.stock : 100,
+              sku: existing !== undefined ? existing.sku : defaultSku
+            });
+          });
+        });
+      } else if (t1Opts.length > 0) {
+        // 1-Tier (Tier 1)
+        t1Opts.forEach((opt, idx) => {
+          const modelName = opt;
+          const defaultSku = `${baseSku}-${opt.toUpperCase().replace(/[\s,]+/g, '_')}`;
+          const existing = existingMap.get(modelName);
+          newMatrix.push({
+            name: modelName,
+            tierIndex: [idx],
+            price: existing !== undefined ? existing.price : basePrice,
+            stock: existing !== undefined ? existing.stock : 100,
+            sku: existing !== undefined ? existing.sku : defaultSku
+          });
+        });
+      } else if (t2Opts.length > 0) {
+        // 1-Tier (Tier 2 only)
+        t2Opts.forEach((opt, idx) => {
+          const modelName = opt;
+          const defaultSku = `${baseSku}-${opt.toUpperCase().replace(/[\s,]+/g, '_')}`;
+          const existing = existingMap.get(modelName);
+          newMatrix.push({
+            name: modelName,
+            tierIndex: [idx],
+            price: existing !== undefined ? existing.price : basePrice,
+            stock: existing !== undefined ? existing.stock : 100,
+            sku: existing !== undefined ? existing.sku : defaultSku
+          });
+        });
+      }
+
+      currentVariationMatrix = newMatrix;
+      if (countBadge) countBadge.textContent = `${currentVariationMatrix.length} phân loại`;
+
+      tbody.innerHTML = currentVariationMatrix.map((row, idx) => `
+        <tr class="hover:bg-gray-50/70 transition">
+          <td class="p-2 font-medium text-gray-800">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-700">
+              ${escapeHtml(row.name)}
+            </span>
+          </td>
+          <td class="p-2">
+            <input type="number" 
+                   value="${row.price}" 
+                   class="w-full p-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-[#ee4d2d] focus:border-[#ee4d2d]" 
+                   oninput="updateVariationRow(${idx}, 'price', this.value)">
+          </td>
+          <td class="p-2">
+            <input type="number" 
+                   value="${row.stock}" 
+                   class="w-full p-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-[#ee4d2d] focus:border-[#ee4d2d]" 
+                   oninput="updateVariationRow(${idx}, 'stock', this.value)">
+          </td>
+          <td class="p-2">
+            <input type="text" 
+                   value="${escapeHtml(row.sku)}" 
+                   class="w-full p-1 border border-gray-300 rounded text-xs font-mono text-[11px] focus:ring-1 focus:ring-[#ee4d2d] focus:border-[#ee4d2d]" 
+                   oninput="updateVariationRow(${idx}, 'sku', this.value)">
+          </td>
+        </tr>
+      `).join('');
+
+      checkVariationPriceRatio();
+    }
+
+    function updateVariationRow(index, field, value) {
+      if (!currentVariationMatrix[index]) return;
+      if (field === 'price') {
+        currentVariationMatrix[index].price = parseFloat(value) || 0;
+        checkVariationPriceRatio();
+      } else if (field === 'stock') {
+        currentVariationMatrix[index].stock = parseInt(value, 10) || 0;
+      } else if (field === 'sku') {
+        currentVariationMatrix[index].sku = value.trim();
+      }
+    }
+
+    function batchApplyVariationValues() {
+      const priceInput = document.getElementById('batch-var-price');
+      const stockInput = document.getElementById('batch-var-stock');
+      const batchPrice = parseFloat(priceInput?.value);
+      const batchStock = parseInt(stockInput?.value, 10);
+
+      if (isNaN(batchPrice) && isNaN(batchStock)) {
+        showToast('Vui lòng nhập giá hoặc kho hàng cần áp dụng hàng loạt!', true);
+        return;
+      }
+
+      currentVariationMatrix.forEach(row => {
+        if (!isNaN(batchPrice) && batchPrice >= 0) row.price = batchPrice;
+        if (!isNaN(batchStock) && batchStock >= 0) row.stock = batchStock;
+      });
+
+      renderVariationMatrix();
+      showToast('Đã áp dụng giá và kho hàng cho tất cả phân loại thành công!');
+    }
+
+    function checkVariationPriceRatio() {
+      const banner = document.getElementById('var-price-ratio-banner');
+      if (!banner) return true;
+
+      const prices = currentVariationMatrix.map(r => Number(r.price)).filter(p => !isNaN(p) && p > 0);
+      if (prices.length <= 1) {
+        banner.className = 'mt-2.5 p-2 rounded-lg text-[11px] flex items-start space-x-2 border border-gray-200 bg-gray-50 text-gray-600';
+        banner.innerHTML = `
+          <i class="fa-solid fa-circle-info text-blue-500 mt-0.5"></i>
+          <div>Shopee cho phép định giá riêng từng phân loại. Khi có nhiều phân loại, tỷ lệ giá cao nhất / thấp nhất không được vượt quá <strong>5:1</strong>.</div>
+        `;
+        return true;
+      }
+
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      const ratio = minPrice > 0 ? (maxPrice / minPrice) : 1;
+
+      if (minPrice > 0 && ratio > 5.0) {
+        banner.className = 'mt-2.5 p-2.5 rounded-lg text-[11px] flex items-start space-x-2 border border-red-300 bg-red-50 text-red-800 animate-pulse';
+        banner.innerHTML = `
+          <i class="fa-solid fa-triangle-exclamation text-red-600 mt-0.5 text-sm"></i>
+          <div>
+            <div class="font-bold text-red-900">Vi phạm quy định tỷ lệ giá Shopee (vượt 5:1):</div>
+            <div>Giá thấp nhất: <strong>${minPrice.toLocaleString('vi-VN')} ₫</strong> — Giá cao nhất: <strong>${maxPrice.toLocaleString('vi-VN')} ₫</strong> (Tỷ lệ: <strong class="underline">${ratio.toFixed(2)}x</strong> > giới hạn 5.0x).</div>
+            <div class="text-[10px] text-red-700 mt-0.5">Hệ thống Shopee sẽ từ chối lưu với lỗi <code>error_param</code> nếu tỷ lệ vượt quá 5 lần. Vui lòng điều chỉnh lại giá bán!</div>
+          </div>
+        `;
+        return false;
+      } else {
+        banner.className = 'mt-2.5 p-2 rounded-lg text-[11px] flex items-start space-x-2 border border-emerald-200 bg-emerald-50 text-emerald-800';
+        banner.innerHTML = `
+          <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+          <div>
+            <span class="font-bold text-emerald-900">Tỷ lệ giá Shopee hợp lệ (${ratio.toFixed(2)}x / tối đa 5.0x):</span>
+            Thấp nhất: <strong>${minPrice.toLocaleString('vi-VN')} ₫</strong> — Cao nhất: <strong>${maxPrice.toLocaleString('vi-VN')} ₫</strong>.
+          </div>
+        `;
+        return true;
+      }
+    }
+
     async function submitAddProduct() {
       const name = document.getElementById('add-prod-name').value.trim();
       const catId = document.getElementById('add-prod-category').value;
       const sku = document.getElementById('add-prod-sku').value.trim();
-      const price = parseFloat(document.getElementById('add-prod-price').value);
-      const weight = parseFloat(document.getElementById('add-prod-weight').value);
+      const price = parseFloat(document.getElementById('add-prod-price').value) || 0;
+      const weight = parseFloat(document.getElementById('add-prod-weight').value) || 0.5;
       const desc = document.getElementById('add-prod-desc').value.trim();
 
-      const t1Name = (document.getElementById('add-prod-tier1-name')?.value || 'Color').trim();
+      const t1Name = (document.getElementById('add-prod-tier1-name')?.value || 'Màu sắc').trim();
       const t1Raw = (document.getElementById('add-prod-tier1-options')?.value || '').trim();
-      const t2Name = (document.getElementById('add-prod-tier2-name')?.value || 'Size').trim();
+      const t2Name = (document.getElementById('add-prod-tier2-name')?.value || 'Kích cỡ').trim();
       const t2Raw = (document.getElementById('add-prod-tier2-options')?.value || '').trim();
 
       if (!name) {
-        showToast('Product title is required', true);
+        showToast('Vui lòng nhập tên sản phẩm!', true);
         return;
       }
 
@@ -2984,36 +3226,39 @@
       const t1Opts = t1Raw ? t1Raw.split(',').map(s => s.trim()).filter(Boolean) : [];
       const t2Opts = t2Raw ? t2Raw.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-      if (t1Opts.length > 0 && t2Opts.length > 0) {
-        // 2-Tier Variation
-        tierVariation = [
-          { name: t1Name, option_list: t1Opts.map(o => ({ option: o })) },
-          { name: t2Name, option_list: t2Opts.map(o => ({ option: o })) }
-        ];
-        t1Opts.forEach((opt1, i) => {
-          t2Opts.forEach((opt2, j) => {
-            models.push({
-              model_name: `${opt1}, ${opt2}`,
-              model_sku: `${sku || 'SKU'}-${opt1.toUpperCase().replace(/\s+/g, '_')}-${opt2.toUpperCase().replace(/\s+/g, '_')}`,
-              original_price: price,
-              seller_stock: 100,
-              tier_index: [i, j]
-            });
-          });
-        });
-      } else if (t1Opts.length > 0) {
-        // 1-Tier Variation
-        tierVariation = [
-          { name: t1Name, option_list: t1Opts.map(o => ({ option: o })) }
-        ];
-        models = t1Opts.map((opt, idx) => ({
-          model_name: opt,
-          model_sku: `${sku || 'SKU'}-${opt.toUpperCase().replace(/\s+/g, '_')}`,
-          original_price: price,
-          seller_stock: 100,
-          tier_index: [idx]
+      if (currentVariationMatrix.length > 0) {
+        if (!checkVariationPriceRatio()) {
+          showToast('Lỗi: Chênh lệch giá giữa các phân loại vượt quá 5:1 theo quy chuẩn Shopee!', true);
+          return;
+        }
+
+        if (t1Opts.length > 0 && t2Opts.length > 0) {
+          tierVariation = [
+            { name: t1Name, option_list: t1Opts.map(o => ({ option: o })) },
+            { name: t2Name, option_list: t2Opts.map(o => ({ option: o })) }
+          ];
+        } else if (t1Opts.length > 0) {
+          tierVariation = [
+            { name: t1Name, option_list: t1Opts.map(o => ({ option: o })) }
+          ];
+        } else if (t2Opts.length > 0) {
+          tierVariation = [
+            { name: t2Name, option_list: t2Opts.map(o => ({ option: o })) }
+          ];
+        }
+
+        models = currentVariationMatrix.map(r => ({
+          model_name: r.name,
+          model_sku: r.sku || `${sku || 'SKU'}-${r.name.toUpperCase().replace(/[\s,]+/g, '_')}`,
+          original_price: Number(r.price),
+          seller_stock: Number(r.stock),
+          tier_index: r.tierIndex
         }));
       }
+
+      const effectiveBasePrice = models.length > 0
+        ? Math.min(...models.map(m => m.original_price))
+        : price;
 
       try {
         const res = await fetch('/api/v2/simulator/product/create', {
@@ -3024,7 +3269,7 @@
             category_id: catId,
             item_name: name,
             description: desc,
-            original_price: price,
+            original_price: effectiveBasePrice,
             weight,
             item_sku: sku || undefined,
             tier_variation: tierVariation,
@@ -3035,11 +3280,13 @@
         const data = await res.json();
         if (data.response) {
           closeAddProductModal();
-          showToast(`Product "${name}" added with ${models.length > 0 ? `${models.length} variants` : 'standard model'}!`);
+          showToast(`Đã tạo sản phẩm "${name}" thành công với ${models.length > 0 ? `${models.length} phân loại giá riêng` : 'mô hình tiêu chuẩn'}!`);
           loadProducts();
+        } else {
+          showToast(data.message || 'Lỗi khi tạo sản phẩm', true);
         }
       } catch (err) {
-        showToast('Failed to create product', true);
+        showToast('Lỗi kết nối khi tạo sản phẩm', true);
       }
     }
 
