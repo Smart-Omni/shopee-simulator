@@ -1945,6 +1945,36 @@ simulatorRouter.post("/api/v2/simulator/product/toggle_unlist", async (req: Requ
 });
 
 // ============================================================================
+// SIMULATOR HELPER: DELETE PRODUCT (SELLER / ADMIN)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/product/delete", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { item_id } = req.body || {};
+    if (!item_id) {
+      res.json(createShopeeErrorResponse("error_param", "item_id is required"));
+      return;
+    }
+    const product = await prisma.product.findUnique({
+      where: { itemId: BigInt(item_id) }
+    });
+    if (!product || product.itemStatus === "SELLER_DELETE" || product.itemStatus === "DELETED") {
+      res.json(createShopeeErrorResponse("error_item_not_found", "Product not found or already deleted"));
+      return;
+    }
+    await prisma.product.update({
+      where: { itemId: product.itemId },
+      data: { itemStatus: "SELLER_DELETE" }
+    });
+    res.json(createShopeeSuccessResponse({
+      item_id: Number(item_id),
+      item_status: "SELLER_DELETE"
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to delete product"));
+  }
+});
+
+// ============================================================================
 // SIMULATOR HELPER: CREATE REVIEW (POST-ORDER RATING)
 // ============================================================================
 simulatorRouter.post("/api/v2/simulator/review/create", async (req: Request, res: Response): Promise<void> => {

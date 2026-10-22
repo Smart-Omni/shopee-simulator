@@ -856,7 +856,47 @@ productRouter.post("/api/v2/product/unlist_item", shopeeAuthGuard, async (req: R
 });
 
 // ============================================================================
-// 14. GET COMMENT: GET /api/v2/product/get_comment
+// 14. DELETE ITEM: POST /api/v2/product/delete_item
+// ============================================================================
+productRouter.post("/api/v2/product/delete_item", shopeeAuthGuard, async (req: Request, res: Response): Promise<void> => {
+  const shopIdStr = req.query.shop_id as string;
+  const shopId = BigInt(shopIdStr);
+  const { item_id } = req.body || {};
+
+  if (!item_id) {
+    res.json(createShopeeErrorResponse("error_param", "item_id is required"));
+    return;
+  }
+
+  const itemId = BigInt(item_id);
+
+  // Check shop vacation mode
+  const shop = await prisma.shop.findUnique({ where: { shopId } });
+  if (shop?.isVacation) {
+    res.json(createShopeeErrorResponse("error_holiday_on_del_item", "Shop is under vacation mode"));
+    return;
+  }
+
+  const product = await prisma.product.findFirst({
+    where: { itemId, shopId }
+  });
+
+  if (!product || product.itemStatus === "SELLER_DELETE" || product.itemStatus === "DELETED") {
+    res.json(createShopeeErrorResponse("error_item_not_found", "Item_id is not found."));
+    return;
+  }
+
+  // Soft-delete item by updating status to SELLER_DELETE (matching Shopee 90-day retention convention)
+  await prisma.product.update({
+    where: { itemId },
+    data: { itemStatus: "SELLER_DELETE" }
+  });
+
+  res.json(createShopeeSuccessResponse({}));
+});
+
+// ============================================================================
+// 15. GET COMMENT: GET /api/v2/product/get_comment
 // ============================================================================
 productRouter.get("/api/v2/product/get_comment", shopeeAuthGuard, async (req: Request, res: Response): Promise<void> => {
   const shopIdStr = req.query.shop_id as string;
