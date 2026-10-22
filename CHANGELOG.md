@@ -4,6 +4,55 @@ All notable changes, bug fixes, architecture evolution, and feature enhancements
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-10-22
+
+### 🎯 Overview
+Implemented comprehensive **Media Upload Support across Product Creation, Returns/Refunds, and Seller Disputes**, interactive **Multi-Tier Variation Pricing Grid with Shopee 5:1 Price Ratio Guard**, **Docker Container Google Drive OAuth2 Credential Forwarding**, and the official **Shopee Product Deletion Lifecycle (`v2.product.delete_item`)** supporting deletion of both active and unlisted products. The test baseline expanded to **540 / 540 passing assertions (100% pass rate)** across all 14 test phases.
+
+### 📸 Media Upload Engine for Product Creation, Returns & Disputes
+- **Product Creation Media Support (`POST /api/v2/simulator/product/create`):**
+  - Integrated `multer` multipart file handling with `storageService`, persisting images and videos directly to Google Drive (or local storage).
+  - Supports `image_url_list`, `images` array, and raw multipart file uploads simultaneously.
+  - Stored URLs and unique Shopee-format image IDs (`imagesJson`) are returned in standard Shopee format.
+- **Buyer Return & Refund Evidence (`POST /api/v2/simulator/returns/buyer_request`):**
+  - Accepts uploaded proof media files and external URLs, recording `ReturnProof` database records flagged with `uploaderType: "BUYER"`.
+- **Seller Dispute & Additional Evidence (`POST /api/v2/simulator/returns/seller_dispute` & `seller_upload_proof`):**
+  - Accepts uploaded dispute media files and video records, persisting them into `ReturnProof` with `uploaderType: "SELLER"`.
+- **Layer A Proof Upload Extension (`POST /api/v2/returns/upload_proof`):**
+  - Enhanced official Partner endpoint to accept direct multipart file uploads alongside URL arrays.
+- **Frontend Dropzones & Previews (`public/index.html`):**
+  - Interactive media dropzones with instant thumbnail previews, file type badges ("Video", "Ảnh bìa"), remove buttons, and media counter indicators for all three workflows.
+  - Dual proof inspection side-by-side inside the Shopee Admin Arbitration Desk.
+
+### 🏷️ Multi-Tier Variation Pricing Grid & Shopee 5:1 Price Ratio Guard
+- **Interactive Variation Matrix in UI (`public/index.html`):**
+  - Dynamically renders the **"Danh Sách Phân Loại Hàng & Thiết Lập Giá"** table when tier variation options are entered into Tier 1 (*Màu sắc*) or Tier 2 (*Kích cỡ*).
+  - Each variation combination row features dedicated editable inputs for **Giá Bán (₫)**, **Kho Hàng (Tồn kho)**, and **SKU Phân Loại**.
+  - **Batch Apply Tool ("Áp dụng nhanh cho tất cả phân loại"):** One-click application of bulk price and stock across all combinations.
+  - **Live Shopee 5:1 Price Ratio Banner:** Real-time calculation and validation of $\max(\text{price}) / \min(\text{price}) \le 5.0$, rendering a green confirmation badge when valid and a pulsing red warning when exceeding the official 5:1 Shopee limit.
+- **Backend Ratio Verification (`src/modules/simulator/simulator.router.ts`):**
+  - Enforces the 5:1 price ratio rule on `POST /api/v2/simulator/product/create`, rejecting illegal spreads with official error code `error_param`.
+  - Persists individual `originalPrice` per `ProductModel` and calibrates base product price to the minimum variation price.
+
+### ☁️ Docker Google Drive OAuth2 Credential Forwarding
+- **Docker Compose Configuration (`docker-compose.yml`):**
+  - Configured `env_file: - .env` and explicitly passed `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, `GOOGLE_DRIVE_REFRESH_TOKEN`, and `GOOGLE_DRIVE_FOLDER_ID` to container `shopee-mock-server`.
+  - Fixed issue where the container previously lacked credentials and fell back to local storage.
+  - Verified live cloud upload to Google Drive folder (`1By2sIoApqE030K9LviudUYHzEDCpb8Ry`) with high-speed CDN URLs (`https://lh3.googleusercontent.com/d/...`).
+
+### 🗑️ Official Product Deletion Lifecycle (`v2.product.delete_item`)
+- **Layer A Official Endpoint (`POST /api/v2/product/delete_item`):**
+  - Strictly enforces HMAC-SHA256 signature verification.
+  - Checks shop vacation mode (`error_holiday_on_del_item`).
+  - Transitions `itemStatus` to `"SELLER_DELETE"`.
+  - Supports deleting products whether in `"NORMAL"` or `"UNLIST"` state.
+- **Layer B Developer Shortcut (`POST /api/v2/simulator/product/delete`):**
+  - Instant product deletion helper for testing and UI management.
+- **Shopee 90-Day Retention Compliance:**
+  - Deleted products remain queryable via `POST /api/v2/product/get_item_list` with `item_status=SELLER_DELETE` or `get_item_base_info`.
+
+---
+
 ## [1.9.0] - 2026-10-21
 
 ### 🎯 Overview
