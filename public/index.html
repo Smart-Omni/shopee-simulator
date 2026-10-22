@@ -2046,14 +2046,23 @@
             Yêu cầu sẽ được Shopee trực tiếp tiếp nhận và xử lý. Shopee sẽ quyết định <span class="font-bold">Hoàn tiền ngay</span> (không cần gửi hàng) hoặc <span class="font-bold">Trả hàng & hoàn tiền</span> (bưu tá tiếp nhận gửi về kho).
           </div>
         </div>
-          </div>
-        </div>
 
-        <!-- Refund Amount -->
+        <!-- Refund Amount (Locked / Auto-calculated by Shopee System) -->
         <div>
-          <label class="block text-gray-700 font-bold mb-1">Số tiền yêu cầu hoàn (₫)</label>
-          <input type="number" id="buyer-return-amount" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white font-bold text-[#ee4d2d] focus:outline-none focus:border-[#ee4d2d]">
-          <p id="buyer-return-max-note" class="text-[10px] text-gray-400 mt-1">Tối đa giá trị đơn hàng</p>
+          <label class="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+            <span>Số tiền hoàn dự kiến (₫)</span>
+            <span class="text-[10px] text-gray-400 font-normal">Hệ thống Shopee tự động tính toán</span>
+          </label>
+          <div class="relative">
+            <input type="number" id="buyer-return-amount" readonly class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-gray-50 font-bold text-[#ee4d2d] cursor-not-allowed select-none">
+            <span class="absolute right-3 top-2.5 text-xs text-gray-400 font-bold">₫</span>
+          </div>
+          <div class="mt-1.5 flex items-start space-x-1.5 text-[10px] text-gray-500 bg-gray-50 p-2 rounded-lg border border-gray-200">
+            <i class="fa-solid fa-lock text-gray-400 mt-0.5"></i>
+            <div>
+              <span>Theo quy chuẩn Shopee, số tiền hoàn được tính cố định dựa trên giá trị đơn hàng thực tế. Người mua <strong>không thể tự ý nhập số tiền bồi thường</strong> khi khởi tạo yêu cầu. Người bán có thể đưa ra đề xuất bồi thường một phần sau khi xem xét lý do và bằng chứng.</span>
+            </div>
+          </div>
         </div>
 
         <!-- Proof Media (Images / Videos) -->
@@ -7019,7 +7028,8 @@
       document.getElementById('buyer-return-ordersn').value = orderSn;
       document.getElementById('buyer-return-ordersn-label').textContent = `Đơn hàng: ${orderSn}`;
       document.getElementById('buyer-return-amount').value = maxAmount;
-      document.getElementById('buyer-return-max-note').textContent = `Tối đa ${formatCurrency(maxAmount)}`;
+      const noteEl = document.getElementById('buyer-return-max-note');
+      if (noteEl) noteEl.textContent = `Tối đa ${formatCurrency(maxAmount)}`;
       document.getElementById('buyer-return-text-reason').value = '';
       document.getElementById('buyer-return-proof').value = '';
       document.getElementById('buyer-return-modal').classList.remove('hidden');
