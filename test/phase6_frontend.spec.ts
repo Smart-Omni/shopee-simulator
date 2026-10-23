@@ -156,6 +156,37 @@ async function runPhase6Tests() {
       });
       assert(verifyModel?.sellerStock === newStockVal, "Database product_models table updated with new stock");
     }
+
+    // =========================================================================
+    // TEST GROUP 3.2: Product Creation with Uploaded Media Support
+    // =========================================================================
+    console.log("\nTEST GROUP 3.2: Product Creation with Custom Images & Video URLs");
+    const testCustomImages = [
+      "https://cf.shopee.vn/file/custom_product_image_1.jpg",
+      "https://cf.shopee.vn/file/custom_product_image_2.png",
+      "https://cf.shopee.vn/file/custom_product_video.mp4"
+    ];
+
+    const createProdRes = await request("/api/v2/simulator/product/create", {
+      method: "POST",
+      body: {
+        shop_id: SHOP_ID,
+        category_id: 100001,
+        item_name: "Test Media Enabled Wireless Keyboard",
+        description: "High quality mechanical keyboard with uploaded media proof",
+        original_price: 350000,
+        weight: 0.8,
+        item_sku: `KB-MEDIA-${Date.now()}`,
+        image_url_list: testCustomImages
+      }
+    });
+
+    assert(createProdRes.status === 200, "Product creation with custom media returns HTTP 200");
+    assert(createProdRes.json?.error === "", "Empty error on media product creation");
+    assert(createProdRes.json?.response?.item_id > 0, "Created item_id is valid number");
+    assert(Array.isArray(createProdRes.json?.response?.images?.image_url_list), "images.image_url_list returned in response");
+    assert(createProdRes.json?.response?.images?.image_url_list.length === 3, "Contains exactly 3 media URLs");
+    assert(createProdRes.json?.response?.images?.image_url_list[2] === "https://cf.shopee.vn/file/custom_product_video.mp4", "Video URL preserved in media list");
     console.log();
 
     // =========================================================================

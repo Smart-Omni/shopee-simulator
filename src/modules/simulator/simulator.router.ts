@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import { prisma } from "../../common/prisma";
 import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../common/utils/envelope";
 import { WebhookService } from "../webhook/webhook.service";
@@ -6,9 +7,17 @@ import { generateShopeeAwbPdf } from "../../common/utils/pdf";
 import { OrderStatus, PromotionStatus } from "@prisma/client";
 import { normalizeReturnReason } from "../returns/returns.constants";
 import { calculateReverseShippingFee } from "../payment/payment.router";
+import { storageService } from "../../common/storage/storage.service";
 import * as crypto from "crypto";
 
 export const simulatorRouter = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50 MB
+  }
+});
 
 // ============================================================================
 // 1. SHOP OVERVIEW & TOKEN STATUS
@@ -473,6 +482,64 @@ simulatorRouter.get("/api/v2/simulator/shop/detail", async (req: Request, res: R
       return;
     }
 
+    // Dynamic calculations from DB
+    const now = new Date();
+    const diffMs = Math.max(0, Date.now() - new Date(shop.createdAt).getTime());
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    let joined = "Recently";
+    if (diffDays >= 730) {
+      joined = `${Math.floor(diffDays / 365)} years ago`;
+    } else if (diffDays >= 365) {
+      joined = "1 year ago";
+    } else if (diffDays >= 60) {
+      joined = `${Math.floor(diffDays / 30)} months ago`;
+    } else if (diffDays >= 30) {
+      joined = "1 month ago";
+    } else if (diffDays > 1) {
+      joined = `${diffDays} days ago`;
+    } else if (diffDays === 1) {
+      joined = "1 day ago";
+    } else {
+      joined = "Today";
+    }
+
+    // Fetch active vouchers and promotional campaigns for the shop
+    const [activeVouchers, activeDiscounts] = await Promise.all([
+      prisma.voucher.findMany({
+        where: {
+          shopId,
+          status: "ONGOING",
+          startTime: { lte: now },
+          endTime: { gte: now }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 6
+      }),
+      prisma.discount.findMany({
+        where: {
+          shopId,
+          status: "ONGOING",
+          startTime: { lte: now },
+          endTime: { gte: now }
+        },
+        take: 5
+      })
+    ]);
+
+    const vouchers = activeVouchers.map((v) => ({
+      voucher_id: Number(v.voucherId),
+      code: v.voucherCode,
+      name: v.voucherName,
+      type: v.percentage ? "percent" : "amount",
+      percent: v.percentage || 0,
+      amount: v.discountAmount ? Number(v.discountAmount) : 0,
+      minimum: Number(v.minBasketPrice || 0),
+      maxDiscount: v.maxPrice ? Number(v.maxPrice) : null,
+      start_time: Math.floor(v.startTime.getTime() / 1000),
+      end_time: Math.floor(v.endTime.getTime() / 1000),
+      expiresAt: v.endTime.toISOString().split("T")[0]
+    }));
+
     res.json(createShopeeSuccessResponse({
       shop: {
         shop_id: Number(shop.shopId),
@@ -482,11 +549,14 @@ simulatorRouter.get("/api/v2/simulator/shop/detail", async (req: Request, res: R
         is_vacation: shop.isVacation,
         rating: Number(shop.rating || 5.0),
         rating_count: shop.ratingCount || 0,
-        followers: 12800,
+        followers: Number(shop.shopId) === 727720655 ? 12800 : (Number(shop.shopId) % 15000 + 5000),
         response_rate: "98%",
-        joined: "2 years ago",
+        response_time: "Within a few hours",
+        joined,
         tagline: "Official Flagship Store",
         story: `${shop.shopName} provides authentic, premium merchandise with full manufacturer warranty and instant Shopee delivery.`,
+        has_campaign: vouchers.length > 0 || activeDiscounts.length > 0,
+        vouchers,
         products: shop.products.map((p) => ({
           item_id: Number(p.itemId),
           item_name: p.itemName,
@@ -939,7 +1009,7 @@ simulatorRouter.get("/api/v2/simulator/buyers", (_req: Request, res: Response): 
 // ============================================================================
 // 13. SELLER ADDS PRODUCT (SHOP INVENTORY MANAGEMENT)
 // ============================================================================
-simulatorRouter.post("/api/v2/simulator/product/create", async (req: Request, res: Response): Promise<void> => {
+simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (req: Request, res: Response): Promise<void> => {
   const {
     shop_id = 727720655,
     category_id = 100001,
@@ -949,7 +1019,9 @@ simulatorRouter.post("/api/v2/simulator/product/create", async (req: Request, re
     weight = 0.5,
     item_sku,
     tier_variation,
-    models = []
+    models = [],
+    images = [],
+    image_url_list = []
   } = req.body || {};
 
   if (!item_name) {
@@ -959,7 +1031,92 @@ simulatorRouter.post("/api/v2/simulator/product/create", async (req: Request, re
 
   const shopId = BigInt(shop_id);
   const catId = BigInt(category_id);
-  const hasModel = Array.isArray(models) && models.length > 0;
+
+  let parsedModels = models;
+  if (typeof models === "string") {
+    try {
+      parsedModels = JSON.parse(models);
+    } catch {
+      parsedModels = [];
+    }
+  }
+  const hasModel = Array.isArray(parsedModels) && parsedModels.length > 0;
+
+  let parsedTierVariation = tier_variation;
+  if (typeof tier_variation === "string") {
+    try {
+      parsedTierVariation = JSON.parse(tier_variation);
+    } catch {
+      parsedTierVariation = undefined;
+    }
+  }
+
+  // Process media: uploaded files or passed URLs
+  const finalImageUrls: string[] = [];
+
+  const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+  for (const file of uploadedFiles) {
+    try {
+      const uploadRes = await storageService.uploadFile(file);
+      finalImageUrls.push(uploadRes.url);
+    } catch (e: any) {
+      console.error("[Simulator:ProductCreate] Media upload error:", e);
+    }
+  }
+
+  const rawImageUrls = Array.isArray(image_url_list)
+    ? image_url_list
+    : typeof image_url_list === "string"
+      ? (() => { try { const p = JSON.parse(image_url_list); return Array.isArray(p) ? p : [image_url_list]; } catch { return [image_url_list]; } })()
+      : [];
+  finalImageUrls.push(...rawImageUrls.filter(Boolean));
+
+  if (Array.isArray(images)) {
+    for (const img of images) {
+      if (typeof img === "string") finalImageUrls.push(img);
+      else if (img && (img.url || img.image_url)) finalImageUrls.push(img.url || img.image_url);
+    }
+  } else if (typeof images === "string" && images.trim()) {
+    try {
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed)) {
+        for (const img of parsed) {
+          if (typeof img === "string") finalImageUrls.push(img);
+          else if (img && (img.url || img.image_url)) finalImageUrls.push(img.url || img.image_url);
+        }
+      } else {
+        finalImageUrls.push(images.trim());
+      }
+    } catch {
+      finalImageUrls.push(images.trim());
+    }
+  }
+
+  const uniqueUrls = Array.from(new Set(finalImageUrls.filter(Boolean)));
+  const effectiveUrls = uniqueUrls.length > 0 ? uniqueUrls : ["https://cf.shopee.vn/file/custom_product_image"];
+  const imageIdList = effectiveUrls.map((_, idx) => `vn-11134201-7rd5z-${Date.now().toString(36)}-${idx}`);
+
+  const imagesJson = {
+    image_id_list: imageIdList,
+    image_url_list: effectiveUrls
+  };
+
+  // Enforce Shopee 5:1 variation price ratio guard if variations are provided
+  let effectiveBasePrice = Number(original_price);
+  if (hasModel) {
+    const modelPrices = parsedModels
+      .map((m: any) => Number(m.original_price ?? original_price))
+      .filter((p: number) => !isNaN(p) && p > 0);
+    if (modelPrices.length > 1) {
+      const minPrice = Math.min(...modelPrices);
+      const maxPrice = Math.max(...modelPrices);
+      if (minPrice > 0 && maxPrice / minPrice > 5.0) {
+        res.json(createShopeeErrorResponse("error_param", "The price ratio between variations exceeds limit"));
+        return;
+      }
+      effectiveBasePrice = minPrice;
+    }
+  }
 
   const product = await prisma.product.create({
     data: {
@@ -967,29 +1124,26 @@ simulatorRouter.post("/api/v2/simulator/product/create", async (req: Request, re
       categoryId: catId,
       itemName: item_name,
       description,
-      originalPrice: Number(original_price),
+      originalPrice: effectiveBasePrice,
       currency: "VND",
       weight: Number(weight),
       itemSku: item_sku || `SKU-${Date.now()}`,
       hasModel,
-      tierVariationJson: tier_variation || undefined,
-      imagesJson: {
-        image_id_list: ["img_custom_1"],
-        image_url_list: ["https://cf.shopee.vn/file/custom_product_image"]
-      }
+      tierVariationJson: parsedTierVariation || undefined,
+      imagesJson
     }
   });
 
   if (hasModel) {
-    for (const m of models) {
+    for (const m of parsedModels) {
       await prisma.productModel.create({
         data: {
           itemId: product.itemId,
           modelName: m.model_name || "Standard",
           modelSku: m.model_sku || `${product.itemSku}-VAR`,
           tierIndex: m.tier_index || [0],
-          originalPrice: Number(m.original_price || original_price),
-          sellerStock: Number(m.seller_stock || 100)
+          originalPrice: Number(m.original_price ?? original_price),
+          sellerStock: Number(m.seller_stock ?? 100)
         }
       });
     }
@@ -1009,7 +1163,8 @@ simulatorRouter.post("/api/v2/simulator/product/create", async (req: Request, re
   res.json(createShopeeSuccessResponse({
     item_id: Number(product.itemId),
     item_name: product.itemName,
-    has_model: product.hasModel
+    has_model: product.hasModel,
+    images: imagesJson
   }));
 });
 
@@ -1851,6 +2006,36 @@ simulatorRouter.post("/api/v2/simulator/product/toggle_unlist", async (req: Requ
 });
 
 // ============================================================================
+// SIMULATOR HELPER: DELETE PRODUCT (SELLER / ADMIN)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/product/delete", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { item_id } = req.body || {};
+    if (!item_id) {
+      res.json(createShopeeErrorResponse("error_param", "item_id is required"));
+      return;
+    }
+    const product = await prisma.product.findUnique({
+      where: { itemId: BigInt(item_id) }
+    });
+    if (!product || product.itemStatus === "SELLER_DELETE" || product.itemStatus === "DELETED") {
+      res.json(createShopeeErrorResponse("error_item_not_found", "Product not found or already deleted"));
+      return;
+    }
+    await prisma.product.update({
+      where: { itemId: product.itemId },
+      data: { itemStatus: "SELLER_DELETE" }
+    });
+    res.json(createShopeeSuccessResponse({
+      item_id: Number(item_id),
+      item_status: "SELLER_DELETE"
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to delete product"));
+  }
+});
+
+// ============================================================================
 // SIMULATOR HELPER: CREATE REVIEW (POST-ORDER RATING)
 // ============================================================================
 simulatorRouter.post("/api/v2/simulator/review/create", async (req: Request, res: Response): Promise<void> => {
@@ -2042,7 +2227,7 @@ simulatorRouter.post("/api/v2/simulator/review/reply", async (req: Request, res:
 // ============================================================================
 
 // 17.1 Buyer requests return/refund
-simulatorRouter.post("/api/v2/simulator/returns/buyer_request", async (req: Request, res: Response): Promise<void> => {
+simulatorRouter.post("/api/v2/simulator/returns/buyer_request", upload.any(), async (req: Request, res: Response): Promise<void> => {
   try {
     const { order_sn, reason, text_reason, solution, refund_amount, validation_type, proof_images } = req.body;
 
@@ -2098,7 +2283,32 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", async (req: Requ
     const returnSn = "RET" + Date.now().toString().slice(-8) + Math.floor(100 + Math.random() * 900);
     const dueDate = new Date(Date.now() + 48 * 3600 * 1000); // 48h SLA
 
-    const images = Array.isArray(proof_images) ? proof_images : [];
+    // Handle proof media: files and URLs
+    const finalProofUrls: string[] = [];
+
+    const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+    for (const file of uploadedFiles) {
+      try {
+        const uploadRes = await storageService.uploadFile(file);
+        finalProofUrls.push(uploadRes.url);
+      } catch (e: any) {
+        console.error("[Simulator:BuyerReturn] Media upload error:", e);
+      }
+    }
+
+    if (Array.isArray(proof_images)) {
+      finalProofUrls.push(...proof_images.filter(Boolean));
+    } else if (typeof proof_images === "string" && proof_images.trim()) {
+      try {
+        const parsed = JSON.parse(proof_images);
+        if (Array.isArray(parsed)) finalProofUrls.push(...parsed.filter(Boolean));
+        else finalProofUrls.push(proof_images.trim());
+      } catch {
+        finalProofUrls.push(proof_images.trim());
+      }
+    }
+
+    const images = Array.from(new Set(finalProofUrls.filter(Boolean)));
 
     const newReturn = await prisma.return.create({
       data: {
@@ -2118,6 +2328,18 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", async (req: Requ
         proofImages: images
       }
     });
+
+    // Create ReturnProof records for buyer proofs
+    for (const pUrl of images) {
+      await prisma.returnProof.create({
+        data: {
+          returnSn,
+          uploaderType: "BUYER",
+          imageUrl: pUrl,
+          comment: text_reason || reason || "Buyer return proof"
+        }
+      });
+    }
 
     // Populate ReturnItems
     const reqItems = req.body.items;
@@ -2491,9 +2713,9 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_accept_offer", async (req:
 });
 
 // 17.3d Seller dispute / request compensation from UI
-simulatorRouter.post("/api/v2/simulator/returns/seller_dispute", async (req: Request, res: Response): Promise<void> => {
+simulatorRouter.post("/api/v2/simulator/returns/seller_dispute", upload.any(), async (req: Request, res: Response): Promise<void> => {
   try {
-    const { return_sn, dispute_reason_id, dispute_text_reason, email, proof_url } = req.body;
+    const { return_sn, dispute_reason_id, dispute_text_reason, email, proof_url, proof_urls, proof_images } = req.body;
     const reasonId = parseInt(String(dispute_reason_id), 10);
 
     if (!return_sn || isNaN(reasonId)) {
@@ -2516,6 +2738,36 @@ simulatorRouter.post("/api/v2/simulator/returns/seller_dispute", async (req: Req
     const compensationStatus = isCompensationDispute ? "COMPENSATION_REQUESTED" : r.compensationStatus;
     const oldStatus = r.status;
 
+    // Handle proof media: files and URLs
+    const finalProofUrls: string[] = [];
+
+    const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+    for (const file of uploadedFiles) {
+      try {
+        const uploadRes = await storageService.uploadFile(file);
+        finalProofUrls.push(uploadRes.url);
+      } catch (e: any) {
+        console.error("[Simulator:SellerDispute] Media upload error:", e);
+      }
+    }
+
+    if (proof_url && typeof proof_url === "string" && proof_url.trim()) {
+      finalProofUrls.push(proof_url.trim());
+    }
+
+    const rawUrls = Array.isArray(proof_urls)
+      ? proof_urls
+      : typeof proof_urls === "string"
+        ? (() => { try { const p = JSON.parse(proof_urls); return Array.isArray(p) ? p : [proof_urls]; } catch { return [proof_urls]; } })()
+        : [];
+    finalProofUrls.push(...rawUrls.filter(Boolean));
+
+    if (Array.isArray(proof_images)) {
+      finalProofUrls.push(...proof_images.filter(Boolean));
+    }
+
+    const uniqueProofUrls = Array.from(new Set(finalProofUrls.filter(Boolean)));
+
     await prisma.return.update({
       where: { returnSn: return_sn },
       data: {
@@ -2528,13 +2780,13 @@ simulatorRouter.post("/api/v2/simulator/returns/seller_dispute", async (req: Req
       }
     });
 
-    if (proof_url) {
+    for (const url of uniqueProofUrls) {
       await prisma.returnProof.create({
         data: {
           returnSn: return_sn,
           uploaderType: "SELLER",
-          imageUrl: proof_url,
-          comment: dispute_text_reason || "Seller proof upload"
+          imageUrl: url,
+          comment: dispute_text_reason || "Seller dispute proof"
         }
       });
     }
@@ -2552,10 +2804,68 @@ simulatorRouter.post("/api/v2/simulator/returns/seller_dispute", async (req: Req
     res.json(createShopeeSuccessResponse({
       return_sn: r.returnSn,
       status: newStatus,
-      compensation_status: compensationStatus
+      compensation_status: compensationStatus,
+      proofs_count: uniqueProofUrls.length
     }));
   } catch (err: any) {
     res.json(createShopeeErrorResponse("server_error", err.message || "Failed to submit dispute"));
+  }
+});
+
+// 17.3e Seller uploads additional proof (e.g. after Admin request)
+simulatorRouter.post("/api/v2/simulator/returns/seller_upload_proof", upload.any(), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { return_sn, comment, proof_url, proof_urls } = req.body;
+    if (!return_sn) {
+      res.json(createShopeeErrorResponse("error_param", "return_sn is required"));
+      return;
+    }
+    const r = await prisma.return.findUnique({ where: { returnSn: return_sn } });
+    if (!r) {
+      res.json(createShopeeErrorResponse("return.not_found", "Return request not found"));
+      return;
+    }
+
+    const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+    const finalProofUrls: string[] = [];
+
+    for (const file of uploadedFiles) {
+      const uploadRes = await storageService.uploadFile(file);
+      finalProofUrls.push(uploadRes.url);
+    }
+
+    if (proof_url && typeof proof_url === "string" && proof_url.trim()) {
+      finalProofUrls.push(proof_url.trim());
+    }
+
+    if (Array.isArray(proof_urls)) {
+      finalProofUrls.push(...proof_urls.filter(Boolean));
+    }
+
+    const uniqueUrls = Array.from(new Set(finalProofUrls.filter(Boolean)));
+    for (const u of uniqueUrls) {
+      await prisma.returnProof.create({
+        data: {
+          returnSn: return_sn,
+          uploaderType: "SELLER",
+          imageUrl: u,
+          comment: comment || "Seller uploaded additional proof"
+        }
+      });
+    }
+
+    const updated = await prisma.return.update({
+      where: { returnSn: return_sn },
+      data: { sellerProofStatus: "UPLOADED" }
+    });
+
+    res.json(createShopeeSuccessResponse({
+      return_sn,
+      uploaded_count: uniqueUrls.length,
+      seller_proof_status: updated.sellerProofStatus
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to upload seller proof"));
   }
 });
 

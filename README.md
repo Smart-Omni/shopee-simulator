@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-teal.svg)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Test Suite](https://img.shields.io/badge/Tests-509%2F509%20Passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/Tests-540%2F540%20Passing-brightgreen.svg)]()
 [![Shopee Open API](https://img.shields.io/badge/Shopee%20Open%20API-v2%20Standard-orange.svg)]()
 
 > High-fidelity, contractually conforming **Shopee Open API v2 Mock Server** and interactive web testbed built for **SmartOmni Channel** integration, multi-merchant e-commerce synchronization, automated testing, and development without sandbox rate limits or dependency on live Shopee seller accounts.
@@ -90,11 +90,13 @@ The simulator has completed **Phases 1 through 14** with **509 automated asserti
 - Background retry worker with exponential backoff for failed webhook deliveries.
 
 ### 3. Product Catalog & 2-Tier Variations System (Fashion & Apparel)
-- Official Endpoints: `get_item_list`, `get_item_base_info`, `get_model_list`, `add_item`, `init_tier_variation`, `update_stock`, `update_price`, `unlist_item`.
+- Official Endpoints: `get_item_list`, `get_item_base_info`, `get_model_list`, `add_item`, `init_tier_variation`, `update_stock`, `update_price`, `unlist_item`, `delete_item`.
 - **2-Tier Variations (Color + Size)**: Cartesian matrix generator ($N \times M$ models) with automated `tier_index: [i, j]` mapping.
-- **Shopee 5:1 Price Ratio Rule**: Enforces that highest variation price cannot exceed $5 \times$ the lowest variation price.
+- **Variation Pricing Grid & Batch Apply**: Full interactive matrix UI supporting individual price, stock, and SKU customization per variation model with a one-click bulk apply tool.
+- **Shopee 5:1 Price Ratio Rule**: Enforces that highest variation price cannot exceed $5 \times$ the lowest variation price ($\max/\min \le 5.0$), backed by real-time frontend indicators and backend rejection (`error_param`).
 - **SKU Status & Stock Lifecycle**:
   - `POST /api/v2/product/unlist_item`: Batch unlisting/relisting (`NORMAL` $\leftrightarrow$ `UNLIST`).
+  - `POST /api/v2/product/delete_item`: Soft-deletes listings (`SELLER_DELETE`) for both `NORMAL` and `UNLIST` products with official Shopee 90-day retention query support.
   - Storefront catalog filter: `GET /api/v2/simulator/products?view_mode=buyer` automatically hides unlisted items.
   - `POST /api/v2/simulator/product/quick_update_stock`: Instant stock adjustment per SKU model.
 

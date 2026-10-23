@@ -1221,7 +1221,7 @@
   <!-- MODAL 1: ADD PRODUCT MODAL (SELLER)                                    -->
   <!-- ======================================================================= -->
   <div id="add-product-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
       <button onclick="closeAddProductModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-lg">
         <i class="fa-solid fa-xmark"></i>
       </button>
@@ -1252,13 +1252,13 @@
           </div>
           <div>
             <label class="block font-semibold text-gray-700 mb-1">SKU</label>
-            <input type="text" id="add-prod-sku" placeholder="e.g. PROD-SKU-01" class="w-full p-2 border border-gray-300 rounded">
+            <input type="text" id="add-prod-sku" placeholder="VD: PROD-SKU-01" oninput="renderVariationMatrix()" class="w-full p-2 border border-gray-300 rounded">
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block font-semibold text-gray-700 mb-1">Giá Bán (VNĐ)</label>
-            <input type="number" id="add-prod-price" value="250000" class="w-full p-2 border border-gray-300 rounded">
+            <label class="block font-semibold text-gray-700 mb-1">Giá Bán Tiêu Chuẩn (VNĐ)</label>
+            <input type="number" id="add-prod-price" value="250000" oninput="renderVariationMatrix()" class="w-full p-2 border border-gray-300 rounded">
           </div>
           <div>
             <label class="block font-semibold text-gray-700 mb-1">Khối Lượng (kg)</label>
@@ -1270,29 +1270,104 @@
           <textarea id="add-prod-desc" rows="2" placeholder="Mô tả chi tiết đặc tính, chất liệu và công năng sản phẩm..." class="w-full p-2 border border-gray-300 rounded"></textarea>
         </div>
 
+        <!-- Product Media Upload (Images & Video) -->
+        <div class="pt-2 border-t border-gray-100">
+          <label class="block font-semibold text-gray-700 mb-1 flex items-center justify-between">
+            <span><i class="fa-solid fa-photo-film text-[#ee4d2d] mr-1"></i> Hình Ảnh & Video Sản Phẩm</span>
+            <span id="add-prod-media-count" class="text-[10px] text-gray-400 font-normal">0/9 tệp</span>
+          </label>
+          <div class="border-2 border-dashed border-gray-300 hover:border-[#ee4d2d] rounded-xl p-3 text-center cursor-pointer bg-gray-50/50 hover:bg-orange-50/30 transition" onclick="document.getElementById('add-prod-media-input').click()">
+            <input type="file" id="add-prod-media-input" multiple accept="image/*,video/*" class="hidden" onchange="handleProductMediaSelect(event)">
+            <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-400 mb-1"></i>
+            <p class="text-[11px] font-semibold text-gray-700">Tải ảnh hoặc video sản phẩm</p>
+            <p class="text-[10px] text-gray-400">Định dạng JPG, PNG, WEBP, MP4 (Tối đa 9 ảnh, 1 video)</p>
+          </div>
+          <div class="mt-2 flex space-x-1.5">
+            <input type="text" id="add-prod-media-url" placeholder="Hoặc dán liên kết ảnh/video (https://...)" class="flex-1 p-1.5 border border-gray-300 rounded text-xs">
+            <button type="button" onclick="addProductMediaUrl()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded border border-gray-300">
+              Thêm
+            </button>
+          </div>
+          <div id="add-prod-media-loading" class="hidden mt-2 text-center text-xs text-[#ee4d2d] font-semibold">
+            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang tải tệp lên máy chủ...
+          </div>
+          <div id="add-prod-media-preview" class="grid grid-cols-4 gap-2 mt-2 empty:hidden"></div>
+        </div>
+
         <div class="pt-2 border-t border-gray-100">
           <label class="block font-semibold text-gray-700 mb-1">Phân Loại Hàng (Biến Thể 2 Tầng Shopee)</label>
           <div class="grid grid-cols-2 gap-2 mb-2">
             <div>
               <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Nhóm Phân Loại 1 (VD: Màu sắc)</label>
-              <input type="text" id="add-prod-tier1-name" value="Color" class="w-full p-1.5 border border-gray-300 rounded text-xs">
+              <input type="text" id="add-prod-tier1-name" value="Màu sắc" oninput="renderVariationMatrix()" class="w-full p-1.5 border border-gray-300 rounded text-xs">
             </div>
             <div>
               <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Phân Loại 1 (Cách nhau dấu phẩy: Đen, Trắng, Be)</label>
-              <input type="text" id="add-prod-tier1-options" placeholder="e.g. Black, White, Beige" class="w-full p-1.5 border border-gray-300 rounded text-xs">
+              <input type="text" id="add-prod-tier1-options" placeholder="VD: Đen, Trắng, Be" oninput="renderVariationMatrix()" class="w-full p-1.5 border border-gray-300 rounded text-xs">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Nhóm Phân Loại 2 (VD: Kích thước)</label>
-              <input type="text" id="add-prod-tier2-name" value="Size" class="w-full p-1.5 border border-gray-300 rounded text-xs">
+              <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Nhóm Phân Loại 2 (VD: Kích cỡ)</label>
+              <input type="text" id="add-prod-tier2-name" value="Kích cỡ" oninput="renderVariationMatrix()" class="w-full p-1.5 border border-gray-300 rounded text-xs">
             </div>
             <div>
               <label class="block text-[11px] text-gray-500 font-medium mb-0.5">Phân Loại 2 (Tùy chọn: S, M, L, XL)</label>
-              <input type="text" id="add-prod-tier2-options" placeholder="e.g. S, M, L, XL" class="w-full p-1.5 border border-gray-300 rounded text-xs">
+              <input type="text" id="add-prod-tier2-options" placeholder="VD: S, M, L, XL" oninput="renderVariationMatrix()" class="w-full p-1.5 border border-gray-300 rounded text-xs">
             </div>
           </div>
           <p class="text-[10px] text-gray-400 mt-1.5">Để trống cả 2 nhóm phân loại sẽ tạo 1 sản phẩm tiêu chuẩn đơn lẻ.</p>
+        </div>
+
+        <!-- Bảng Phân Loại Hàng & Thiết Lập Giá (Shopee Tier Variation Grid) -->
+        <div id="add-prod-variants-section" class="pt-3 border-t border-gray-100 hidden">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <span class="font-bold text-gray-800 text-xs flex items-center">
+                <i class="fa-solid fa-layer-group text-[#ee4d2d] mr-1.5"></i> Danh Sách Phân Loại Hàng & Thiết Lập Giá
+              </span>
+              <p class="text-[11px] text-gray-500">Shopee cho phép định giá riêng cho từng phân loại (quy định chênh lệch tối đa 5:1 giữa giá cao nhất và thấp nhất).</p>
+            </div>
+            <span id="var-matrix-count" class="text-[10px] bg-orange-50 text-[#ee4d2d] px-2 py-0.5 rounded-full font-bold border border-orange-200">
+              0 phân loại
+            </span>
+          </div>
+
+          <!-- Áp Dụng Nhanh Hàng Loạt -->
+          <div class="bg-orange-50/70 p-2.5 rounded-xl border border-orange-200 mb-3 text-xs">
+            <span class="block text-[11px] font-bold text-gray-700 mb-1.5 flex items-center">
+              <i class="fa-solid fa-wand-magic-sparkles text-[#ee4d2d] mr-1"></i> Áp dụng nhanh cho tất cả phân loại:
+            </span>
+            <div class="grid grid-cols-3 gap-2">
+              <input type="number" id="batch-var-price" placeholder="Giá bán chung (₫)" class="p-1.5 border border-gray-300 rounded text-xs bg-white focus:ring-1 focus:ring-[#ee4d2d]">
+              <input type="number" id="batch-var-stock" placeholder="Kho hàng chung" class="p-1.5 border border-gray-300 rounded text-xs bg-white focus:ring-1 focus:ring-[#ee4d2d]">
+              <button type="button" onclick="batchApplyVariationValues()" class="bg-[#ee4d2d] hover:bg-orange-600 text-white font-bold text-xs rounded px-2 py-1.5 shadow-sm transition">
+                Áp Dụng Tất Cả
+              </button>
+            </div>
+          </div>
+
+          <!-- Bảng Chi Tiết Từng Phân Loại -->
+          <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm max-h-60 overflow-y-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-gray-50 text-gray-600 font-semibold sticky top-0 z-10 border-b border-gray-200">
+                <tr>
+                  <th class="p-2">Tên Phân Loại</th>
+                  <th class="p-2 w-36">Giá Bán (₫) <span class="text-[#ee4d2d]">*</span></th>
+                  <th class="p-2 w-28">Kho Hàng <span class="text-[#ee4d2d]">*</span></th>
+                  <th class="p-2 w-36">SKU Phân Loại</th>
+                </tr>
+              </thead>
+              <tbody id="add-prod-variants-tbody" class="divide-y divide-gray-100 bg-white">
+                <!-- Tự động kết xuất từng dòng phân loại -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Thanh Cảnh Báo Quy Tắc Tỷ Lệ Giá 5:1 Của Shopee -->
+          <div id="var-price-ratio-banner" class="mt-2.5 p-2 rounded-lg text-[11px] flex items-start space-x-2 border transition">
+            <!-- Tự động cập nhật trạng thái hợp lệ hoặc cảnh báo đỏ -->
+          </div>
         </div>
       </div>
 
@@ -1971,21 +2046,48 @@
             Yêu cầu sẽ được Shopee trực tiếp tiếp nhận và xử lý. Shopee sẽ quyết định <span class="font-bold">Hoàn tiền ngay</span> (không cần gửi hàng) hoặc <span class="font-bold">Trả hàng & hoàn tiền</span> (bưu tá tiếp nhận gửi về kho).
           </div>
         </div>
+
+        <!-- Refund Amount (Locked / Auto-calculated by Shopee System) -->
+        <div>
+          <label class="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+            <span>Số tiền hoàn dự kiến (₫)</span>
+            <span class="text-[10px] text-gray-400 font-normal">Hệ thống Shopee tự động tính toán</span>
+          </label>
+          <div class="relative">
+            <input type="number" id="buyer-return-amount" readonly class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-gray-50 font-bold text-[#ee4d2d] cursor-not-allowed select-none">
+            <span class="absolute right-3 top-2.5 text-xs text-gray-400 font-bold">₫</span>
+          </div>
+          <div class="mt-1.5 flex items-start space-x-1.5 text-[10px] text-gray-500 bg-gray-50 p-2 rounded-lg border border-gray-200">
+            <i class="fa-solid fa-lock text-gray-400 mt-0.5"></i>
+            <div>
+              <span>Theo quy chuẩn Shopee, số tiền hoàn được tính cố định dựa trên giá trị đơn hàng thực tế. Người mua <strong>không thể tự ý nhập số tiền bồi thường</strong> khi khởi tạo yêu cầu. Người bán có thể đưa ra đề xuất bồi thường một phần sau khi xem xét lý do và bằng chứng.</span>
+            </div>
           </div>
         </div>
 
-        <!-- Refund Amount -->
+        <!-- Proof Media (Images / Videos) -->
         <div>
-          <label class="block text-gray-700 font-bold mb-1">Số tiền yêu cầu hoàn (₫)</label>
-          <input type="number" id="buyer-return-amount" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white font-bold text-[#ee4d2d] focus:outline-none focus:border-[#ee4d2d]">
-          <p id="buyer-return-max-note" class="text-[10px] text-gray-400 mt-1">Tối đa giá trị đơn hàng</p>
-        </div>
-
-        <!-- Proof URL (Optional) -->
-        <div>
-          <label class="block text-gray-700 font-bold mb-1">Bằng chứng hình ảnh / video (Tùy chọn)</label>
-          <input type="text" id="buyer-return-proof" placeholder="https://example.com/evidence_photo.jpg" class="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#ee4d2d]">
-          <p class="text-[10px] text-gray-400 mt-0.5">Dán link ảnh chụp bưu kiện bị hỏng hoặc sản phẩm lỗi</p>
+          <label class="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+            <span><i class="fa-solid fa-camera text-[#ee4d2d] mr-1"></i> Bằng chứng hình ảnh / video (Tùy chọn)</span>
+            <span id="buyer-return-media-count" class="text-[10px] text-gray-400 font-normal">0/5 tệp</span>
+          </label>
+          <div class="border-2 border-dashed border-gray-300 hover:border-[#ee4d2d] rounded-xl p-3 text-center cursor-pointer bg-gray-50/50 hover:bg-orange-50/30 transition" onclick="document.getElementById('buyer-return-media-input').click()">
+            <input type="file" id="buyer-return-media-input" multiple accept="image/*,video/*" class="hidden" onchange="handleBuyerReturnMediaSelect(event)">
+            <i class="fa-solid fa-cloud-arrow-up text-xl text-gray-400 mb-1"></i>
+            <p class="text-[11px] font-semibold text-gray-700">Tải ảnh sản phẩm lỗi hoặc video mở hộp</p>
+            <p class="text-[10px] text-gray-400">Định dạng JPG, PNG, MP4 (Tối đa 5 tệp, tối đa 50MB/tệp)</p>
+          </div>
+          <div class="mt-2 flex space-x-1.5">
+            <input type="text" id="buyer-return-proof-url" placeholder="Hoặc dán liên kết bằng chứng (https://...)" class="flex-1 p-1.5 border border-gray-300 rounded text-xs">
+            <button type="button" onclick="addBuyerReturnMediaUrl()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded border border-gray-300">
+              Thêm
+            </button>
+          </div>
+          <div id="buyer-return-media-loading" class="hidden mt-2 text-center text-xs text-[#ee4d2d] font-semibold">
+            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang tải tệp bằng chứng lên...
+          </div>
+          <div id="buyer-return-media-preview" class="grid grid-cols-5 gap-2 mt-2 empty:hidden"></div>
+          <input type="hidden" id="buyer-return-proof" value="">
         </div>
       </div>
 
@@ -2096,10 +2198,29 @@
           <input type="email" id="seller-dispute-email" value="seller@smartomni.vn" class="w-full p-2.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-red-500">
         </div>
 
-        <!-- Proof Images (Optional) -->
+        <!-- Proof Media (Images / Videos) -->
         <div>
-          <label class="block text-gray-700 font-bold mb-1">Hình ảnh bằng chứng đóng gói / mở hộp (Tùy chọn)</label>
-          <input type="text" id="seller-dispute-proof-url" placeholder="https://example.com/packing_video.jpg" class="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-red-500">
+          <label class="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+            <span><i class="fa-solid fa-shield-halved text-red-600 mr-1"></i> Bằng chứng đóng gói / mở hộp (Tùy chọn)</span>
+            <span id="seller-dispute-media-count" class="text-[10px] text-gray-400 font-normal">0/5 tệp</span>
+          </label>
+          <div class="border-2 border-dashed border-gray-300 hover:border-red-500 rounded-xl p-3 text-center cursor-pointer bg-gray-50/50 hover:bg-red-50/30 transition" onclick="document.getElementById('seller-dispute-media-input').click()">
+            <input type="file" id="seller-dispute-media-input" multiple accept="image/*,video/*" class="hidden" onchange="handleSellerDisputeMediaSelect(event)">
+            <i class="fa-solid fa-cloud-arrow-up text-xl text-gray-400 mb-1"></i>
+            <p class="text-[11px] font-semibold text-gray-700">Tải ảnh/video bưu phẩm niêm phong hoặc video bóc hàng</p>
+            <p class="text-[10px] text-gray-400">Định dạng JPG, PNG, MP4 (Tối đa 5 tệp, tối đa 50MB/tệp)</p>
+          </div>
+          <div class="mt-2 flex space-x-1.5">
+            <input type="text" id="seller-dispute-proof-input-url" placeholder="Hoặc dán liên kết bằng chứng (https://...)" class="flex-1 p-1.5 border border-gray-300 rounded text-xs">
+            <button type="button" onclick="addSellerDisputeMediaUrl()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded border border-gray-300">
+              Thêm
+            </button>
+          </div>
+          <div id="seller-dispute-media-loading" class="hidden mt-2 text-center text-xs text-red-600 font-semibold">
+            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang tải tệp bằng chứng lên...
+          </div>
+          <div id="seller-dispute-media-preview" class="grid grid-cols-5 gap-2 mt-2 empty:hidden"></div>
+          <input type="hidden" id="seller-dispute-proof-url" value="">
         </div>
       </div>
 
@@ -2282,6 +2403,28 @@
     function changeAdminReturnsPage(p) {
       adminReturnsPage = p;
       renderAdminReturnsTable();
+    }
+
+    // ------------------------------------------------------------------------
+    // MEDIA & FILE UPLOAD HELPERS
+    // ------------------------------------------------------------------------
+    function isVideoUrl(url) {
+      if (!url || typeof url !== 'string') return false;
+      return /\.(mp4|webm|mov|avi|mkv)($|\?)/i.test(url);
+    }
+
+    async function uploadMediaFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/v2/simulator/media/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.error) {
+        throw new Error(data.message || data.error);
+      }
+      return data.response?.url;
     }
 
     // Helper to format Date for <input type="datetime-local">
@@ -2685,12 +2828,30 @@
           ? '<span class="bg-gray-100 text-gray-600 font-bold px-2 py-0.5 rounded text-[11px] border border-gray-200">Unlisted</span>'
           : '<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[11px] border border-emerald-300">Listed</span>';
 
+        const thumbUrl = p.images?.image_url_list?.[0] || '';
+        const isVid = isVideoUrl(thumbUrl);
+
         models.forEach((m) => {
           html += `
             <tr class="hover:bg-gray-50 transition">
               <td class="py-3 px-4">
-                <div class="font-bold text-gray-900">${p.item_name}</div>
-                <div class="text-[11px] text-gray-400 font-mono">ID: ${p.item_id}</div>
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                    ${thumbUrl ? (isVid ? `
+                      <div class="w-full h-full bg-gray-900 text-white flex items-center justify-center text-[10px]">
+                        <i class="fa-solid fa-video text-orange-400"></i>
+                      </div>
+                    ` : `
+                      <img src="${escapeHtml(thumbUrl)}" class="w-full h-full object-cover">
+                    `) : `
+                      <i class="fa-solid fa-box text-gray-400"></i>
+                    `}
+                  </div>
+                  <div>
+                    <div class="font-bold text-gray-900">${p.item_name}</div>
+                    <div class="text-[11px] text-gray-400 font-mono">ID: ${p.item_id}</div>
+                  </div>
+                </div>
               </td>
               <td class="py-3 px-4 text-xs">
                 <span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium">${p.category_name}</span>
@@ -2767,29 +2928,304 @@
       }
     }
 
-    // Add Product Modal
+    // Add Product Modal & Media State
+    let addProductMediaList = [];
+    let currentVariationMatrix = [];
+
     function openAddProductModal() {
+      addProductMediaList = [];
+      renderProductMediaPreview();
+      const urlInput = document.getElementById('add-prod-media-url');
+      if (urlInput) urlInput.value = '';
+      currentVariationMatrix = [];
+      renderVariationMatrix();
       document.getElementById('add-product-modal').classList.remove('hidden');
     }
+
     function closeAddProductModal() {
+      addProductMediaList = [];
+      currentVariationMatrix = [];
       document.getElementById('add-product-modal').classList.add('hidden');
+    }
+
+    function handleProductMediaSelect(event) {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+      uploadFilesToProductList(files);
+    }
+
+    async function uploadFilesToProductList(files) {
+      const loadingEl = document.getElementById('add-prod-media-loading');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      try {
+        for (const file of files) {
+          if (addProductMediaList.length >= 9) {
+            showToast('Tối đa 9 tệp hình ảnh/video cho mỗi sản phẩm!', true);
+            break;
+          }
+          const url = await uploadMediaFile(file);
+          if (url) {
+            addProductMediaList.push(url);
+          }
+        }
+        renderProductMediaPreview();
+      } catch (err) {
+        showToast(`Tải tệp thất bại: ${err.message}`, true);
+      } finally {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        const input = document.getElementById('add-prod-media-input');
+        if (input) input.value = '';
+      }
+    }
+
+    function addProductMediaUrl() {
+      const input = document.getElementById('add-prod-media-url');
+      const url = input.value.trim();
+      if (!url) return;
+      if (addProductMediaList.length >= 9) {
+        showToast('Tối đa 9 tệp hình ảnh/video cho mỗi sản phẩm!', true);
+        return;
+      }
+      addProductMediaList.push(url);
+      input.value = '';
+      renderProductMediaPreview();
+    }
+
+    function removeProductMedia(index) {
+      addProductMediaList.splice(index, 1);
+      renderProductMediaPreview();
+    }
+
+    function renderProductMediaPreview() {
+      const container = document.getElementById('add-prod-media-preview');
+      const countEl = document.getElementById('add-prod-media-count');
+      if (countEl) countEl.textContent = `${addProductMediaList.length}/9 tệp`;
+      if (!container) return;
+
+      container.innerHTML = addProductMediaList.map((url, idx) => `
+        <div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100 flex items-center justify-center">
+          ${isVideoUrl(url) ? `
+            <video src="${escapeHtml(url)}" class="w-full h-full object-cover"></video>
+            <span class="absolute top-1 left-1 bg-black/70 text-white text-[9px] px-1 rounded flex items-center">
+              <i class="fa-solid fa-video mr-0.5"></i> Video
+            </span>
+          ` : `
+            <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+          `}
+          ${idx === 0 ? `
+            <span class="absolute bottom-1 left-1 bg-[#ee4d2d] text-white text-[8px] px-1 font-bold rounded">
+              Ảnh bìa
+            </span>
+          ` : ''}
+          <button type="button" onclick="removeProductMedia(${idx})" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] opacity-80 hover:opacity-100 transition shadow">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Shopee Multi-Tier Variation Matrix & Pricing Logic
+    function renderVariationMatrix() {
+      const container = document.getElementById('add-prod-variants-section');
+      const tbody = document.getElementById('add-prod-variants-tbody');
+      const countBadge = document.getElementById('var-matrix-count');
+      if (!container || !tbody) return;
+
+      const t1Name = (document.getElementById('add-prod-tier1-name')?.value || 'Màu sắc').trim();
+      const t1Raw = (document.getElementById('add-prod-tier1-options')?.value || '').trim();
+      const t2Name = (document.getElementById('add-prod-tier2-name')?.value || 'Kích cỡ').trim();
+      const t2Raw = (document.getElementById('add-prod-tier2-options')?.value || '').trim();
+      const basePrice = parseFloat(document.getElementById('add-prod-price')?.value) || 250000;
+      const baseSku = (document.getElementById('add-prod-sku')?.value || 'SKU').trim();
+
+      const t1Opts = t1Raw ? t1Raw.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const t2Opts = t2Raw ? t2Raw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+      if (t1Opts.length === 0 && t2Opts.length === 0) {
+        container.classList.add('hidden');
+        currentVariationMatrix = [];
+        return;
+      }
+
+      container.classList.remove('hidden');
+
+      // Preserve previously typed values by model name
+      const existingMap = new Map();
+      currentVariationMatrix.forEach(row => {
+        existingMap.set(row.name, { price: row.price, stock: row.stock, sku: row.sku });
+      });
+
+      const newMatrix = [];
+
+      if (t1Opts.length > 0 && t2Opts.length > 0) {
+        // 2-Tier Variation
+        t1Opts.forEach((opt1, i) => {
+          t2Opts.forEach((opt2, j) => {
+            const modelName = `${opt1}, ${opt2}`;
+            const defaultSku = `${baseSku}-${opt1.toUpperCase().replace(/[\s,]+/g, '_')}-${opt2.toUpperCase().replace(/[\s,]+/g, '_')}`;
+            const existing = existingMap.get(modelName);
+            newMatrix.push({
+              name: modelName,
+              tierIndex: [i, j],
+              price: existing !== undefined ? existing.price : basePrice,
+              stock: existing !== undefined ? existing.stock : 100,
+              sku: existing !== undefined ? existing.sku : defaultSku
+            });
+          });
+        });
+      } else if (t1Opts.length > 0) {
+        // 1-Tier (Tier 1)
+        t1Opts.forEach((opt, idx) => {
+          const modelName = opt;
+          const defaultSku = `${baseSku}-${opt.toUpperCase().replace(/[\s,]+/g, '_')}`;
+          const existing = existingMap.get(modelName);
+          newMatrix.push({
+            name: modelName,
+            tierIndex: [idx],
+            price: existing !== undefined ? existing.price : basePrice,
+            stock: existing !== undefined ? existing.stock : 100,
+            sku: existing !== undefined ? existing.sku : defaultSku
+          });
+        });
+      } else if (t2Opts.length > 0) {
+        // 1-Tier (Tier 2 only)
+        t2Opts.forEach((opt, idx) => {
+          const modelName = opt;
+          const defaultSku = `${baseSku}-${opt.toUpperCase().replace(/[\s,]+/g, '_')}`;
+          const existing = existingMap.get(modelName);
+          newMatrix.push({
+            name: modelName,
+            tierIndex: [idx],
+            price: existing !== undefined ? existing.price : basePrice,
+            stock: existing !== undefined ? existing.stock : 100,
+            sku: existing !== undefined ? existing.sku : defaultSku
+          });
+        });
+      }
+
+      currentVariationMatrix = newMatrix;
+      if (countBadge) countBadge.textContent = `${currentVariationMatrix.length} phân loại`;
+
+      tbody.innerHTML = currentVariationMatrix.map((row, idx) => `
+        <tr class="hover:bg-gray-50/70 transition">
+          <td class="p-2 font-medium text-gray-800">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-700">
+              ${escapeHtml(row.name)}
+            </span>
+          </td>
+          <td class="p-2">
+            <input type="number" 
+                   value="${row.price}" 
+                   class="w-full p-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-[#ee4d2d] focus:border-[#ee4d2d]" 
+                   oninput="updateVariationRow(${idx}, 'price', this.value)">
+          </td>
+          <td class="p-2">
+            <input type="number" 
+                   value="${row.stock}" 
+                   class="w-full p-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-[#ee4d2d] focus:border-[#ee4d2d]" 
+                   oninput="updateVariationRow(${idx}, 'stock', this.value)">
+          </td>
+          <td class="p-2">
+            <input type="text" 
+                   value="${escapeHtml(row.sku)}" 
+                   class="w-full p-1 border border-gray-300 rounded text-xs font-mono text-[11px] focus:ring-1 focus:ring-[#ee4d2d] focus:border-[#ee4d2d]" 
+                   oninput="updateVariationRow(${idx}, 'sku', this.value)">
+          </td>
+        </tr>
+      `).join('');
+
+      checkVariationPriceRatio();
+    }
+
+    function updateVariationRow(index, field, value) {
+      if (!currentVariationMatrix[index]) return;
+      if (field === 'price') {
+        currentVariationMatrix[index].price = parseFloat(value) || 0;
+        checkVariationPriceRatio();
+      } else if (field === 'stock') {
+        currentVariationMatrix[index].stock = parseInt(value, 10) || 0;
+      } else if (field === 'sku') {
+        currentVariationMatrix[index].sku = value.trim();
+      }
+    }
+
+    function batchApplyVariationValues() {
+      const priceInput = document.getElementById('batch-var-price');
+      const stockInput = document.getElementById('batch-var-stock');
+      const batchPrice = parseFloat(priceInput?.value);
+      const batchStock = parseInt(stockInput?.value, 10);
+
+      if (isNaN(batchPrice) && isNaN(batchStock)) {
+        showToast('Vui lòng nhập giá hoặc kho hàng cần áp dụng hàng loạt!', true);
+        return;
+      }
+
+      currentVariationMatrix.forEach(row => {
+        if (!isNaN(batchPrice) && batchPrice >= 0) row.price = batchPrice;
+        if (!isNaN(batchStock) && batchStock >= 0) row.stock = batchStock;
+      });
+
+      renderVariationMatrix();
+      showToast('Đã áp dụng giá và kho hàng cho tất cả phân loại thành công!');
+    }
+
+    function checkVariationPriceRatio() {
+      const banner = document.getElementById('var-price-ratio-banner');
+      if (!banner) return true;
+
+      const prices = currentVariationMatrix.map(r => Number(r.price)).filter(p => !isNaN(p) && p > 0);
+      if (prices.length <= 1) {
+        banner.className = 'mt-2.5 p-2 rounded-lg text-[11px] flex items-start space-x-2 border border-gray-200 bg-gray-50 text-gray-600';
+        banner.innerHTML = `
+          <i class="fa-solid fa-circle-info text-blue-500 mt-0.5"></i>
+          <div>Shopee cho phép định giá riêng từng phân loại. Khi có nhiều phân loại, tỷ lệ giá cao nhất / thấp nhất không được vượt quá <strong>5:1</strong>.</div>
+        `;
+        return true;
+      }
+
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      const ratio = minPrice > 0 ? (maxPrice / minPrice) : 1;
+
+      if (minPrice > 0 && ratio > 5.0) {
+        banner.className = 'mt-2.5 p-2.5 rounded-lg text-[11px] flex items-start space-x-2 border border-red-300 bg-red-50 text-red-800 animate-pulse';
+        banner.innerHTML = `
+          <i class="fa-solid fa-triangle-exclamation text-red-600 mt-0.5 text-sm"></i>
+          <div>
+            <div class="font-bold text-red-900">Vi phạm quy định tỷ lệ giá Shopee (vượt 5:1):</div>
+            <div>Giá thấp nhất: <strong>${minPrice.toLocaleString('vi-VN')} ₫</strong> — Giá cao nhất: <strong>${maxPrice.toLocaleString('vi-VN')} ₫</strong> (Tỷ lệ: <strong class="underline">${ratio.toFixed(2)}x</strong> > giới hạn 5.0x).</div>
+            <div class="text-[10px] text-red-700 mt-0.5">Hệ thống Shopee sẽ từ chối lưu với lỗi <code>error_param</code> nếu tỷ lệ vượt quá 5 lần. Vui lòng điều chỉnh lại giá bán!</div>
+          </div>
+        `;
+        return false;
+      } else {
+        banner.className = 'mt-2.5 p-2 rounded-lg text-[11px] flex items-start space-x-2 border border-emerald-200 bg-emerald-50 text-emerald-800';
+        banner.innerHTML = `
+          <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+          <div>
+            <span class="font-bold text-emerald-900">Tỷ lệ giá Shopee hợp lệ (${ratio.toFixed(2)}x / tối đa 5.0x):</span>
+            Thấp nhất: <strong>${minPrice.toLocaleString('vi-VN')} ₫</strong> — Cao nhất: <strong>${maxPrice.toLocaleString('vi-VN')} ₫</strong>.
+          </div>
+        `;
+        return true;
+      }
     }
 
     async function submitAddProduct() {
       const name = document.getElementById('add-prod-name').value.trim();
       const catId = document.getElementById('add-prod-category').value;
       const sku = document.getElementById('add-prod-sku').value.trim();
-      const price = parseFloat(document.getElementById('add-prod-price').value);
-      const weight = parseFloat(document.getElementById('add-prod-weight').value);
+      const price = parseFloat(document.getElementById('add-prod-price').value) || 0;
+      const weight = parseFloat(document.getElementById('add-prod-weight').value) || 0.5;
       const desc = document.getElementById('add-prod-desc').value.trim();
 
-      const t1Name = (document.getElementById('add-prod-tier1-name')?.value || 'Color').trim();
+      const t1Name = (document.getElementById('add-prod-tier1-name')?.value || 'Màu sắc').trim();
       const t1Raw = (document.getElementById('add-prod-tier1-options')?.value || '').trim();
-      const t2Name = (document.getElementById('add-prod-tier2-name')?.value || 'Size').trim();
+      const t2Name = (document.getElementById('add-prod-tier2-name')?.value || 'Kích cỡ').trim();
       const t2Raw = (document.getElementById('add-prod-tier2-options')?.value || '').trim();
 
       if (!name) {
-        showToast('Product title is required', true);
+        showToast('Vui lòng nhập tên sản phẩm!', true);
         return;
       }
 
@@ -2799,36 +3235,39 @@
       const t1Opts = t1Raw ? t1Raw.split(',').map(s => s.trim()).filter(Boolean) : [];
       const t2Opts = t2Raw ? t2Raw.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-      if (t1Opts.length > 0 && t2Opts.length > 0) {
-        // 2-Tier Variation
-        tierVariation = [
-          { name: t1Name, option_list: t1Opts.map(o => ({ option: o })) },
-          { name: t2Name, option_list: t2Opts.map(o => ({ option: o })) }
-        ];
-        t1Opts.forEach((opt1, i) => {
-          t2Opts.forEach((opt2, j) => {
-            models.push({
-              model_name: `${opt1}, ${opt2}`,
-              model_sku: `${sku || 'SKU'}-${opt1.toUpperCase().replace(/\s+/g, '_')}-${opt2.toUpperCase().replace(/\s+/g, '_')}`,
-              original_price: price,
-              seller_stock: 100,
-              tier_index: [i, j]
-            });
-          });
-        });
-      } else if (t1Opts.length > 0) {
-        // 1-Tier Variation
-        tierVariation = [
-          { name: t1Name, option_list: t1Opts.map(o => ({ option: o })) }
-        ];
-        models = t1Opts.map((opt, idx) => ({
-          model_name: opt,
-          model_sku: `${sku || 'SKU'}-${opt.toUpperCase().replace(/\s+/g, '_')}`,
-          original_price: price,
-          seller_stock: 100,
-          tier_index: [idx]
+      if (currentVariationMatrix.length > 0) {
+        if (!checkVariationPriceRatio()) {
+          showToast('Lỗi: Chênh lệch giá giữa các phân loại vượt quá 5:1 theo quy chuẩn Shopee!', true);
+          return;
+        }
+
+        if (t1Opts.length > 0 && t2Opts.length > 0) {
+          tierVariation = [
+            { name: t1Name, option_list: t1Opts.map(o => ({ option: o })) },
+            { name: t2Name, option_list: t2Opts.map(o => ({ option: o })) }
+          ];
+        } else if (t1Opts.length > 0) {
+          tierVariation = [
+            { name: t1Name, option_list: t1Opts.map(o => ({ option: o })) }
+          ];
+        } else if (t2Opts.length > 0) {
+          tierVariation = [
+            { name: t2Name, option_list: t2Opts.map(o => ({ option: o })) }
+          ];
+        }
+
+        models = currentVariationMatrix.map(r => ({
+          model_name: r.name,
+          model_sku: r.sku || `${sku || 'SKU'}-${r.name.toUpperCase().replace(/[\s,]+/g, '_')}`,
+          original_price: Number(r.price),
+          seller_stock: Number(r.stock),
+          tier_index: r.tierIndex
         }));
       }
+
+      const effectiveBasePrice = models.length > 0
+        ? Math.min(...models.map(m => m.original_price))
+        : price;
 
       try {
         const res = await fetch('/api/v2/simulator/product/create', {
@@ -2839,21 +3278,24 @@
             category_id: catId,
             item_name: name,
             description: desc,
-            original_price: price,
+            original_price: effectiveBasePrice,
             weight,
             item_sku: sku || undefined,
             tier_variation: tierVariation,
-            models
+            models,
+            image_url_list: addProductMediaList
           })
         });
         const data = await res.json();
         if (data.response) {
           closeAddProductModal();
-          showToast(`Product "${name}" added with ${models.length > 0 ? `${models.length} variants` : 'standard model'}!`);
+          showToast(`Đã tạo sản phẩm "${name}" thành công với ${models.length > 0 ? `${models.length} phân loại giá riêng` : 'mô hình tiêu chuẩn'}!`);
           loadProducts();
+        } else {
+          showToast(data.message || 'Lỗi khi tạo sản phẩm', true);
         }
       } catch (err) {
-        showToast('Failed to create product', true);
+        showToast('Lỗi kết nối khi tạo sản phẩm', true);
       }
     }
 
@@ -3858,10 +4300,19 @@
             `;
           }
 
+          const firstImg = p.images?.image_url_list?.[0] || '';
+          const isCardVid = isVideoUrl(firstImg);
+
           html += `
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition flex flex-col justify-between ${isVacation ? 'opacity-85' : ''}">
-              <div class="h-44 bg-gradient-to-tr from-gray-100 to-gray-50 flex items-center justify-center p-4 border-b border-gray-100 relative">
-                <i class="fa-solid fa-box-open text-gray-300 text-6xl"></i>
+              <div class="h-44 bg-gradient-to-tr from-gray-100 to-gray-50 flex items-center justify-center border-b border-gray-100 relative overflow-hidden">
+                ${firstImg ? (isCardVid ? `
+                  <video src="${escapeHtml(firstImg)}" class="w-full h-full object-cover" controls></video>
+                ` : `
+                  <img src="${escapeHtml(firstImg)}" alt="${escapeHtml(p.item_name)}" class="w-full h-full object-cover">
+                `) : `
+                  <i class="fa-solid fa-box-open text-gray-300 text-6xl"></i>
+                `}
                 ${vacationBadge}
                 <span class="absolute top-3 right-3 text-[10px] font-bold text-gray-700 bg-white/95 px-2 py-0.5 rounded shadow-sm border border-gray-100 flex items-center">
                   <i class="fa-solid fa-store mr-1 text-[#ee4d2d]"></i>${p.shop_name || 'Store'}
@@ -4966,9 +5417,13 @@
             <div class="mt-2 flex items-center space-x-2">
               <span class="text-[11px] text-gray-500 font-medium">Bằng chứng:</span>
               <div class="flex items-center space-x-1.5">
-                ${allProofs.map(img => `
-                  <a href="${escapeHtml(img)}" target="_blank" class="block w-9 h-9 rounded border border-gray-200 overflow-hidden hover:opacity-80 transition">
-                    <img src="${escapeHtml(img)}" alt="proof" class="w-full h-full object-cover">
+                ${allProofs.map(url => isVideoUrl(url) ? `
+                  <a href="${escapeHtml(url)}" target="_blank" class="block w-9 h-9 rounded border border-gray-200 bg-gray-900 text-white flex items-center justify-center text-[10px] hover:opacity-80 transition relative" title="Xem video bằng chứng">
+                    <i class="fa-solid fa-play text-orange-400"></i>
+                  </a>
+                ` : `
+                  <a href="${escapeHtml(url)}" target="_blank" class="block w-9 h-9 rounded border border-gray-200 overflow-hidden hover:opacity-80 transition">
+                    <img src="${escapeHtml(url)}" alt="proof" class="w-full h-full object-cover">
                   </a>
                 `).join('')}
               </div>
@@ -6264,6 +6719,33 @@
           `;
         }
 
+        if (r.seller_proof_status === 'PENDING') {
+          actionBtns += `
+            <button onclick="openSellerDisputeModal('${r.return_sn}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition shadow-xs flex items-center" title="Shopee yêu cầu bổ sung chứng cứ">
+              <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Bổ sung bằng chứng
+            </button>
+          `;
+        }
+
+        const proofsList = [...(r.proof_images || []), ...(r.proofs || []).map(p => p.image_url)].filter(Boolean);
+        let proofThumbnails = '';
+        if (proofsList.length > 0) {
+          proofThumbnails = `
+            <div class="mt-1 flex items-center space-x-1">
+              ${proofsList.slice(0, 3).map(url => isVideoUrl(url) ? `
+                <a href="${escapeHtml(url)}" target="_blank" class="w-6 h-6 rounded border border-gray-200 bg-gray-900 text-white flex items-center justify-center text-[8px]" title="Xem video bằng chứng">
+                  <i class="fa-solid fa-play"></i>
+                </a>
+              ` : `
+                <a href="${escapeHtml(url)}" target="_blank" class="w-6 h-6 rounded border border-gray-200 overflow-hidden block" title="Xem ảnh bằng chứng">
+                  <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+                </a>
+              `).join('')}
+              ${proofsList.length > 3 ? `<span class="text-[9px] text-gray-400 font-bold">+${proofsList.length - 3}</span>` : ''}
+            </div>
+          `;
+        }
+
         html += `
           <tr class="hover:bg-gray-50/80 transition">
             <td class="px-6 py-4 whitespace-nowrap">
@@ -6279,6 +6761,7 @@
             </td>
             <td class="px-6 py-4">
               <div class="font-medium text-gray-800 text-xs">${r.text_reason || r.reason}</div>
+              ${proofThumbnails}
               <div class="mt-1 flex items-center space-x-1.5">
                 <span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold">
                   ${r.solution === 'RETURN_REFUND' ? '📦 Trả hàng & hoàn tiền' : '💰 Hoàn tiền ngay'}
@@ -6535,23 +7018,102 @@
     }
 
     // Modal & Action Controllers
+    let buyerReturnMediaList = [];
+
     function openBuyerReturnModal(orderSn, maxAmount) {
+      buyerReturnMediaList = [];
+      renderBuyerReturnMediaPreview();
+      const urlInput = document.getElementById('buyer-return-proof-url');
+      if (urlInput) urlInput.value = '';
       document.getElementById('buyer-return-ordersn').value = orderSn;
       document.getElementById('buyer-return-ordersn-label').textContent = `Đơn hàng: ${orderSn}`;
       document.getElementById('buyer-return-amount').value = maxAmount;
-      document.getElementById('buyer-return-max-note').textContent = `Tối đa ${formatCurrency(maxAmount)}`;
+      const noteEl = document.getElementById('buyer-return-max-note');
+      if (noteEl) noteEl.textContent = `Tối đa ${formatCurrency(maxAmount)}`;
       document.getElementById('buyer-return-text-reason').value = '';
       document.getElementById('buyer-return-proof').value = '';
       document.getElementById('buyer-return-modal').classList.remove('hidden');
     }
 
     function closeBuyerReturnModal() {
+      buyerReturnMediaList = [];
       const submitBtn = document.getElementById('buyer-return-submit-btn');
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1.5"></i> Gửi Yêu Cầu';
       }
       document.getElementById('buyer-return-modal').classList.add('hidden');
+    }
+
+    function handleBuyerReturnMediaSelect(event) {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+      uploadFilesToBuyerReturn(files);
+    }
+
+    async function uploadFilesToBuyerReturn(files) {
+      const loadingEl = document.getElementById('buyer-return-media-loading');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      try {
+        for (const file of files) {
+          if (buyerReturnMediaList.length >= 5) {
+            showToast('Tối đa 5 tệp bằng chứng cho mỗi yêu cầu!', true);
+            break;
+          }
+          const url = await uploadMediaFile(file);
+          if (url) {
+            buyerReturnMediaList.push(url);
+          }
+        }
+        renderBuyerReturnMediaPreview();
+      } catch (err) {
+        showToast(`Tải bằng chứng thất bại: ${err.message}`, true);
+      } finally {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        const input = document.getElementById('buyer-return-media-input');
+        if (input) input.value = '';
+      }
+    }
+
+    function addBuyerReturnMediaUrl() {
+      const input = document.getElementById('buyer-return-proof-url');
+      const url = input.value.trim();
+      if (!url) return;
+      if (buyerReturnMediaList.length >= 5) {
+        showToast('Tối đa 5 tệp bằng chứng!', true);
+        return;
+      }
+      buyerReturnMediaList.push(url);
+      input.value = '';
+      renderBuyerReturnMediaPreview();
+    }
+
+    function removeBuyerReturnMedia(index) {
+      buyerReturnMediaList.splice(index, 1);
+      renderBuyerReturnMediaPreview();
+    }
+
+    function renderBuyerReturnMediaPreview() {
+      const container = document.getElementById('buyer-return-media-preview');
+      const countEl = document.getElementById('buyer-return-media-count');
+      if (countEl) countEl.textContent = `${buyerReturnMediaList.length}/5 tệp`;
+      if (!container) return;
+
+      container.innerHTML = buyerReturnMediaList.map((url, idx) => `
+        <div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100 flex items-center justify-center">
+          ${isVideoUrl(url) ? `
+            <video src="${escapeHtml(url)}" class="w-full h-full object-cover"></video>
+            <span class="absolute top-1 left-1 bg-black/70 text-white text-[9px] px-1 rounded flex items-center">
+              <i class="fa-solid fa-video mr-0.5"></i> Video
+            </span>
+          ` : `
+            <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+          `}
+          <button type="button" onclick="removeBuyerReturnMedia(${idx})" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] opacity-80 hover:opacity-100 transition shadow">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `).join('');
     }
 
     async function submitBuyerReturn() {
@@ -6574,6 +7136,11 @@
         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Đang gửi...';
       }
 
+      const allProofs = [...buyerReturnMediaList];
+      if (proofUrl && !allProofs.includes(proofUrl)) {
+        allProofs.push(proofUrl);
+      }
+
       try {
         const body = {
           order_sn: orderSn,
@@ -6582,7 +7149,7 @@
           solution,
           refund_amount: refundAmount,
           validation_type: validationType,
-          proof_images: proofUrl ? [proofUrl] : []
+          proof_images: allProofs
         };
 
         const res = await fetch('/api/v2/simulator/returns/buyer_request', {
@@ -6682,7 +7249,13 @@
       }
     }
 
+    let sellerDisputeMediaList = [];
+
     function openSellerDisputeModal(returnSn) {
+      sellerDisputeMediaList = [];
+      renderSellerDisputeMediaPreview();
+      const urlInput = document.getElementById('seller-dispute-proof-input-url');
+      if (urlInput) urlInput.value = '';
       document.getElementById('seller-dispute-return-sn').value = returnSn;
       document.getElementById('seller-dispute-return-label').textContent = `Yêu cầu: ${returnSn}`;
       document.getElementById('seller-dispute-text').value = '';
@@ -6691,7 +7264,79 @@
     }
 
     function closeSellerDisputeModal() {
+      sellerDisputeMediaList = [];
       document.getElementById('seller-dispute-modal').classList.add('hidden');
+    }
+
+    function handleSellerDisputeMediaSelect(event) {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+      uploadFilesToSellerDispute(files);
+    }
+
+    async function uploadFilesToSellerDispute(files) {
+      const loadingEl = document.getElementById('seller-dispute-media-loading');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      try {
+        for (const file of files) {
+          if (sellerDisputeMediaList.length >= 5) {
+            showToast('Tối đa 5 tệp bằng chứng cho mỗi khiếu nại!', true);
+            break;
+          }
+          const url = await uploadMediaFile(file);
+          if (url) {
+            sellerDisputeMediaList.push(url);
+          }
+        }
+        renderSellerDisputeMediaPreview();
+      } catch (err) {
+        showToast(`Tải bằng chứng thất bại: ${err.message}`, true);
+      } finally {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        const input = document.getElementById('seller-dispute-media-input');
+        if (input) input.value = '';
+      }
+    }
+
+    function addSellerDisputeMediaUrl() {
+      const input = document.getElementById('seller-dispute-proof-input-url');
+      const url = input.value.trim();
+      if (!url) return;
+      if (sellerDisputeMediaList.length >= 5) {
+        showToast('Tối đa 5 tệp bằng chứng!', true);
+        return;
+      }
+      sellerDisputeMediaList.push(url);
+      input.value = '';
+      renderSellerDisputeMediaPreview();
+    }
+
+    function removeSellerDisputeMedia(index) {
+      sellerDisputeMediaList.splice(index, 1);
+      renderSellerDisputeMediaPreview();
+    }
+
+    function renderSellerDisputeMediaPreview() {
+      const container = document.getElementById('seller-dispute-media-preview');
+      const countEl = document.getElementById('seller-dispute-media-count');
+      if (countEl) countEl.textContent = `${sellerDisputeMediaList.length}/5 tệp`;
+      if (!container) return;
+
+      container.innerHTML = sellerDisputeMediaList.map((url, idx) => `
+        <div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100 flex items-center justify-center">
+          ${isVideoUrl(url) ? `
+            <video src="${escapeHtml(url)}" class="w-full h-full object-cover"></video>
+            <span class="absolute top-1 left-1 bg-black/70 text-white text-[9px] px-1 rounded flex items-center">
+              <i class="fa-solid fa-video mr-0.5"></i> Video
+            </span>
+          ` : `
+            <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+          `}
+          <button type="button" onclick="removeSellerDisputeMedia(${idx})" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] opacity-80 hover:opacity-100 transition shadow">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `).join('');
     }
 
     async function submitSellerDispute() {
@@ -6706,6 +7351,11 @@
         return;
       }
 
+      const allProofs = [...sellerDisputeMediaList];
+      if (proofUrl && !allProofs.includes(proofUrl)) {
+        allProofs.push(proofUrl);
+      }
+
       try {
         const res = await fetch('/api/v2/simulator/returns/seller_dispute', {
           method: 'POST',
@@ -6715,7 +7365,8 @@
             dispute_reason_id: reasonId,
             dispute_text_reason: textReason,
             email,
-            proof_url: proofUrl
+            proof_url: allProofs[0] || '',
+            proof_urls: allProofs
           })
         });
         const data = await res.json();
@@ -6867,11 +7518,29 @@
         <div class="p-3 bg-white rounded-xl border border-gray-200">
           <div class="text-gray-500 font-bold mb-1">Lý do từ người mua:</div>
           <div class="text-gray-900 font-medium">${r.text_reason || r.reason}</div>
-          ${r.proof_images && r.proof_images.length > 0 ? `
-            <div class="mt-2 flex space-x-2">
-              ${r.proof_images.map(img => `<a href="${img}" target="_blank" class="block w-16 h-16 rounded-lg border border-gray-200 overflow-hidden bg-gray-100"><img src="${img}" class="w-full h-full object-cover"></a>`).join('')}
-            </div>
-          ` : ''}
+          ${(() => {
+            const bProofs = [...(r.proof_images || []), ...(r.proofs || []).filter(p => p.uploader_type === 'BUYER').map(p => p.image_url)].filter(Boolean);
+            const uniqueBProofs = Array.from(new Set(bProofs));
+            if (uniqueBProofs.length === 0) return '';
+            return `
+              <div class="mt-2.5 pt-2 border-t border-gray-100">
+                <div class="text-[11px] font-bold text-gray-700 mb-1 flex items-center">
+                  <i class="fa-solid fa-photo-film text-[#ee4d2d] mr-1"></i> Bằng chứng Người Mua cung cấp (${uniqueBProofs.length} tệp):
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  ${uniqueBProofs.map(url => isVideoUrl(url) ? `
+                    <div class="w-20 h-20 rounded-lg border border-gray-200 bg-gray-900 overflow-hidden relative shadow-xs">
+                      <video src="${escapeHtml(url)}" class="w-full h-full object-cover" controls></video>
+                    </div>
+                  ` : `
+                    <a href="${escapeHtml(url)}" target="_blank" class="block w-16 h-16 rounded-lg border border-gray-200 overflow-hidden bg-gray-100 hover:scale-105 transition shadow-xs">
+                      <img src="${escapeHtml(url)}" class="w-full h-full object-cover">
+                    </a>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          })()}
         </div>
 
         ${r.dispute_reason_id ? `
@@ -6880,6 +7549,28 @@
             <div class="font-bold text-red-900 text-xs">${disputeReasonMap[r.dispute_reason_id] || `Mã ${r.dispute_reason_id}`}</div>
             <div class="text-red-800 mt-1">${r.dispute_text_reason || ''}</div>
             <div class="text-[10px] text-red-500 mt-1">Trạng thái bồi thường: <strong>${r.compensation_status}</strong></div>
+            ${(() => {
+              const sProofs = (r.proofs || []).filter(p => p.uploader_type === 'SELLER');
+              if (sProofs.length === 0) return '';
+              return `
+                <div class="mt-2.5 pt-2 border-t border-red-200">
+                  <div class="text-[11px] font-bold text-red-900 mb-1 flex items-center">
+                    <i class="fa-solid fa-shield-halved mr-1"></i> Bằng chứng Người Bán cung cấp (${sProofs.length} tệp):
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    ${sProofs.map(p => isVideoUrl(p.image_url) ? `
+                      <div class="w-20 h-20 rounded-lg border border-red-300 bg-gray-900 overflow-hidden relative shadow-xs">
+                        <video src="${escapeHtml(p.image_url)}" class="w-full h-full object-cover" controls></video>
+                      </div>
+                    ` : `
+                      <a href="${escapeHtml(p.image_url)}" target="_blank" class="block w-16 h-16 rounded-lg border border-red-300 overflow-hidden bg-white hover:scale-105 transition shadow-xs" title="${escapeHtml(p.comment || '')}">
+                        <img src="${escapeHtml(p.image_url)}" class="w-full h-full object-cover">
+                      </a>
+                    `).join('')}
+                  </div>
+                </div>
+              `;
+            })()}
           </div>
         ` : ''}
 

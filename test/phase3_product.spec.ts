@@ -514,6 +514,47 @@ async function runTests() {
     }
 
     // ------------------------------------------------------------------------
+    console.log("\nTEST GROUP 12.5: Unlist Item & Subsequent Deletion (POST /api/v2/product/unlist_item & /delete_item)");
+    // ------------------------------------------------------------------------
+    {
+      // Step 1: Unlist the product
+      const unlistPath = "/api/v2/product/unlist_item";
+      const unlistRes = await request(makeSignedUrl(unlistPath), {
+        method: "POST",
+        body: {
+          item_list: [{ item_id: createdItemId, unlist: true }]
+        }
+      });
+      assert(unlistRes.status === 200, "Unlist item returns HTTP 200");
+      assert(unlistRes.json?.response?.success_list?.[0]?.item_id === createdItemId, "Item successfully unlisted");
+      assert(unlistRes.json?.response?.success_list?.[0]?.unlist === true, "Unlist flag confirmed true");
+
+      // Verify itemStatus is UNLIST in database
+      const dbUnlistedItem = await prisma.product.findUnique({ where: { itemId: BigInt(createdItemId) } });
+      assert(dbUnlistedItem?.itemStatus === "UNLIST", "Database itemStatus transitioned to UNLIST");
+
+      // Step 2: Delete the unlisted product via official Shopee delete_item API
+      const deletePath = "/api/v2/product/delete_item";
+      const deleteRes = await request(makeSignedUrl(deletePath), {
+        method: "POST",
+        body: { item_id: createdItemId }
+      });
+      assert(deleteRes.status === 200, "Delete unlisted item returns HTTP 200");
+      assert(deleteRes.json?.error === "", "Empty error code on deleting unlisted item");
+
+      // Verify itemStatus transitioned to SELLER_DELETE
+      const dbDeletedItem = await prisma.product.findUnique({ where: { itemId: BigInt(createdItemId) } });
+      assert(dbDeletedItem?.itemStatus === "SELLER_DELETE", "Database itemStatus transitioned to SELLER_DELETE");
+
+      // Step 3: Deleting an already deleted product returns error_item_not_found
+      const reDeleteRes = await request(makeSignedUrl(deletePath), {
+        method: "POST",
+        body: { item_id: createdItemId }
+      });
+      assert(reDeleteRes.json?.error === "error_item_not_found", "Re-deleting returns error_item_not_found");
+    }
+
+    // ------------------------------------------------------------------------
     console.log("\nTEST GROUP 13: Protocol Security & Signature Checks on Product APIs");
     // ------------------------------------------------------------------------
     {
