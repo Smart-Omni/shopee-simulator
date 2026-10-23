@@ -1,6 +1,6 @@
 {
   "name": "shopee-simulator",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Shopee Open API v2 Mock Simulator Server & Webhook Dispatcher",
   "main": "dist/index.js",
   "scripts": {

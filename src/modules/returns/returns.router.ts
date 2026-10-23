@@ -1,10 +1,12 @@
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import { OrderStatus } from "@prisma/client";
 import { prisma } from "../../common/prisma";
 import { shopeeAuthGuard } from "../../common/middleware/auth-guard";
 import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../common/utils/envelope";
 import { WebhookService } from "../webhook/webhook.service";
 import { calculateReverseShippingFee } from "../payment/payment.router";
+import { storageService } from "../../common/storage/storage.service";
 import {
   SHOPEE_DISPUTE_REASONS,
   VALID_RETURN_STATUSES,
@@ -13,6 +15,13 @@ import {
 } from "./returns.constants";
 
 export const returnsRouter = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50 MB
+  }
+});
 
 // ============================================================================
 // 1. GET RETURN LIST: POST & GET /api/v2/returns/get_return_list
@@ -654,17 +663,28 @@ returnsRouter.post("/api/v2/returns/get_available_solutions", shopeeAuthGuard, h
 // ============================================================================
 // 10. UPLOAD & QUERY PROOF: /api/v2/returns/upload_proof & query_proof
 // ============================================================================
-returnsRouter.post("/api/v2/returns/upload_proof", shopeeAuthGuard, async (req: Request, res: Response): Promise<void> => {
+returnsRouter.post("/api/v2/returns/upload_proof", shopeeAuthGuard, upload.any(), async (req: Request, res: Response): Promise<void> => {
   const shopIdStr = req.query.shop_id as string;
   const shopId = BigInt(shopIdStr);
 
   const returnSn = req.body?.return_sn;
   const rawUrlList = req.body?.image_url_list || (req.body?.url ? [req.body.url] : []);
-  const imageUrlList = Array.isArray(rawUrlList) ? rawUrlList : [rawUrlList];
+  const imageUrlList = Array.isArray(rawUrlList) ? [...rawUrlList] : rawUrlList ? [rawUrlList] : [];
   const comment = req.body?.comment || req.body?.description || "";
 
+  // Process uploaded files if any
+  const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+  for (const file of uploadedFiles) {
+    try {
+      const uploadRes = await storageService.uploadFile(file);
+      imageUrlList.push(uploadRes.url);
+    } catch (e: any) {
+      console.error("[Returns:UploadProof] File upload error:", e);
+    }
+  }
+
   if (!returnSn || imageUrlList.length === 0) {
-    res.json(createShopeeErrorResponse("error_param", "return_sn and image_url_list (or url) are required"));
+    res.json(createShopeeErrorResponse("error_param", "return_sn and image_url_list (or url or file upload) are required"));
     return;
   }
 

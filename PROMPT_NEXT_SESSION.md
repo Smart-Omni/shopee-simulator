@@ -1,4 +1,4 @@
-# 🚀 Shopee Open API v2 Simulator — Next Session Kickoff Prompt
+# 🚀 Shopee Open API v2 Simulator & Shopiz Client — Next Session Kickoff Prompt
 
 Use this prompt when initiating a new coding or pairing session with an AI coding assistant (Antigravity or any LLM agent). It eliminates context decay, establishes the technical baseline, and guarantees immediate productive pairing.
 
@@ -7,35 +7,54 @@ Use this prompt when initiating a new coding or pairing session with an AI codin
 ## 📋 Copy-Paste Prompt for New Session
 
 ```markdown
-We are continuing development on the **Shopee Open API v2 Simulator** located in `shopee-simulator/`.
+We are continuing development on the **Shopee Open API v2 Simulator** (`shopee-simulator/`) and the integrated **Shopiz Marketplace & Seller Center client** (`shopiz/`).
 
-### 1. Context & Baseline
-- **Current Version:** v1.9.0 (Phases 1 through 14 complete, Cloud Media Storage via Google Drive/Local, Automated CI/CD, Tri-Persona UI: Seller, Buyer, Shopee Admin, vi-VN localization).
-- **Test Baseline:** 509 / 509 test assertions passing (100% pass rate across all 14 phases). Run `npm test` immediately (with network socket access enabled for port 5432) to verify baseline health before making any changes.
-- **Git Branch:** Currently on `feature/shopiz-integration` (or `develop`). Follow the Conventional Commits specification for all commit messages.
+### 1. Context & Technical Baseline
+- **Backend Simulator (`shopee-simulator/`):**
+  - **Current Version:** v1.11.0 (Phases 1 through 14 complete, Cloud Media Storage via Google Drive/Local, Automated CI/CD, Tri-Persona vi-VN Testbed on port 8080, Dynamic Logistics Carrier Calculation Engine, Multi-Shop Storefront & Fulfillment APIs).
+  - **Docker Containers:** `shopee-mock-server` on port 8080, `shopee-mock-postgres` on port 5432 (PostgreSQL 16).
+  - **Test Baseline:** 540 / 540 passing assertions (100% pass rate). Run `cd shopee-simulator && npm test` to verify backend health.
+  - **Git Branch:** `feature/media-upload-support` (or `develop`).
+- **Frontend Client (`shopiz/`):**
+  - **Framework:** React 19, Vite 6, React Router 7, CSS Modules, Lucide React, Axios.
+  - **Git Branch:** `backend-integration` (commit in small chunks per project conventions).
+  - **Key Pages & Capabilities:**
+    - Marketplace Storefront (`/`, `/search`, `/product/:id`, `/collection/mall`, `/collection/flash-deals`).
+    - Dynamic Carrier Rate Calculation (`POST /api/v2/simulator/logistics/calculate_fee`) on Product and Checkout pages based on recipient city (`SPX Express`, `SPX Instant`, `SPX Economy`).
+    - Live Interactive Chat (`ChatDialog.jsx`, `chatService.js`) with shop/product/order context pinning.
+    - Multi-Shop Storefronts (`/shop/727720655`, `/shop/839910244`, `/shop/910283751`) with live ratings, followers, joined duration, and dynamic campaign vouchers.
+    - Buyer Purchases (`/account/purchases`) with Contact Seller live chat, Delivery Confirmation (escrow release), and 5-star reviews.
+    - Multi-Address Checkout with PostgreSQL synchronization (`addressService.js`).
+    - Multi-Shop Seller Center Portal (`/seller/select-shop` and `ShopSelectPage.jsx`) with instant "Switch Shop" shortcuts.
+    - Seller Center Control Console (`/seller`) with live backend orders, "Arrange Shipment" (`POST /simulator/order/ship`), printable Air Waybill PDFs (`GET /simulator/order/download_awb`), catalog inventory toggle unlist (`POST /simulator/product/toggle_unlist`), and marketing campaign vouchers.
+  - **Test Baseline:** 100% pass across all Playwright suites:
+    - `npm run check:shop-select`
+    - `npm run check:seller`
+    - `npm run check:checkout`
+    - `npm run check:purchases`
+    - `npm run check:shipping-chat`
+    - `npm run check:integration`
 
 ### 2. Architecture & Rules of Engagement
-- **Two-Layer Architecture:**
-  - **Layer A (`/api/v2/{module}/{action}`)**: Official partner endpoints. Strictly enforced `shopeeAuthGuard` (HMAC-SHA256 signature verification), standard envelope `{ error, message, response, request_id }`, and official Shopee error codes.
-  - **Layer B (`/api/v2/simulator/*`)**: Developer helpers, Buyer actions, Shopee Admin arbitration desk, and browser testbed routes in `src/modules/simulator/simulator.router.ts`.
+- **Small Commits Rule:** Always commit code in small, well-scoped atomic chunks following the Conventional Commits specification.
+- **Two-Layer Backend Architecture:**
+  - **Layer A (`/api/v2/{module}/{action}`)**: Official partner endpoints with strict HMAC-SHA256 signature verification (`shopeeAuthGuard`), standard Shopee envelope `{ error, message, response, request_id }`, and official error codes.
+  - **Layer B (`/api/v2/simulator/*`)**: Public simulator helpers, Buyer actions, and Shopiz integration routes in `src/modules/simulator/simulator.router.ts`.
 - **UI Platform & Localization Standards:**
-  - Browser testbed is at `public/index.html` (served on port 8080).
-  - **Tri-Persona Interface:** 1-click fast login for **Kênh Người Bán (Seller)**, **Sàn Mua Sắm Shopee (Buyer)**, and **Bàn Trọng Tài Shopee (Admin)**.
-  - **Mandatory UI Localization:** All user-facing UI copy in `public/index.html` (buttons, tabs, modals, badges, form labels, toasts) MUST be in authentic **Vietnamese (`vi-VN`)** matching Shopee Vietnam standards.
-  - **Developer Communication:** All agent dialogue, explanations, code comments, and git commits MUST remain in **English**.
+  - Browser testbed is at `shopee-simulator/public/index.html` (port 8080) with authentic Vietnamese copy (`vi-VN`).
+  - Shopiz marketplace and Seller Center are in `shopiz/` (port 5173) with clean monochrome styling.
+  - All developer explanations, code comments, and git commits MUST remain in **English**.
 - **Docker Container Build Hygiene:**
-  - The live simulator runs via Docker container `shopee-mock-server` on port 8080 executing `/app/dist`.
-  - Whenever modifying TypeScript in `src/` or HTML in `public/`, compile with `npm run build` and synchronize into the container:
-    `docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker cp prisma/schema.prisma shopee-mock-server:/app/prisma/schema.prisma && docker restart shopee-mock-server`
+  - Whenever updating TypeScript in `shopee-simulator/src/`, compile with `npm run build` and synchronize into the container:
+    `docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker restart shopee-mock-server`
 
 ### 3. Key Reference Documentation
-- **Master Protocol Spec & API Index:** `../SHOPEE_SIMULATOR_SPEC_AND_API_INDEX.md` (452 endpoints, 35 webhooks, 64 developer guides).
-- **Phased Implementation Blueprint:** `../SHOPEE_MOCK_IMPLEMENTATION_PLAN.md`.
-- **Official Markdown Documentation:** `../api-reference/` and `../push-mechanism/`.
-- **Workspace Skill:** `.agents/skills/shopee-simulator/SKILL.md`.
-- **Changelog & History:** `CHANGELOG.md` and `README.md`.
+- **Master Protocol Spec & API Index:** `SHOPEE_SIMULATOR_SPEC_AND_API_INDEX.md`
+- **Backend Changelog:** `shopee-simulator/CHANGELOG.md`
+- **Frontend Documentation:** `shopiz/README.md`
+- **Workspace Skill:** `.agents/skills/shopee-simulator/SKILL.md`
 
-Please confirm that you have checked the `develop` branch, verified baseline health via `npm test`, and are ready for the next task.
+Please confirm that you have checked the repositories, verified baseline health via `npm test` and `npm run check:integration`, and are ready for the next task.
 ```
 
 ---
@@ -44,9 +63,13 @@ Please confirm that you have checked the `develop` branch, verified baseline hea
 
 | Task | Command |
 | :--- | :--- |
-| **Verify baseline health** | `npm test` (run across all 14 phases) |
-| **Compile TypeScript** | `npm run build` (`tsc` exits 0) |
-| **Check git branch status** | `git status` (should be on `develop` or feature branch) |
-| **Synchronize live Docker container** | `docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker cp prisma/schema.prisma shopee-mock-server:/app/prisma/schema.prisma && docker restart shopee-mock-server` |
-| **Test single phase** | `npm run test:phase<N>` (e.g. `npm run test:phase13`) |
-| **Check database logs** | `docker logs shopee-mock-server --tail 50` |
+| **Verify Backend Tests** | `cd shopee-simulator && npm test` |
+| **Compile Backend TypeScript** | `cd shopee-simulator && npm run build` |
+| **Synchronize Live Backend Container** | `docker cp shopee-simulator/dist/. shopee-mock-server:/app/dist/ && docker restart shopee-mock-server` |
+| **Verify Frontend Integration** | `cd shopiz && npm run check:integration` |
+| **Verify Multi-Shop Selector** | `cd shopiz && npm run check:shop-select` |
+| **Verify Seller Center Suite** | `cd shopiz && SHOPIZ_URL="http://127.0.0.1:5173" node scripts/verify-seller.mjs` |
+| **Verify Dynamic Shipping & Live Chat** | `cd shopiz && npm run check:shipping-chat` |
+| **Verify Checkout Suite** | `cd shopiz && npm run check:checkout` |
+| **Verify Purchases Suite** | `cd shopiz && npm run check:purchases` |
+
