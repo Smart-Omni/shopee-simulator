@@ -4,6 +4,43 @@ All notable changes, bug fixes, architecture evolution, and feature enhancements
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-10-23
+
+### 🎯 Overview
+Implemented end-to-end integration between **Shopee Open API v2 Simulator** and the **Shopiz React 19 Client Marketplace & Seller Center**. Added dynamic carrier rate calculations, multi-shop storefront APIs, live order fulfillment with Air Waybill PDF generation, multi-address PostgreSQL book synchronization, active store voucher campaign tracking, and dedicated multi-shop selection capabilities.
+
+### 🚚 Dynamic Logistics Rate Calculation Engine
+- **Carrier Rate Lookup (`POST /api/v2/simulator/logistics/calculate_fee`):**
+  - Public simulator endpoint for instant frontend shipping calculation without requiring HMAC signatures.
+  - Dynamically calculates package chargeable weight ($\max(\text{actual\_weight}, \text{volumetric\_weight})$) based on cart item dimensions and weights.
+  - Resolves geographic shipping zones (Intra-city vs. Inter-region) using shop origin city and recipient destination city.
+  - Quotes all active logistics channels (`SPX Express`, `SPX Instant`, `SPX Economy`) with accurate `actual_fee`, `buyer_paid_fee`, estimated delivery days, and free shipping rebate logic.
+
+### 🏬 Multi-Shop Storefront & Profile API
+- **Multi-Store Listing (`GET /api/v2/simulator/shops`):**
+  - Returns all registered shops from PostgreSQL (`727720655`: SmartOmni Official Flagship, `839910244`: Hanoi Streetwear Co., `910283751`: Saigon Modern Living) with real-time active product and order counts.
+- **Detailed Storefront Profile (`GET /api/v2/simulator/shop/detail?shop_id=...`):**
+  - Dynamically computes joined duration (`"1 day ago"`, `"1 month ago"`, `"2 years ago"`).
+  - Calculates live store rating, follower counts, response rate (`98%`), and response time (`"Within a few hours"`).
+  - Fetches ongoing campaign vouchers and active discounts from database.
+  - Dynamically sets `has_campaign: true/false` depending on ongoing promotions to ensure frontends accurately hide promotional banners when inactive.
+
+### 📦 Multi-Shop Order Lifecycle & AWB Fulfillment
+- **Multi-Shop Batch Order Checkout (`POST /api/v2/simulator/order/batch_checkout`):**
+  - Atomic multi-shop order splitting with per-shop carrier selection, shipping address, seller notes, and voucher codes.
+- **Order Shipment Arrangement (`POST /api/v2/simulator/order/ship`):**
+  - Marks orders as `SHIPPED`, generates unique tracking numbers (`SPXVN...`), and triggers carrier dispatch webhook.
+- **Air Waybill PDF Generation & Download (`GET /api/v2/simulator/order/download_awb?order_sn=...`):**
+  - Returns complete official Shopee-formatted PDF Air Waybills for printing.
+
+### 🗃️ Database & Address Normalization
+- **Buyer Address Schema Normalization:**
+  - Standardized `ward`, `district`, and `city` fields across all default seeded buyer addresses in PostgreSQL `buyer_addresses`.
+- **Campaign Voucher Validity Extension:**
+  - Extended active campaign vouchers (`PCT15`, `VCHP77T`) to ensure continuous test repeatability across development sessions.
+
+---
+
 ## [1.10.0] - 2026-10-22
 
 ### 🎯 Overview
