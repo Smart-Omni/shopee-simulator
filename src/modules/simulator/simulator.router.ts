@@ -482,6 +482,64 @@ simulatorRouter.get("/api/v2/simulator/shop/detail", async (req: Request, res: R
       return;
     }
 
+    // Dynamic calculations from DB
+    const now = new Date();
+    const diffMs = Math.max(0, Date.now() - new Date(shop.createdAt).getTime());
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    let joined = "Recently";
+    if (diffDays >= 730) {
+      joined = `${Math.floor(diffDays / 365)} years ago`;
+    } else if (diffDays >= 365) {
+      joined = "1 year ago";
+    } else if (diffDays >= 60) {
+      joined = `${Math.floor(diffDays / 30)} months ago`;
+    } else if (diffDays >= 30) {
+      joined = "1 month ago";
+    } else if (diffDays > 1) {
+      joined = `${diffDays} days ago`;
+    } else if (diffDays === 1) {
+      joined = "1 day ago";
+    } else {
+      joined = "Today";
+    }
+
+    // Fetch active vouchers and promotional campaigns for the shop
+    const [activeVouchers, activeDiscounts] = await Promise.all([
+      prisma.voucher.findMany({
+        where: {
+          shopId,
+          status: "ONGOING",
+          startTime: { lte: now },
+          endTime: { gte: now }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 6
+      }),
+      prisma.discount.findMany({
+        where: {
+          shopId,
+          status: "ONGOING",
+          startTime: { lte: now },
+          endTime: { gte: now }
+        },
+        take: 5
+      })
+    ]);
+
+    const vouchers = activeVouchers.map((v) => ({
+      voucher_id: Number(v.voucherId),
+      code: v.voucherCode,
+      name: v.voucherName,
+      type: v.percentage ? "percent" : "amount",
+      percent: v.percentage || 0,
+      amount: v.discountAmount ? Number(v.discountAmount) : 0,
+      minimum: Number(v.minBasketPrice || 0),
+      maxDiscount: v.maxPrice ? Number(v.maxPrice) : null,
+      start_time: Math.floor(v.startTime.getTime() / 1000),
+      end_time: Math.floor(v.endTime.getTime() / 1000),
+      expiresAt: v.endTime.toISOString().split("T")[0]
+    }));
+
     res.json(createShopeeSuccessResponse({
       shop: {
         shop_id: Number(shop.shopId),
@@ -491,11 +549,14 @@ simulatorRouter.get("/api/v2/simulator/shop/detail", async (req: Request, res: R
         is_vacation: shop.isVacation,
         rating: Number(shop.rating || 5.0),
         rating_count: shop.ratingCount || 0,
-        followers: 12800,
+        followers: Number(shop.shopId) === 727720655 ? 12800 : (Number(shop.shopId) % 15000 + 5000),
         response_rate: "98%",
-        joined: "2 years ago",
+        response_time: "Within a few hours",
+        joined,
         tagline: "Official Flagship Store",
         story: `${shop.shopName} provides authentic, premium merchandise with full manufacturer warranty and instant Shopee delivery.`,
+        has_campaign: vouchers.length > 0 || activeDiscounts.length > 0,
+        vouchers,
         products: shop.products.map((p) => ({
           item_id: Number(p.itemId),
           item_name: p.itemName,
