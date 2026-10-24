@@ -237,6 +237,7 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
       image_ratio: p.imageRatio,
       product_condition: p.productCondition,
       is_preorder: p.isPreorder,
+      preorder_days_to_ship: p.preorderDaysToShip,
       attribute_list: p.attributesJson,
       shipping_options: p.shippingOptionsJson,
       category_name: p.category?.categoryName || "General",
@@ -1078,6 +1079,7 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
     image_ratio = "1:1",
     product_condition = "NEW",
     is_preorder = false,
+    preorder_days_to_ship,
     shipping_option_ids = [],
     item_status = "NORMAL"
   } = req.body || {};
@@ -1145,7 +1147,7 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
       res.json(createShopeeErrorResponse("error_param", "One or more selected shipping options are unavailable"));
       return;
     }
-    if (selectedShippingOptions.some((option) => Number(package_weight_grams) > option.maximumWeightGram)) {
+    if (selectedShippingOptions.some((option) => option.maximumWeightGram !== null && Number(package_weight_grams) > option.maximumWeightGram)) {
       res.json(createShopeeErrorResponse("error_param", "Package weight exceeds the selected shipping option limit"));
       return;
     }
@@ -1163,6 +1165,14 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
     }
     if (image_ratio !== "1:1" && image_ratio !== "3:4") {
       res.json(createShopeeErrorResponse("error_param", "image_ratio must be 1:1 or 3:4"));
+      return;
+    }
+    if (Boolean(is_preorder) && (!Number.isInteger(Number(preorder_days_to_ship)) || Number(preorder_days_to_ship) < 5 || Number(preorder_days_to_ship) > 15)) {
+      res.json(createShopeeErrorResponse("error_param", "preorder_days_to_ship must be an integer from 5 to 15"));
+      return;
+    }
+    if (!Boolean(is_preorder) && preorder_days_to_ship != null) {
+      res.json(createShopeeErrorResponse("error_param", "preorder_days_to_ship is only allowed for pre-order products"));
       return;
     }
     if (!String(description).trim()) {
@@ -1221,6 +1231,16 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
     } catch {
       parsedTierVariation = undefined;
     }
+  }
+  if (product_workflow && Array.isArray(parsedTierVariation) && parsedTierVariation.length > 4) {
+    res.json(createShopeeErrorResponse("error_param", "The simulator supports at most 4 product variation groups"));
+    return;
+  }
+  if (product_workflow && parsedTierVariation !== undefined && (!Array.isArray(parsedTierVariation) || parsedTierVariation.some((tier: any) =>
+    !String(tier?.name || "").trim() || !Array.isArray(tier?.option_list) || tier.option_list.length === 0 || tier.option_list.some((option: any) => !String(option?.option || "").trim())
+  ))) {
+    res.json(createShopeeErrorResponse("error_param", "Each product variation group requires a name and at least one value"));
+    return;
   }
 
   // Process media: uploaded files or passed URLs
@@ -1305,6 +1325,7 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
       imageRatio: image_ratio,
       productCondition: product_condition,
       isPreorder: Boolean(is_preorder),
+      preorderDaysToShip: Boolean(is_preorder) ? Number(preorder_days_to_ship) : null,
       itemStatus: product_workflow ? item_status : "NORMAL",
       originalPrice: effectiveBasePrice,
       currency: "VND",

@@ -155,7 +155,21 @@ async function main() {
       maximumWeightGram: 10000,
       sortOrder: 2,
       enabled: true
-    }
+    },
+    ...[
+      ["same_day_express", "2. Hỏa Tốc", "Hỏa Tốc", 3],
+      ["same_day_delivery", "3. Trong Ngày", "Trong Ngày", 4],
+      ["fast_delivery", "4. Nhanh", "Nhanh", 5],
+      ["bulky_goods", "5. Hàng Cồng Kềnh", "Hàng Cồng Kềnh", 6]
+    ].map(([optionId, optionGroup, optionName, sortOrder]) => ({
+      optionId: String(optionId),
+      optionName: String(optionName),
+      optionGroup: String(optionGroup),
+      partnerLabel: "ĐỐI TÁC SHOPEE",
+      maximumWeightGram: null,
+      sortOrder: Number(sortOrder),
+      enabled: true
+    }))
   ];
 
   for (const option of productShippingOptions) {

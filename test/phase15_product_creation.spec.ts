@@ -39,7 +39,11 @@ async function runTests() {
   try {
     const options = [
       { optionId: "pickup_point", optionName: "Điểm nhận hàng", optionGroup: "Lấy hàng chủ động", partnerLabel: "ĐỐI TÁC SHOPEE", maximumWeightGram: 10000, sortOrder: 1, enabled: true },
-      { optionId: "viettel_smartbox", optionName: "Tủ nhận hàng - Viettel Smartbox", optionGroup: "Lấy hàng chủ động", partnerLabel: "ĐỐI TÁC SHOPEE", maximumWeightGram: 10000, sortOrder: 2, enabled: true }
+      { optionId: "viettel_smartbox", optionName: "Tủ nhận hàng - Viettel Smartbox", optionGroup: "Lấy hàng chủ động", partnerLabel: "ĐỐI TÁC SHOPEE", maximumWeightGram: 10000, sortOrder: 2, enabled: true },
+      { optionId: "same_day_express", optionName: "Hỏa Tốc", optionGroup: "2. Hỏa Tốc", partnerLabel: "ĐỐI TÁC SHOPEE", maximumWeightGram: null, sortOrder: 3, enabled: true },
+      { optionId: "same_day_delivery", optionName: "Trong Ngày", optionGroup: "3. Trong Ngày", partnerLabel: "ĐỐI TÁC SHOPEE", maximumWeightGram: null, sortOrder: 4, enabled: true },
+      { optionId: "fast_delivery", optionName: "Nhanh", optionGroup: "4. Nhanh", partnerLabel: "ĐỐI TÁC SHOPEE", maximumWeightGram: null, sortOrder: 5, enabled: true },
+      { optionId: "bulky_goods", optionName: "Hàng Cồng Kềnh", optionGroup: "5. Hàng Cồng Kềnh", partnerLabel: "ĐỐI TÁC SHOPEE", maximumWeightGram: null, sortOrder: 6, enabled: true }
     ];
     for (const option of options) {
       await prisma.productShippingOption.upsert({ where: { optionId: option.optionId }, update: option, create: option });
@@ -54,8 +58,9 @@ async function runTests() {
     assert(config.error === "", "Product creation config succeeds");
     assert(config.response.is_vacation === originalShop.isVacation, "Config returns current shop holiday state");
     assert(!("partner_key" in config.response) && !("access_token" in config.response), "Shop config does not expose credentials");
-    assert(config.response.shipping_options.length === 2, "Config returns the two enabled shipping options");
-    assert(config.response.shipping_options.every((option: any) => option.maximum_weight_gram === 10000), "Shipping options expose the 10,000 g limit");
+    assert(config.response.shipping_options.length === 6, "Config returns all six enabled shipping options");
+    assert(config.response.shipping_options.filter((option: any) => option.maximum_weight_gram === 10000).length === 2, "Existing pickup methods retain their 10,000 g limit");
+    assert(config.response.shipping_options.slice(2).every((option: any) => option.maximum_weight_gram === null && option.partner_label === "ĐỐI TÁC SHOPEE"), "New shipping methods have Shopee partner badges without guessed weight limits");
 
     const category = await prisma.category.findFirstOrThrow({
       where: { hasChildren: false, attributes: { some: { isMandatory: true } } },
@@ -86,6 +91,7 @@ async function runTests() {
       image_ratio: "3:4",
       product_condition: "NEW",
       is_preorder: false,
+      preorder_days_to_ship: null,
       shipping_option_ids: ["pickup_point"],
       attribute_list: attributeList,
       image_url_list: ["https://media.example.test/product-cover.jpg"],
@@ -129,11 +135,42 @@ async function runTests() {
     const savedProduct = await prisma.product.findUniqueOrThrow({ where: { itemId }, include: { models: true } });
     assert(savedProduct.gtin === valid.gtin && savedProduct.videoUrl === valid.video_url, "GTIN and video URL persist");
     assert(savedProduct.imageRatio === "3:4", "Selected image ratio persists");
+    assert(savedProduct.preorderDaysToShip === null, "Non-preorder product has no preparation lead time");
     assert(savedProduct.itemStatus === "UNLIST", "Hidden status persists");
     assert(Number(savedProduct.weight) === 0.9, "Grams are stored in the existing kilogram field");
     assert((savedProduct.shippingOptionsJson as any[])[0].option_id === "pickup_point", "Selected shipping option persists");
     assert(savedProduct.models.length === 2 && savedProduct.models[1].sellerStock === 9, "Variation prices and inventory persist");
     assert(JSON.stringify(savedProduct.attributesJson) === JSON.stringify(attributeList), "Category attribute values persist");
+
+    const preorder = await request("/api/v2/simulator/product/create", {
+      method: "POST", body: { ...valid, item_name: `${valid.item_name} preorder`, is_preorder: true, preorder_days_to_ship: 7, shipping_option_ids: ["same_day_delivery"], tier_variation: [], models: [] }
+    });
+    assert(preorder.error === "", "Preorder product accepts a 5–15 day preparation period");
+    const preorderId = BigInt(preorder.response.item_id);
+    createdIds.push(preorderId);
+    const preorderProduct = await prisma.product.findUniqueOrThrow({ where: { itemId: preorderId } });
+    assert(preorderProduct.preorderDaysToShip === 7, "Preorder preparation days persist");
+    const invalidPreorder = await request("/api/v2/simulator/product/create", {
+      method: "POST", body: { ...valid, is_preorder: true, preorder_days_to_ship: 16 }
+    });
+    assert(invalidPreorder.error === "error_param", "Preorder preparation days outside 5–15 are rejected");
+
+    const fourTiers = ["Color", "Size", "Material", "Pack"].map((name) => ({ name, option_list: [{ option: "A" }, { option: "B" }] }));
+    const fourTierModels = Array.from({ length: 16 }, (_, index) => ({
+      model_name: `Combination ${index}`,
+      tier_index: [0, 1, 2, index % 2],
+      original_price: 250000,
+      seller_stock: 1
+    }));
+    const fourTierProduct = await request("/api/v2/simulator/product/create", {
+      method: "POST", body: { ...valid, item_name: `${valid.item_name} four tiers`, tier_variation: fourTiers, models: fourTierModels }
+    });
+    assert(fourTierProduct.error === "", "Layer B product creation accepts up to four variation groups");
+    createdIds.push(BigInt(fourTierProduct.response.item_id));
+    const tooManyTiers = await request("/api/v2/simulator/product/create", {
+      method: "POST", body: { ...valid, tier_variation: [...fourTiers, { name: "Fifth", option_list: [{ option: "A" }] }] }
+    });
+    assert(tooManyTiers.error === "error_param", "Layer B rejects a fifth variation group");
 
     const normalCreated = await request("/api/v2/simulator/product/create", {
       method: "POST", body: { ...valid, item_name: `${valid.item_name} visible`, item_status: "NORMAL", models: [] }
