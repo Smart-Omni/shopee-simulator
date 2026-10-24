@@ -76,6 +76,18 @@ export const simulatorSwaggerPaths: Record<string, any> = {
       responses: { "200": { description: "Catalog product list" } }
     }
   },
+  "/api/v2/simulator/product/extra_info": {
+    get: {
+      tags: ["Simulator Control"],
+      summary: "Get Shopiz Product Metrics",
+      description: "Shop-safe metrics integration for Shopiz. Accepts 1–50 item IDs and returns the same sales, views, likes, and review metrics as the signed Shopee endpoint.",
+      parameters: [
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "item_id_list", in: "query", required: true, description: "Comma-separated IDs; maximum 50", schema: { type: "string" } }
+      ],
+      responses: { "200": { description: "Returns item_list metrics" } }
+    }
+  },
   "/api/v2/simulator/product/create": {
     post: {
       tags: ["Simulator Control"],

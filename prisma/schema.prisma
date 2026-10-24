@@ -157,6 +157,7 @@ model Product {
   isPreorder        Boolean   @default(false)
   preorderDaysToShip Int?
   itemStatus        String   @default("NORMAL") // NORMAL, UNLIST, BANNED, DELETED
+  viewCount         Int      @default(0)
   originalPrice     Decimal  @db.Decimal(15, 2)
   currency          String   @default("VND")
   weight            Decimal  @default(0.5) @db.Decimal(10, 2)
@@ -176,6 +177,7 @@ model Product {
   discountItems     DiscountItem[]
   voucherItems      VoucherItem[]
   comments          ProductComment[]
+  likes             ProductLike[]
 
   @@index([shopId, itemStatus, updatedAt])
   @@map("products")
@@ -620,8 +622,21 @@ model BuyerUser {
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
   addresses    BuyerAddress[]
+  productLikes ProductLike[]
 
   @@map("buyer_users")
+}
+
+model ProductLike {
+  itemId      BigInt
+  buyerUserId BigInt
+  createdAt   DateTime  @default(now())
+  product     Product   @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+  buyer       BuyerUser @relation(fields: [buyerUserId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, buyerUserId])
+  @@index([buyerUserId])
+  @@map("product_likes")
 }
 
 model BuyerAddress {

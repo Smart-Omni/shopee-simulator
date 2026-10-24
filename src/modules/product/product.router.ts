@@ -3,8 +3,32 @@ import { prisma } from "../../common/prisma";
 import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../common/utils/envelope";
 import { shopeeAuthGuard } from "../../common/middleware/auth-guard";
 import { WebhookService } from "../webhook/webhook.service";
+import { getItemExtraInfo, parseItemIds } from "./product-metrics.service";
 
 export const productRouter = Router();
+
+// ============================================================================
+// GET ITEM EXTRA INFO: GET /api/v2/product/get_item_extra_info
+// ============================================================================
+productRouter.get("/api/v2/product/get_item_extra_info", shopeeAuthGuard, async (req: Request, res: Response): Promise<void> => {
+  const shopIdRaw = req.query.shop_id;
+  const itemIds = parseItemIds(req.query.item_id_list);
+  if (!shopIdRaw || !/^\d+$/.test(String(shopIdRaw)) || !itemIds) {
+    res.json(createShopeeErrorResponse("error_param", "shop_id and a valid item_id_list are required"));
+    return;
+  }
+  if (itemIds.length > 50) {
+    res.json(createShopeeErrorResponse("error_param", "item_id_list supports at most 50 item IDs"));
+    return;
+  }
+  const shopId = BigInt(String(shopIdRaw));
+  const items = await getItemExtraInfo(shopId, itemIds);
+  if (items.length !== new Set(itemIds.map(String)).size) {
+    res.json(createShopeeErrorResponse("error_param", "One or more items do not belong to this shop"));
+    return;
+  }
+  res.json(createShopeeSuccessResponse({ item_list: items }));
+});
 
 // Helper to parse query parameter lists that might be string, comma-separated, or JSON array
 function parseListParam(param: any): string[] {

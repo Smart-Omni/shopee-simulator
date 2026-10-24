@@ -9,8 +9,76 @@ import { normalizeReturnReason } from "../returns/returns.constants";
 import { calculateReverseShippingFee } from "../payment/payment.router";
 import { storageService } from "../../common/storage/storage.service";
 import * as crypto from "crypto";
+import { getItemExtraInfo, parseItemIds } from "../product/product-metrics.service";
 
 export const simulatorRouter = Router();
+
+simulatorRouter.get("/api/v2/simulator/product/extra_info", async (req: Request, res: Response): Promise<void> => {
+  const shopRaw = req.query.shop_id;
+  const itemIds = parseItemIds(req.query.item_id_list);
+  if (!shopRaw || !/^\d+$/.test(String(shopRaw)) || !itemIds || itemIds.length > 50) {
+    res.json(createShopeeErrorResponse("error_param", "shop_id and 1-50 valid item IDs are required"));
+    return;
+  }
+  const itemList = await getItemExtraInfo(BigInt(String(shopRaw)), itemIds);
+  if (itemList.length !== new Set(itemIds.map(String)).size) {
+    res.json(createShopeeErrorResponse("error_param", "One or more items do not belong to this shop"));
+    return;
+  }
+  res.json(createShopeeSuccessResponse({ item_list: itemList }));
+});
+
+simulatorRouter.post("/api/v2/simulator/product/view", async (req: Request, res: Response): Promise<void> => {
+  const itemRaw = req.body?.item_id;
+  if (!/^\d+$/.test(String(itemRaw ?? ""))) {
+    res.json(createShopeeErrorResponse("error_param", "A valid item_id is required"));
+    return;
+  }
+  const itemId = BigInt(String(itemRaw));
+  const product = await prisma.product.update({ where: { itemId }, data: { viewCount: { increment: 1 } }, select: { viewCount: true } }).catch(() => null);
+  if (!product) {
+    res.json(createShopeeErrorResponse("error_param", "Product not found"));
+    return;
+  }
+  res.json(createShopeeSuccessResponse({ item_id: Number(itemId), views: product.viewCount }));
+});
+
+simulatorRouter.get("/api/v2/simulator/product/like", async (req: Request, res: Response): Promise<void> => {
+  const itemRaw = req.query.item_id;
+  const buyerRaw = req.query.buyer_user_id;
+  if (!/^\d+$/.test(String(itemRaw ?? "")) || !/^\d+$/.test(String(buyerRaw ?? ""))) {
+    res.json(createShopeeErrorResponse("error_param", "item_id and buyer_user_id are required"));
+    return;
+  }
+  const itemId = BigInt(String(itemRaw));
+  const buyerUserId = BigInt(String(buyerRaw));
+  const [liked, likes] = await Promise.all([
+    prisma.productLike.findUnique({ where: { itemId_buyerUserId: { itemId, buyerUserId } } }),
+    prisma.productLike.count({ where: { itemId } })
+  ]);
+  res.json(createShopeeSuccessResponse({ item_id: Number(itemId), liked: Boolean(liked), likes }));
+});
+
+simulatorRouter.post("/api/v2/simulator/product/like", async (req: Request, res: Response): Promise<void> => {
+  const { item_id: itemRaw, buyer_user_id: buyerRaw } = req.body || {};
+  if (!/^\d+$/.test(String(itemRaw ?? "")) || !/^\d+$/.test(String(buyerRaw ?? ""))) {
+    res.json(createShopeeErrorResponse("error_param", "item_id and buyer_user_id are required"));
+    return;
+  }
+  const itemId = BigInt(String(itemRaw));
+  const buyerUserId = BigInt(String(buyerRaw));
+  const key = { itemId_buyerUserId: { itemId, buyerUserId } };
+  let liked: boolean;
+  if (await prisma.productLike.findUnique({ where: key })) {
+    await prisma.productLike.delete({ where: key });
+    liked = false;
+  } else {
+    await prisma.productLike.create({ data: { itemId, buyerUserId } });
+    liked = true;
+  }
+  const likes = await prisma.productLike.count({ where: { itemId } });
+  res.json(createShopeeSuccessResponse({ item_id: Number(itemId), liked, likes }));
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
