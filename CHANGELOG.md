@@ -4,6 +4,17 @@ All notable changes, bug fixes, architecture evolution, and feature enhancements
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Implemented the signed Layer A simulator route `GET /api/v2/product/get_item_extra_info`, including HMAC-SHA256 enforcement, required `item_id_list` validation, support for up to 50 IDs, JSON-encoded or comma-separated lists, and shop ownership checks.
+- Added Shopiz-safe `GET /api/v2/simulator/product/extra_info` plus buyer product-view and like endpoints. Layer A and Layer B share the same metric aggregation service.
+- Persisted product detail views and unique buyer/product likes in PostgreSQL. Sales report lifetime quantity from completed orders; ratings and review counts aggregate stored product reviews, with zero values when none exist.
+- Added Swagger documentation and Phase 16 integration coverage for signatures, validation, isolation, aggregations, views, and like toggling.
+
+### Changed
+- Synchronized Prisma schema changes with `prisma db push`; product metrics fields and relationships are documented in the simulator data model.
+
 ## [1.12.0] - 2026-10-24
 
 ### 🎯 Overview

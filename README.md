@@ -69,7 +69,7 @@ The simulator implements a **Two-Layer Dual Architecture**:
 
 ## 🚀 Supported Modules & Capabilities
 
-The simulator has completed **Phases 1 through 14** with **509 automated assertions passing (100%)**:
+The established backend baseline is **540 passing assertions** across the original test phases. Phase 16 adds a dedicated product-metrics integration suite (`npm run test:phase16`).
 
 ### 1. Authentication & Dual-Token Grace Period (OAuth 2.0)
 - `POST /api/v2/public/get_token_by_resend_code`: Exchange authorization code for initial `access_token` and `refresh_token`.
@@ -99,6 +99,15 @@ The simulator has completed **Phases 1 through 14** with **509 automated asserti
   - `POST /api/v2/product/delete_item`: Soft-deletes listings (`SELLER_DELETE`) for both `NORMAL` and `UNLIST` products with official Shopee 90-day retention query support.
   - Storefront catalog filter: `GET /api/v2/simulator/products?view_mode=buyer` automatically hides unlisted items.
   - `POST /api/v2/simulator/product/quick_update_stock`: Instant stock adjustment per SKU model.
+
+### 3A. Product Extra Metrics (Phase 16)
+- **Signed Layer A simulator route:** `GET /api/v2/product/get_item_extra_info` accepts a required `item_id_list` with no more than 50 IDs. The list may be comma-separated or JSON-encoded. The signed shop must own every requested item.
+- The local crawled Shopee reference disagrees on this endpoint's HTTP method: its front matter says `PUT`, the master API index says `POST`, and its cURL examples use `GET`. The simulator currently follows `GET`; verify the production method against Shopee Open Platform before using this route as a production contract.
+- **Shopee metric fields:** `sale`, `views`, `likes`, `rating_star`, and `comment_count` are returned per item in the standard Shopee response envelope.
+- **Metric semantics:** `sale` is lifetime purchased quantity in completed orders only; `views` counts product detail visits; `likes` counts unique buyer/product records; rating and comment count are derived from stored product reviews and return zero when no reviews exist.
+- **Shopiz Layer B helpers:** `GET /api/v2/simulator/product/extra_info` returns the same metrics for 1–50 shop-owned item IDs. `POST /api/v2/simulator/product/view` increments a product view. `GET` and `POST /api/v2/simulator/product/like` read or toggle a buyer's persisted like.
+- The Layer B buyer ID follows the simulator's existing client-supplied buyer convention; the Shopiz interface gates likes behind its sign-in state.
+- **Verification:** `npm run test:phase16` covers signatures, ID validation and limits, shop isolation, completed-order sales, review aggregation, zero-review products, persisted views, duplicate-safe likes, and Layer A/Layer B parity.
 
 ### 4. Order Management, Multi-Shop Cart & SLA Deadlines
 - Official Endpoints: `get_order_list`, `get_order_detail`, `cancel_order`, `handle_buyer_cancellation`.
