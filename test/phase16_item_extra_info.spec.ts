@@ -55,6 +55,7 @@ async function runTests() {
     await prisma.productComment.create({ data: { shopId, itemId, orderSn, comment: "Phase 16 metrics review", ratingStar: 4 } });
     const valid = await request(signed(String(itemId)));
     assert(valid.error === "", "Valid signed Layer A request succeeds");
+    assert((await request(signed(encodeURIComponent(JSON.stringify([Number(itemId)]))))).error === "", "Layer A accepts JSON-encoded item_id_list values");
     const metric = valid.response.item_list[0];
     assert(metric.sale === baseline.sale + 3, "Sales increase by completed-order quantity only");
     const reviewAggregate = await prisma.productComment.aggregate({ where: { shopId, itemId }, _avg: { ratingStar: true }, _count: { _all: true } });

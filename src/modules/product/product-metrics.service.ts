@@ -59,9 +59,27 @@ export async function getItemExtraInfo(shopId: bigint, itemIds: bigint[]): Promi
 }
 
 export function parseItemIds(value: unknown): bigint[] | null {
-  const parts = Array.isArray(value) ? value.flatMap((item) => String(item).split(","))
-    : typeof value === "string" ? value.split(",") : [];
-  const normalized = parts.map((part) => part.trim()).filter(Boolean);
+  let parts: unknown[];
+  if (Array.isArray(value)) {
+    parts = value;
+  } else if (typeof value === "string") {
+    const input = value.trim();
+    if (input.startsWith("[") && input.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(input);
+        parts = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        parts = input.slice(1, -1).split(",");
+      }
+    } else {
+      parts = input.split(",");
+    }
+  } else {
+    parts = [];
+  }
+  const normalized = parts.flatMap((part) => String(part).split(","))
+    .map((part) => part.trim().replace(/^['"]|['"]$/g, ""))
+    .filter(Boolean);
   if (!normalized.length || normalized.some((id) => !/^\d+$/.test(id))) return null;
   return normalized.map((id) => BigInt(id));
 }
