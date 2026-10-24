@@ -155,22 +155,22 @@ async function runTests() {
     });
     assert(invalidPreorder.error === "error_param", "Preorder preparation days outside 5–15 are rejected");
 
-    const fourTiers = ["Color", "Size", "Material", "Pack"].map((name) => ({ name, option_list: [{ option: "A" }, { option: "B" }] }));
-    const fourTierModels = Array.from({ length: 16 }, (_, index) => ({
+    const twoTiers = ["Color", "Size"].map((name) => ({ name, option_list: [{ option: "A" }, { option: "B" }] }));
+    const twoTierModels = Array.from({ length: 4 }, (_, index) => ({
       model_name: `Combination ${index}`,
-      tier_index: [0, 1, 2, index % 2],
+      tier_index: [Math.floor(index / 2), index % 2],
       original_price: 250000,
       seller_stock: 1
     }));
-    const fourTierProduct = await request("/api/v2/simulator/product/create", {
-      method: "POST", body: { ...valid, item_name: `${valid.item_name} four tiers`, tier_variation: fourTiers, models: fourTierModels }
+    const twoTierProduct = await request("/api/v2/simulator/product/create", {
+      method: "POST", body: { ...valid, item_name: `${valid.item_name} two tiers`, tier_variation: twoTiers, models: twoTierModels }
     });
-    assert(fourTierProduct.error === "", "Layer B product creation accepts up to four variation groups");
-    createdIds.push(BigInt(fourTierProduct.response.item_id));
+    assert(twoTierProduct.error === "", "Layer B product creation accepts two variation groups");
+    createdIds.push(BigInt(twoTierProduct.response.item_id));
     const tooManyTiers = await request("/api/v2/simulator/product/create", {
-      method: "POST", body: { ...valid, tier_variation: [...fourTiers, { name: "Fifth", option_list: [{ option: "A" }] }] }
+      method: "POST", body: { ...valid, tier_variation: [...twoTiers, { name: "Third", option_list: [{ option: "A" }] }] }
     });
-    assert(tooManyTiers.error === "error_param", "Layer B rejects a fifth variation group");
+    assert(tooManyTiers.error === "error_param", "Layer B rejects a third variation group");
 
     const normalCreated = await request("/api/v2/simulator/product/create", {
       method: "POST", body: { ...valid, item_name: `${valid.item_name} visible`, item_status: "NORMAL", models: [] }

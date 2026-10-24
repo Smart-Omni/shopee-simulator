@@ -1232,8 +1232,8 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
       parsedTierVariation = undefined;
     }
   }
-  if (product_workflow && Array.isArray(parsedTierVariation) && parsedTierVariation.length > 4) {
-    res.json(createShopeeErrorResponse("error_param", "The simulator supports at most 4 product variation groups"));
+  if (product_workflow && Array.isArray(parsedTierVariation) && parsedTierVariation.length > 2) {
+    res.json(createShopeeErrorResponse("error_param", "Shopee products support at most 2 variation groups"));
     return;
   }
   if (product_workflow && parsedTierVariation !== undefined && (!Array.isArray(parsedTierVariation) || parsedTierVariation.some((tier: any) =>
