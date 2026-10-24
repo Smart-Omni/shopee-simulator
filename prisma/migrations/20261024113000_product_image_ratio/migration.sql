@@ -1,0 +1,2 @@
+ALTER TABLE "products"
+ADD COLUMN "imageRatio" TEXT NOT NULL DEFAULT '1:1';

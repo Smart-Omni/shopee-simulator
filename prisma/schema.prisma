@@ -101,6 +101,20 @@ model LogisticsChannel {
   @@map("logistics_channels")
 }
 
+model ProductShippingOption {
+  optionId          String   @id
+  optionName        String
+  optionGroup       String
+  partnerLabel      String
+  maximumWeightGram Int
+  sortOrder         Int      @default(0)
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("product_shipping_options")
+}
+
 // ----------------------------------------------------
 // 3. PRODUCT CATALOG, CATEGORIES & ATTRIBUTES
 // ----------------------------------------------------
@@ -136,6 +150,11 @@ model Product {
   itemName          String
   description       String   @db.Text
   itemSku           String?
+  gtin              String?
+  videoUrl          String?
+  imageRatio        String    @default("1:1")
+  productCondition  String    @default("NEW")
+  isPreorder        Boolean   @default(false)
   itemStatus        String   @default("NORMAL") // NORMAL, UNLIST, BANNED, DELETED
   originalPrice     Decimal  @db.Decimal(15, 2)
   currency          String   @default("VND")
@@ -145,6 +164,7 @@ model Product {
   attributesJson    Json?    // [{ attribute_id, attribute_value_list: [{ value_id }] }]
   hasModel          Boolean  @default(false)
   tierVariationJson Json?   // [{ name: "Color", option_list: [{ option: "Red" }] }]
+  shippingOptionsJson Json?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
