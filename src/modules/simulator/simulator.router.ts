@@ -230,6 +230,7 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
       is_vacation: Boolean(p.shop?.isVacation),
       item_name: p.itemName,
       item_status: p.itemStatus,
+      category_id: Number(p.categoryId),
       description: p.description,
       item_sku: p.itemSku,
       gtin: p.gtin,
