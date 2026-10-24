@@ -744,6 +744,7 @@ export async function createSingleOrderRecord(body: any): Promise<{ success: boo
         sellerTransactionFee: Math.round(finalTotalAmount * 0.025),
         escrowAmount: Math.max(0, itemsSubtotal - voucherDiscount + buyerPaidShippingFee - actualShippingFee + shopeeShippingRebate - Math.round(itemsSubtotal * 0.02) - (shopeeShippingRebate > 0 ? Math.round(itemsSubtotal * 0.015) : 0) - Math.round(finalTotalAmount * 0.025)),
         escrowReleaseTime: (order_status as OrderStatus) === OrderStatus.COMPLETED ? new Date() : null,
+        completedAt: (order_status as OrderStatus) === OrderStatus.COMPLETED ? new Date() : null,
         currency: "VND",
         paymentMethod: "ShopeePay",
         payTime: new Date(),
@@ -947,7 +948,8 @@ orderRouter.post("/api/v2/simulator/order/confirm_delivery", async (req: Request
       where: { orderSn: order_sn },
       data: {
         orderStatus: OrderStatus.COMPLETED,
-        escrowReleaseTime: now
+        escrowReleaseTime: now,
+        completedAt: now
       }
     });
 

@@ -253,6 +253,7 @@ model Order {
   payTime              DateTime?
   shipByDate           DateTime?
   escrowReleaseTime    DateTime?
+  completedAt          DateTime?
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
 
@@ -263,6 +264,7 @@ model Order {
   comments             ProductComment[]
 
   @@index([shopId, orderStatus, createdAt])
+  @@index([shopId, orderStatus, completedAt])
   @@index([shopId, escrowReleaseTime])
   @@map("orders")
 }

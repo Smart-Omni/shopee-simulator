@@ -1743,7 +1743,7 @@ simulatorRouter.post("/api/v2/simulator/order/deliver", async (req: Request, res
   const now = new Date();
   await prisma.order.update({
     where: { orderSn: order_sn },
-    data: { orderStatus: OrderStatus.COMPLETED, updatedAt: now, escrowReleaseTime: now }
+    data: { orderStatus: OrderStatus.COMPLETED, updatedAt: now, escrowReleaseTime: now, completedAt: now }
   });
 
   for (const pkg of order.packages) {
@@ -2532,41 +2532,146 @@ simulatorRouter.post("/api/v2/simulator/review/create", async (req: Request, res
 simulatorRouter.get("/api/v2/simulator/reviews", async (req: Request, res: Response): Promise<void> => {
   try {
     const shopIdStr = req.query.shop_id as string | undefined;
-    const itemIdStr = req.query.item_id as string | undefined;
-
-    const whereClause: any = {};
-    if (shopIdStr && shopIdStr.toUpperCase() !== "ALL") {
-      whereClause.shopId = BigInt(shopIdStr);
+    if (!shopIdStr || !/^\d+$/.test(shopIdStr)) {
+      res.json(createShopeeErrorResponse("error_param", "A valid shop_id is required"));
+      return;
     }
-    if (itemIdStr) {
-      whereClause.itemId = BigInt(itemIdStr);
+    const shopId = BigInt(shopIdStr);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size) || 20));
+    const cursor = Math.max(0, Number(req.query.cursor) || 0);
+    const status = String(req.query.status || "ALL").toUpperCase();
+    if (!Number.isInteger(pageSize) || !Number.isInteger(cursor) || !["ALL", "NEED_REPLY", "REPLIED"].includes(status)) {
+      res.json(createShopeeErrorResponse("error_param", "Invalid review pagination or status filter"));
+      return;
     }
 
-    const reviews = await prisma.productComment.findMany({
-      where: whereClause,
-      include: {
-        product: true
-      },
-      orderBy: { commentId: "desc" }
-    });
+    const where: any = { shopId };
+    const dateFrom = req.query.date_from ? new Date(String(req.query.date_from)) : null;
+    const dateTo = req.query.date_to ? new Date(String(req.query.date_to)) : null;
+    if ((dateFrom && Number.isNaN(dateFrom.getTime())) || (dateTo && Number.isNaN(dateTo.getTime())) || (dateFrom && dateTo && dateFrom > dateTo)) {
+      res.json(createShopeeErrorResponse("error_param", "Review date range is invalid"));
+      return;
+    }
+    if (dateFrom || dateTo) where.createdAt = { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) };
+
+    const ratingsRaw = String(req.query.rating_star_list || "").trim();
+    const ratings = ratingsRaw ? ratingsRaw.split(",").map(Number) : [];
+    if (ratings.some((rating) => !Number.isInteger(rating) || rating < 1 || rating > 5)) {
+      res.json(createShopeeErrorResponse("error_param", "rating_star_list must contain ratings from 1 to 5"));
+      return;
+    }
+    if (ratings.length) where.ratingStar = { in: [...new Set(ratings)] };
+
+    const keyword = String(req.query.keyword || "").trim();
+    if (keyword) where.OR = [
+      { orderSn: { contains: keyword, mode: "insensitive" } },
+      { buyerUsername: { contains: keyword, mode: "insensitive" } },
+      { product: { itemName: { contains: keyword, mode: "insensitive" } } }
+    ];
+    const commonWhere = { ...where };
+    if (status === "NEED_REPLY") where.reply = null;
+    if (status === "REPLIED") where.reply = { not: null };
+
+    const [reviews, totalCount, needReplyCount, repliedCount, starCounts] = await Promise.all([
+      prisma.productComment.findMany({
+        where,
+        include: { product: { select: { itemName: true, imagesJson: true, models: true } } },
+        orderBy: [{ createdAt: "desc" }, { commentId: "desc" }],
+        skip: cursor,
+        take: pageSize
+      }),
+      prisma.productComment.count({ where }),
+      prisma.productComment.count({ where: { ...commonWhere, reply: null } }),
+      prisma.productComment.count({ where: { ...commonWhere, reply: { not: null } } }),
+      prisma.productComment.groupBy({ by: ["ratingStar"], where: commonWhere, _count: { _all: true } })
+    ]);
+    const stars: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+    for (const row of starCounts) stars[String(row.ratingStar)] = row._count._all;
 
     res.json(createShopeeSuccessResponse({
-      reviews: reviews.map(r => ({
-        comment_id: Number(r.commentId),
-        order_sn: r.orderSn,
-        item_id: Number(r.itemId),
-        item_name: r.product?.itemName || `Item ${r.itemId}`,
-        model_id: r.modelId ? Number(r.modelId) : 0,
-        buyer_username: r.buyerUsername,
-        rating_star: r.ratingStar,
-        comment: r.comment,
-        reply: r.reply,
-        reply_time: r.replyTime ? Math.floor(r.replyTime.getTime() / 1000) : null,
-        create_time: Math.floor(r.createdAt.getTime() / 1000)
-      }))
+      reviews: reviews.map((r) => {
+        const images = r.product?.imagesJson as any;
+        const imageList = Array.isArray(images?.image_url_list) ? images.image_url_list : [];
+        const model = r.modelId ? r.product?.models.find((entry) => entry.modelId === r.modelId) : null;
+        return {
+          comment_id: Number(r.commentId), order_sn: r.orderSn, item_id: Number(r.itemId),
+          item_name: r.product?.itemName || `Item ${r.itemId}`, item_image: imageList[0] || null,
+          model_id: r.modelId ? Number(r.modelId) : 0, model_name: model?.modelName || null,
+          buyer_username: r.buyerUsername, rating_star: r.ratingStar, comment: r.comment,
+          images: Array.isArray(r.imagesJson) ? r.imagesJson : [], reply: r.reply,
+          reply_time: r.replyTime ? Math.floor(r.replyTime.getTime() / 1000) : null,
+          create_time: Math.floor(r.createdAt.getTime() / 1000)
+        };
+      }),
+      pagination: { cursor, page_size: pageSize, total_count: totalCount, next_cursor: cursor + reviews.length < totalCount ? String(cursor + reviews.length) : "", more: cursor + reviews.length < totalCount },
+      counts: { all: totalCount, need_reply: needReplyCount, replied: repliedCount, stars }
     }));
   } catch (err: any) {
     res.json(createShopeeErrorResponse("server_error", err.message || "Failed to fetch reviews"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: REVIEW DASHBOARD SUMMARY
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/reviews/summary", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const shopRaw = String(req.query.shop_id || "");
+    if (!/^\d+$/.test(shopRaw)) {
+      res.json(createShopeeErrorResponse("error_param", "A valid shop_id is required"));
+      return;
+    }
+    const shopId = BigInt(shopRaw);
+    const now = new Date();
+    const currentFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const previousFrom = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const lastVisitRaw = req.query.last_visit_at ? Number(req.query.last_visit_at) : null;
+    const lastVisit = lastVisitRaw && Number.isFinite(lastVisitRaw) && lastVisitRaw > 0 ? new Date(lastVisitRaw * 1000) : null;
+    const [shop, currentReviews, previousReviews, currentOrders, previousOrders, negativePending, recentCount] = await Promise.all([
+      prisma.shop.findUnique({ where: { shopId }, select: { rating: true, ratingCount: true } }),
+      prisma.productComment.findMany({ where: { shopId, createdAt: { gte: currentFrom, lte: now } }, select: { ratingStar: true, orderSn: true } }),
+      prisma.productComment.findMany({ where: { shopId, createdAt: { gte: previousFrom, lt: currentFrom } }, select: { ratingStar: true, orderSn: true } }),
+      prisma.order.findMany({ where: { shopId, orderStatus: OrderStatus.COMPLETED, completedAt: { gte: currentFrom, lte: now } }, select: { orderSn: true } }),
+      prisma.order.findMany({ where: { shopId, orderStatus: OrderStatus.COMPLETED, completedAt: { gte: previousFrom, lt: currentFrom } }, select: { orderSn: true } }),
+      prisma.productComment.count({ where: { shopId, ratingStar: { in: [1, 2] }, reply: null } }),
+      lastVisit ? prisma.productComment.count({ where: { shopId, createdAt: { gt: lastVisit } } }) : Promise.resolve(0)
+    ]);
+    if (!shop) {
+      res.json(createShopeeErrorResponse("error_param", "Shop not found"));
+      return;
+    }
+    const buildMetrics = async (reviews: typeof currentReviews, orders: { orderSn: string }[]) => {
+      const orderSns = new Set(orders.map((order) => order.orderSn));
+      const orderReviews = orderSns.size ? await prisma.productComment.findMany({
+        where: { shopId, orderSn: { in: [...orderSns] } },
+        select: { orderSn: true }
+      }) : [];
+      const reviewedOrderSns = new Set(orderReviews.map((review) => review.orderSn));
+      const reviewedOrders = [...reviewedOrderSns].filter((orderSn) => orderSns.has(orderSn)).length;
+      const positive = reviews.filter((review) => review.ratingStar >= 4).length;
+      return {
+        review_count: reviews.length,
+        review_rate: orders.length ? (reviewedOrders / orders.length) * 100 : null,
+        positive_review_rate: reviews.length ? (positive / reviews.length) * 100 : null
+      };
+    };
+    const [current, previous] = await Promise.all([buildMetrics(currentReviews, currentOrders), buildMetrics(previousReviews, previousOrders)]);
+    const change = (currentValue: number | null, previousValue: number | null) => currentValue === null || previousValue === null || previousValue === 0
+      ? null
+      : Number((((currentValue - previousValue) / Math.abs(previousValue)) * 100).toFixed(2));
+    res.json(createShopeeSuccessResponse({
+      rating: Number(shop.rating), rating_count: shop.ratingCount,
+      period: { current_from: Math.floor(currentFrom.getTime() / 1000), current_to: Math.floor(now.getTime() / 1000), previous_from: Math.floor(previousFrom.getTime() / 1000), previous_to: Math.floor(currentFrom.getTime() / 1000) },
+      metrics: {
+        review_count: { value: current.review_count, previous: previous.review_count, change_percent: change(current.review_count, previous.review_count) },
+        review_rate: { value: current.review_rate, previous: previous.review_rate, change_percent: change(current.review_rate, previous.review_rate) },
+        positive_review_rate: { value: current.positive_review_rate, previous: previous.positive_review_rate, change_percent: change(current.positive_review_rate, previous.positive_review_rate) }
+      },
+      negative_reviews_needing_reply: negativePending,
+      recent_reviews_since_last_visit: recentCount
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to load review summary"));
   }
 });
 
@@ -2575,10 +2680,10 @@ simulatorRouter.get("/api/v2/simulator/reviews", async (req: Request, res: Respo
 // ============================================================================
 simulatorRouter.post("/api/v2/simulator/review/reply", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { comment_id, reply } = req.body || {};
+    const { comment_id, reply, shop_id } = req.body || {};
 
-    if (!comment_id) {
-      res.json(createShopeeErrorResponse("error_param", "comment_id is required"));
+    if (!comment_id || !/^\d+$/.test(String(shop_id || ""))) {
+      res.json(createShopeeErrorResponse("error_param", "comment_id and a valid shop_id are required"));
       return;
     }
 
@@ -2588,8 +2693,8 @@ simulatorRouter.post("/api/v2/simulator/review/reply", async (req: Request, res:
       return;
     }
 
-    const comment = await prisma.productComment.findUnique({
-      where: { commentId: BigInt(comment_id) }
+    const comment = await prisma.productComment.findFirst({
+      where: { commentId: BigInt(comment_id), shopId: BigInt(String(shop_id)) }
     });
 
     if (!comment) {

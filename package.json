@@ -27,7 +27,8 @@
     "test:phase14": "ts-node test/phase14_shopiz_integration.spec.ts",
     "test:phase15": "ts-node test/phase15_product_creation.spec.ts",
     "test:phase16": "ts-node test/phase16_item_extra_info.spec.ts",
-    "test": "ts-node test/phase1_auth.spec.ts && ts-node test/phase2_shop.spec.ts && ts-node test/phase3_product.spec.ts && ts-node test/phase4_order.spec.ts && ts-node test/phase5_webhook.spec.ts && ts-node test/phase6_frontend.spec.ts && ts-node test/phase7_promotions.spec.ts && ts-node test/phase8_shipping_fee.spec.ts && ts-node test/phase9_variations.spec.ts && ts-node test/phase10_lifecycle_deadline.spec.ts && ts-node test/phase11_chat_reviews.spec.ts && ts-node test/phase12_escrow_payment.spec.ts && ts-node test/phase13_returns_disputes.spec.ts && ts-node test/phase14_shopiz_integration.spec.ts && ts-node test/phase15_product_creation.spec.ts && ts-node test/phase16_item_extra_info.spec.ts"
+    "test:phase17": "ts-node test/phase17_review_management.spec.ts",
+    "test": "ts-node test/phase1_auth.spec.ts && ts-node test/phase2_shop.spec.ts && ts-node test/phase3_product.spec.ts && ts-node test/phase4_order.spec.ts && ts-node test/phase5_webhook.spec.ts && ts-node test/phase6_frontend.spec.ts && ts-node test/phase7_promotions.spec.ts && ts-node test/phase8_shipping_fee.spec.ts && ts-node test/phase9_variations.spec.ts && ts-node test/phase10_lifecycle_deadline.spec.ts && ts-node test/phase11_chat_reviews.spec.ts && ts-node test/phase12_escrow_payment.spec.ts && ts-node test/phase13_returns_disputes.spec.ts && ts-node test/phase14_shopiz_integration.spec.ts && ts-node test/phase15_product_creation.spec.ts && ts-node test/phase16_item_extra_info.spec.ts && ts-node test/phase17_review_management.spec.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.4.0",
