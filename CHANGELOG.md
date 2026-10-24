@@ -4,6 +4,39 @@ All notable changes, bug fixes, architecture evolution, and feature enhancements
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-10-24
+
+### 🎯 Overview
+Implemented authentic **Shopee 3-Level Category Tree Hierarchy** (Root $\rightarrow$ Subcategory $\rightarrow$ Leaf) and seeded **77 Mandatory & Key Attributes** based on official Shopee Open API v2 specifications (`v2.product.get_category` and `v2.product.get_attribute_tree`). Maintained 100% backward compatibility for existing products and test suites across all 14 phases (540 / 540 passing assertions).
+
+### 🌳 3-Level Category Tree Hierarchy
+- **Level 1 (6 Root Categories, `parentId = 0`, `hasChildren = true`):**
+  - `100000`: Thiết Bị Điện Tử & Công Nghệ (Electronics & Tech)
+  - `200000`: Thời Trang & Phụ Kiện (Fashion & Apparel)
+  - `300000`: Nhà Cửa & Đời Sống (Home & Living)
+  - `400000`: Sức Khỏe & Sắc Đẹp (Health & Beauty)
+  - `500000`: Thiết Bị Điện Gia Dụng (Home Appliances)
+  - `600000`: Bách Hóa Online & Thực Phẩm (Groceries & Food)
+- **Level 2 (14 Subcategories, `parentId = L1_ID`, `hasChildren = true`):**
+  - Under `100000`: `110000` Điện Thoại & Phụ Kiện, `120000` Máy Tính & Laptop, `130000` Thiết Bị Âm Thanh
+  - Under `200000`: `210000` Thời Trang Nam, `220000` Thời Trang Nữ, `230000` Giày Dép & Sneakers
+  - Under `300000`: `310000` Nội Thất Nhà Ở, `320000` Dụng Cụ Bếp & Bàn Ăn
+  - Under `400000`: `410000` Chăm Sóc Da Mặt, `420000` Trang Điểm & Son Môi
+  - Under `500000`: `510000` Thiết Bị Nhà Bếp Điện, `520000` Thiết Bị Làm Sạch & Làm Mát
+  - Under `600000`: `610000` Đồ Ăn Vặt & Hạt Dinh Dưỡng, `620000` Đồ Uống & Trà Cà Phê
+- **Level 3 (19 Leaf Categories, `parentId = L2_ID`, `hasChildren = false`):**
+  - Preserved canonical categories `100001` (Electronics), `100002` (Fashion & Apparel), and `100003` (Home & Living) under appropriate Level 2 subcategories to guarantee zero test regressions.
+  - Added new leaf nodes for Smartphones (`110002`), Phone Accessories (`110003`), Laptops (`120001`), Audio (`130001`), Men's T-Shirts (`210001`), Jeans (`210002`), Women's Dresses (`220001`), Sneakers (`230001`), Desks & Chairs (`310001`), Cookware (`320001`), Serums (`410001`), Sunscreens (`410002`), Lipsticks (`420001`), Air Fryers (`510001`), Kettles (`510002`), Air Purifiers (`520001`), Healthy Nuts (`610001`), and Specialty Coffee & Tea (`620001`).
+
+### 🏷️ Mandatory & Key Attributes Seeding
+- **77 Structured Attributes in PostgreSQL:**
+  - Standardized attribute types: `DROP_DOWN`, `COMBO_BOX`, `TEXT_FILED`, and `MULTI_SELECT`.
+  - Allowed value arrays (`valueListJson`) populated with real-world identifiers, display names, and standard units (`g`, `kg`, `ml`, `L`, `W`, `inch`, `tháng`).
+  - Preserved strict Phase 3 test invariants on Category `100001`: Attribute `50001` (`Brand`) remains `isMandatory = true` with exactly 3 allowed options (`Apple`, `Samsung`, `Xiaomi`).
+  - Added optional attributes for warranty period, storage, and material on preserved categories.
+
+---
+
 ## [1.11.0] - 2026-10-23
 
 ### 🎯 Overview
