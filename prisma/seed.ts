@@ -136,72 +136,1189 @@ async function main() {
   }
   console.log(`✓ Ensured 3 Logistics Channels`);
 
-  // 4. Seed Categories & Attributes
-  const categoriesData = [
-    {
-      id: 100001,
-      name: "Electronics",
-      attributeId: 50001,
-      brands: [
-        { value_id: 1, original_value_name: "Apple" },
-        { value_id: 2, original_value_name: "Samsung" },
-        { value_id: 3, original_value_name: "Xiaomi" }
-      ]
-    },
-    {
-      id: 100002,
-      name: "Fashion & Apparel",
-      attributeId: 50002,
-      brands: [
-        { value_id: 1, original_value_name: "SmartOmni Apparel" },
-        { value_id: 2, original_value_name: "Hanoi Streetwear" },
-        { value_id: 3, original_value_name: "Casual Standard" }
-      ]
-    },
-    {
-      id: 100003,
-      name: "Home & Living",
-      attributeId: 50003,
-      brands: [
-        { value_id: 1, original_value_name: "Saigon Living" },
-        { value_id: 2, original_value_name: "Nordic Minimalist" },
-        { value_id: 3, original_value_name: "Eco Home" }
-      ]
-    }
+  // 4. Seed Shopee 3-Level Category Tree & Rich Attributes
+  const treeCategoriesData = [
+    // ------------------------------------------------------------------------
+    // LEVEL 1: ROOT CATEGORIES (parentId: 0, hasChildren: true)
+    // ------------------------------------------------------------------------
+    { categoryId: BigInt(100000), parentId: BigInt(0), categoryName: "Thiết Bị Điện Tử & Công Nghệ", hasChildren: true },
+    { categoryId: BigInt(200000), parentId: BigInt(0), categoryName: "Thời Trang & Phụ Kiện", hasChildren: true },
+    { categoryId: BigInt(300000), parentId: BigInt(0), categoryName: "Nhà Cửa & Đời Sống", hasChildren: true },
+    { categoryId: BigInt(400000), parentId: BigInt(0), categoryName: "Sức Khỏe & Sắc Đẹp", hasChildren: true },
+    { categoryId: BigInt(500000), parentId: BigInt(0), categoryName: "Thiết Bị Điện Gia Dụng", hasChildren: true },
+    { categoryId: BigInt(600000), parentId: BigInt(0), categoryName: "Bách Hóa Online & Thực Phẩm", hasChildren: true },
+
+    // ------------------------------------------------------------------------
+    // LEVEL 2: SUBCATEGORIES (parentId: L1_ID, hasChildren: true)
+    // ------------------------------------------------------------------------
+    // Under 100000: Thiết Bị Điện Tử & Công Nghệ
+    { categoryId: BigInt(110000), parentId: BigInt(100000), categoryName: "Điện Thoại & Phụ Kiện", hasChildren: true },
+    { categoryId: BigInt(120000), parentId: BigInt(100000), categoryName: "Máy Tính & Laptop", hasChildren: true },
+    { categoryId: BigInt(130000), parentId: BigInt(100000), categoryName: "Thiết Bị Âm Thanh", hasChildren: true },
+
+    // Under 200000: Thời Trang & Phụ Kiện
+    { categoryId: BigInt(210000), parentId: BigInt(200000), categoryName: "Thời Trang Nam", hasChildren: true },
+    { categoryId: BigInt(220000), parentId: BigInt(200000), categoryName: "Thời Trang Nữ", hasChildren: true },
+    { categoryId: BigInt(230000), parentId: BigInt(200000), categoryName: "Giày Dép & Sneakers", hasChildren: true },
+
+    // Under 300000: Nhà Cửa & Đời Sống
+    { categoryId: BigInt(310000), parentId: BigInt(300000), categoryName: "Nội Thất Nhà Ở", hasChildren: true },
+    { categoryId: BigInt(320000), parentId: BigInt(300000), categoryName: "Dụng Cụ Bếp & Bàn Ăn", hasChildren: true },
+
+    // Under 400000: Sức Khỏe & Sắc Đẹp
+    { categoryId: BigInt(410000), parentId: BigInt(400000), categoryName: "Chăm Sóc Da Mặt", hasChildren: true },
+    { categoryId: BigInt(420000), parentId: BigInt(400000), categoryName: "Trang Điểm & Son Môi", hasChildren: true },
+
+    // Under 500000: Thiết Bị Điện Gia Dụng
+    { categoryId: BigInt(510000), parentId: BigInt(500000), categoryName: "Thiết Bị Nhà Bếp Điện", hasChildren: true },
+    { categoryId: BigInt(520000), parentId: BigInt(500000), categoryName: "Thiết Bị Làm Sạch & Làm Mát", hasChildren: true },
+
+    // Under 600000: Bách Hóa Online & Thực Phẩm
+    { categoryId: BigInt(610000), parentId: BigInt(600000), categoryName: "Đồ Ăn Vặt & Hạt Dinh Dưỡng", hasChildren: true },
+    { categoryId: BigInt(620000), parentId: BigInt(600000), categoryName: "Đồ Uống & Trà Cà Phê", hasChildren: true },
+
+    // ------------------------------------------------------------------------
+    // LEVEL 3: LEAF CATEGORIES (parentId: L2_ID, hasChildren: false)
+    // ------------------------------------------------------------------------
+    // Under 110000: Điện Thoại & Phụ Kiện
+    { categoryId: BigInt(100001), parentId: BigInt(110000), categoryName: "Electronics", hasChildren: false }, // PRESERVED TEST NODE
+    { categoryId: BigInt(110002), parentId: BigInt(110000), categoryName: "Điện Thoại Di Động", hasChildren: false },
+    { categoryId: BigInt(110003), parentId: BigInt(110000), categoryName: "Phụ Kiện Điện Thoại", hasChildren: false },
+
+    // Under 120000: Máy Tính & Laptop
+    { categoryId: BigInt(120001), parentId: BigInt(120000), categoryName: "Laptop & Máy Tính Xách Tay", hasChildren: false },
+
+    // Under 130000: Thiết Bị Âm Thanh
+    { categoryId: BigInt(130001), parentId: BigInt(130000), categoryName: "Tai Nghe & Loa Bluetooth", hasChildren: false },
+
+    // Under 210000: Thời Trang Nam
+    { categoryId: BigInt(100002), parentId: BigInt(210000), categoryName: "Fashion & Apparel", hasChildren: false }, // PRESERVED TEST NODE
+    { categoryId: BigInt(210001), parentId: BigInt(210000), categoryName: "Áo Thun & Áo Polo Nam", hasChildren: false },
+    { categoryId: BigInt(210002), parentId: BigInt(210000), categoryName: "Quần Jeans & Quần Dài Nam", hasChildren: false },
+
+    // Under 220000: Thời Trang Nữ
+    { categoryId: BigInt(220001), parentId: BigInt(220000), categoryName: "Đầm & Chân Váy Nữ", hasChildren: false },
+
+    // Under 230000: Giày Dép & Sneakers
+    { categoryId: BigInt(230001), parentId: BigInt(230000), categoryName: "Giày Sneaker Thể Thao", hasChildren: false },
+
+    // Under 310000: Nội Thất Nhà Ở
+    { categoryId: BigInt(100003), parentId: BigInt(310000), categoryName: "Home & Living", hasChildren: false }, // PRESERVED TEST NODE
+    { categoryId: BigInt(310001), parentId: BigInt(310000), categoryName: "Bàn Ghế Làm Việc", hasChildren: false },
+
+    // Under 320000: Dụng Cụ Bếp & Bàn Ăn
+    { categoryId: BigInt(320001), parentId: BigInt(320000), categoryName: "Xoong Nồi & Chảo Chống Dính", hasChildren: false },
+
+    // Under 410000: Chăm Sóc Da Mặt
+    { categoryId: BigInt(410001), parentId: BigInt(410000), categoryName: "Serum & Tinh Chất Dưỡng Da", hasChildren: false },
+    { categoryId: BigInt(410002), parentId: BigInt(410000), categoryName: "Kem Chống Nắng", hasChildren: false },
+
+    // Under 420000: Trang Điểm & Son Môi
+    { categoryId: BigInt(420001), parentId: BigInt(420000), categoryName: "Son Môi & Son Dưỡng", hasChildren: false },
+
+    // Under 510000: Thiết Bị Nhà Bếp Điện
+    { categoryId: BigInt(510001), parentId: BigInt(510000), categoryName: "Nồi Chiên Không Dầu", hasChildren: false },
+    { categoryId: BigInt(510002), parentId: BigInt(510000), categoryName: "Ấm Siêu Tốc & Bình Đun", hasChildren: false },
+
+    // Under 520000: Thiết Bị Làm Sạch & Làm Mát
+    { categoryId: BigInt(520001), parentId: BigInt(520000), categoryName: "Máy Lọc Không Khí", hasChildren: false },
+
+    // Under 610000: Đồ Ăn Vặt & Hạt Dinh Dưỡng
+    { categoryId: BigInt(610001), parentId: BigInt(610000), categoryName: "Hạt Dinh Dưỡng & Ngũ Cốc", hasChildren: false },
+
+    // Under 620000: Đồ Uống & Trà Cà Phê
+    { categoryId: BigInt(620001), parentId: BigInt(620000), categoryName: "Cà Phê & Trà Thượng Hạng", hasChildren: false },
   ];
 
-  for (const c of categoriesData) {
-    const cat = await prisma.category.upsert({
-      where: { categoryId: BigInt(c.id) },
-      update: { categoryName: c.name },
-      create: {
-        categoryId: BigInt(c.id),
-        categoryName: c.name,
-        parentId: BigInt(0),
-        hasChildren: false
-      }
-    });
-
-    await prisma.categoryAttribute.upsert({
-      where: { attributeId: BigInt(c.attributeId) },
+  for (const c of treeCategoriesData) {
+    await prisma.category.upsert({
+      where: { categoryId: c.categoryId },
       update: {
-        categoryId: cat.categoryId,
-        name: "Brand",
-        isMandatory: true,
-        inputType: "DROP_DOWN",
-        valueListJson: c.brands
+        categoryName: c.categoryName,
+        parentId: c.parentId,
+        hasChildren: c.hasChildren,
       },
       create: {
-        attributeId: BigInt(c.attributeId),
-        categoryId: cat.categoryId,
-        name: "Brand",
-        isMandatory: true,
-        inputType: "DROP_DOWN",
-        valueListJson: c.brands
-      }
+        categoryId: c.categoryId,
+        categoryName: c.categoryName,
+        parentId: c.parentId,
+        hasChildren: c.hasChildren,
+      },
     });
   }
-  console.log(`✓ Ensured Categories & Attributes`);
+
+  // --------------------------------------------------------------------------
+  // Category Attributes (Mandatory & Key Attributes)
+  // --------------------------------------------------------------------------
+  const categoryAttributesData = [
+    // 100001: Electronics (Preserved for tests - Brand attribute 50001 must have exactly 3 options)
+    {
+      attributeId: BigInt(50001),
+      categoryId: BigInt(100001),
+      name: "Brand",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Apple" },
+        { value_id: 2, original_value_name: "Samsung" },
+        { value_id: 3, original_value_name: "Xiaomi" },
+      ],
+    },
+    {
+      attributeId: BigInt(50004),
+      categoryId: BigInt(100001),
+      name: "Hạn bảo hành",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "12 tháng" },
+        { value_id: 2, original_value_name: "24 tháng" },
+        { value_id: 3, original_value_name: "36 tháng" },
+      ],
+    },
+    {
+      attributeId: BigInt(50005),
+      categoryId: BigInt(100001),
+      name: "Dung lượng lưu trữ",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "128GB" },
+        { value_id: 2, original_value_name: "256GB" },
+        { value_id: 3, original_value_name: "512GB" },
+        { value_id: 4, original_value_name: "1TB" },
+      ],
+    },
+
+    // 110002: Điện Thoại Di Động
+    {
+      attributeId: BigInt(110021),
+      categoryId: BigInt(110002),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Apple" },
+        { value_id: 2, original_value_name: "Samsung" },
+        { value_id: 3, original_value_name: "Xiaomi" },
+        { value_id: 4, original_value_name: "OPPO" },
+        { value_id: 5, original_value_name: "vivo" },
+        { value_id: 6, original_value_name: "Realme" },
+        { value_id: 7, original_value_name: "No Brand" },
+      ],
+    },
+    {
+      attributeId: BigInt(110022),
+      categoryId: BigInt(110002),
+      name: "Hạn bảo hành",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "12 tháng" },
+        { value_id: 2, original_value_name: "18 tháng" },
+        { value_id: 3, original_value_name: "24 tháng" },
+      ],
+    },
+    {
+      attributeId: BigInt(110023),
+      categoryId: BigInt(110002),
+      name: "Dung lượng lưu trữ",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "64GB" },
+        { value_id: 2, original_value_name: "128GB" },
+        { value_id: 3, original_value_name: "256GB" },
+        { value_id: 4, original_value_name: "512GB" },
+        { value_id: 5, original_value_name: "1TB" },
+      ],
+    },
+    {
+      attributeId: BigInt(110024),
+      categoryId: BigInt(110002),
+      name: "Bộ nhớ RAM",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "4GB" },
+        { value_id: 2, original_value_name: "6GB" },
+        { value_id: 3, original_value_name: "8GB" },
+        { value_id: 4, original_value_name: "12GB" },
+        { value_id: 5, original_value_name: "16GB" },
+      ],
+    },
+    {
+      attributeId: BigInt(110025),
+      categoryId: BigInt(110002),
+      name: "Kích thước màn hình",
+      isMandatory: false,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "6.1 inch" },
+        { value_id: 2, original_value_name: "6.5 inch" },
+        { value_id: 3, original_value_name: "6.7 inch" },
+        { value_id: 4, original_value_name: "6.8 inch" },
+      ],
+    },
+
+    // 110003: Phụ Kiện Điện Thoại
+    {
+      attributeId: BigInt(110031),
+      categoryId: BigInt(110003),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Anker" },
+        { value_id: 2, original_value_name: "Baseus" },
+        { value_id: 3, original_value_name: "Ugreen" },
+        { value_id: 4, original_value_name: "Apple" },
+        { value_id: 5, original_value_name: "Samsung" },
+        { value_id: 6, original_value_name: "No Brand" },
+      ],
+    },
+    {
+      attributeId: BigInt(110032),
+      categoryId: BigInt(110003),
+      name: "Loại phụ kiện",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Cáp sạc & Củ sạc nhanh" },
+        { value_id: 2, original_value_name: "Ốp lưng & Bao da" },
+        { value_id: 3, original_value_name: "Kính cường lực bảo vệ màn hình" },
+        { value_id: 4, original_value_name: "Pin sạc dự phòng" },
+        { value_id: 5, original_value_name: "Giá đỡ điện thoại" },
+      ],
+    },
+    {
+      attributeId: BigInt(110033),
+      categoryId: BigInt(110003),
+      name: "Hạn bảo hành",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "3 tháng" },
+        { value_id: 2, original_value_name: "6 tháng" },
+        { value_id: 3, original_value_name: "12 tháng" },
+        { value_id: 4, original_value_name: "18 tháng" },
+      ],
+    },
+
+    // 120001: Laptop & Máy Tính Xách Tay
+    {
+      attributeId: BigInt(120011),
+      categoryId: BigInt(120001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Apple" },
+        { value_id: 2, original_value_name: "ASUS" },
+        { value_id: 3, original_value_name: "Dell" },
+        { value_id: 4, original_value_name: "Lenovo" },
+        { value_id: 5, original_value_name: "HP" },
+        { value_id: 6, original_value_name: "Acer" },
+        { value_id: 7, original_value_name: "MSI" },
+      ],
+    },
+    {
+      attributeId: BigInt(120012),
+      categoryId: BigInt(120001),
+      name: "Hạn bảo hành",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "12 tháng" },
+        { value_id: 2, original_value_name: "24 tháng" },
+        { value_id: 3, original_value_name: "36 tháng" },
+      ],
+    },
+    {
+      attributeId: BigInt(120013),
+      categoryId: BigInt(120001),
+      name: "Vi xử lý CPU",
+      isMandatory: false,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Apple M-Series" },
+        { value_id: 2, original_value_name: "Intel Core i5" },
+        { value_id: 3, original_value_name: "Intel Core i7" },
+        { value_id: 4, original_value_name: "Intel Core i9" },
+        { value_id: 5, original_value_name: "AMD Ryzen 5" },
+        { value_id: 6, original_value_name: "AMD Ryzen 7" },
+      ],
+    },
+    {
+      attributeId: BigInt(120014),
+      categoryId: BigInt(120001),
+      name: "Dung lượng RAM",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "8GB" },
+        { value_id: 2, original_value_name: "16GB" },
+        { value_id: 3, original_value_name: "32GB" },
+        { value_id: 4, original_value_name: "64GB" },
+      ],
+    },
+    {
+      attributeId: BigInt(120015),
+      categoryId: BigInt(120001),
+      name: "Ổ cứng lưu trữ",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "256GB SSD" },
+        { value_id: 2, original_value_name: "512GB SSD" },
+        { value_id: 3, original_value_name: "1TB SSD" },
+        { value_id: 4, original_value_name: "2TB SSD" },
+      ],
+    },
+
+    // 130001: Tai Nghe & Loa Bluetooth
+    {
+      attributeId: BigInt(130011),
+      categoryId: BigInt(130001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Sony" },
+        { value_id: 2, original_value_name: "JBL" },
+        { value_id: 3, original_value_name: "Marshall" },
+        { value_id: 4, original_value_name: "Apple" },
+        { value_id: 5, original_value_name: "Soundpeats" },
+        { value_id: 6, original_value_name: "Bose" },
+      ],
+    },
+    {
+      attributeId: BigInt(130012),
+      categoryId: BigInt(130001),
+      name: "Loại kết nối",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Bluetooth 5.3" },
+        { value_id: 2, original_value_name: "Wireless 2.4GHz" },
+        { value_id: 3, original_value_name: "Jack 3.5mm" },
+        { value_id: 4, original_value_name: "Type-C" },
+      ],
+    },
+    {
+      attributeId: BigInt(130013),
+      categoryId: BigInt(130001),
+      name: "Hạn bảo hành",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "6 tháng" },
+        { value_id: 2, original_value_name: "12 tháng" },
+        { value_id: 3, original_value_name: "24 tháng" },
+      ],
+    },
+    {
+      attributeId: BigInt(130014),
+      categoryId: BigInt(130001),
+      name: "Tính năng âm thanh",
+      isMandatory: false,
+      inputType: "MULTI_SELECT",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Chống ồn chủ động (ANC)" },
+        { value_id: 2, original_value_name: "Xuyên âm (Ambient Sound)" },
+        { value_id: 3, original_value_name: "Kháng nước IPX5/IPX7" },
+        { value_id: 4, original_value_name: "Mic đàm thoại lọc ồn AI" },
+      ],
+    },
+
+    // 100002: Fashion & Apparel (Preserved for tests)
+    {
+      attributeId: BigInt(50002),
+      categoryId: BigInt(100002),
+      name: "Brand",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "SmartOmni Apparel" },
+        { value_id: 2, original_value_name: "Hanoi Streetwear" },
+        { value_id: 3, original_value_name: "Casual Standard" },
+      ],
+    },
+    {
+      attributeId: BigInt(50006),
+      categoryId: BigInt(100002),
+      name: "Chất liệu",
+      isMandatory: false,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Cotton" },
+        { value_id: 2, original_value_name: "Polyester" },
+        { value_id: 3, original_value_name: "Denim" },
+        { value_id: 4, original_value_name: "Linen" },
+        { value_id: 5, original_value_name: "Spandex" },
+      ],
+    },
+    {
+      attributeId: BigInt(50007),
+      categoryId: BigInt(100002),
+      name: "Xuất xứ",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Việt Nam" },
+        { value_id: 2, original_value_name: "Hàn Quốc" },
+        { value_id: 3, original_value_name: "Nhật Bản" },
+        { value_id: 4, original_value_name: "Trung Quốc" },
+      ],
+    },
+
+    // 210001: Áo Thun & Áo Polo Nam
+    {
+      attributeId: BigInt(210011),
+      categoryId: BigInt(210001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Coolmate" },
+        { value_id: 2, original_value_name: "Routine" },
+        { value_id: 3, original_value_name: "Biluxury" },
+        { value_id: 4, original_value_name: "SSStutter" },
+        { value_id: 5, original_value_name: "No Brand" },
+      ],
+    },
+    {
+      attributeId: BigInt(210012),
+      categoryId: BigInt(210001),
+      name: "Chất liệu",
+      isMandatory: true,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "100% Cotton 2 chiều" },
+        { value_id: 2, original_value_name: "Cotton Compact chải kỹ" },
+        { value_id: 3, original_value_name: "Vải cá sấu CVC cao cấp" },
+        { value_id: 4, original_value_name: "Vải thể thao Spandex" },
+      ],
+    },
+    {
+      attributeId: BigInt(210013),
+      categoryId: BigInt(210001),
+      name: "Xuất xứ",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Việt Nam" },
+        { value_id: 2, original_value_name: "Quảng Châu" },
+        { value_id: 3, original_value_name: "Hàn Quốc" },
+      ],
+    },
+    {
+      attributeId: BigInt(210014),
+      categoryId: BigInt(210001),
+      name: "Kiểu dáng",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Form rộng Oversized" },
+        { value_id: 2, original_value_name: "Tiêu chuẩn Regular Fit" },
+        { value_id: 3, original_value_name: "Ôm vừa Slim Fit" },
+      ],
+    },
+
+    // 210002: Quần Jeans & Quần Dài Nam
+    {
+      attributeId: BigInt(210021),
+      categoryId: BigInt(210002),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Levis" },
+        { value_id: 2, original_value_name: "GenViet" },
+        { value_id: 3, original_value_name: "Torano" },
+        { value_id: 4, original_value_name: "Viet Tien" },
+        { value_id: 5, original_value_name: "No Brand" },
+      ],
+    },
+    {
+      attributeId: BigInt(210022),
+      categoryId: BigInt(210002),
+      name: "Chất liệu",
+      isMandatory: true,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Vải Denim bò co giãn" },
+        { value_id: 2, original_value_name: "Vải Kaki cotton dày dặn" },
+        { value_id: 3, original_value_name: "Vải tây tuyết mưa chống nhăn" },
+      ],
+    },
+    {
+      attributeId: BigInt(210023),
+      categoryId: BigInt(210002),
+      name: "Xuất xứ",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Việt Nam" },
+        { value_id: 2, original_value_name: "Hàn Quốc" },
+        { value_id: 3, original_value_name: "Trung Quốc" },
+      ],
+    },
+
+    // 220001: Đầm & Chân Váy Nữ
+    {
+      attributeId: BigInt(220011),
+      categoryId: BigInt(220001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "IVY moda" },
+        { value_id: 2, original_value_name: "Elise" },
+        { value_id: 3, original_value_name: "NEM" },
+        { value_id: 4, original_value_name: "Chic-Land" },
+        { value_id: 5, original_value_name: "No Brand" },
+      ],
+    },
+    {
+      attributeId: BigInt(220012),
+      categoryId: BigInt(220001),
+      name: "Chất liệu",
+      isMandatory: true,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Lụa tơ tằm" },
+        { value_id: 2, original_value_name: "Voan tơ cao cấp" },
+        { value_id: 3, original_value_name: "Linen tưng tự nhiên" },
+        { value_id: 4, original_value_name: "Ren cotton thêu" },
+      ],
+    },
+    {
+      attributeId: BigInt(220013),
+      categoryId: BigInt(220001),
+      name: "Xuất xứ",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Việt Nam" },
+        { value_id: 2, original_value_name: "Hàn Quốc" },
+        { value_id: 3, original_value_name: "Pháp" },
+      ],
+    },
+    {
+      attributeId: BigInt(220014),
+      categoryId: BigInt(220001),
+      name: "Dáng đầm",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Dáng chữ A thanh lịch" },
+        { value_id: 2, original_value_name: "Đầm suông giấu dáng" },
+        { value_id: 3, original_value_name: "Đầm ôm body quyến rũ" },
+        { value_id: 4, original_value_name: "Đầm xòe công chúa" },
+      ],
+    },
+
+    // 230001: Giày Sneaker Thể Thao
+    {
+      attributeId: BigInt(230011),
+      categoryId: BigInt(230001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Nike" },
+        { value_id: 2, original_value_name: "Adidas" },
+        { value_id: 3, original_value_name: "New Balance" },
+        { value_id: 4, original_value_name: "Biti's Hunter" },
+        { value_id: 5, original_value_name: "Converse" },
+        { value_id: 6, original_value_name: "Vans" },
+      ],
+    },
+    {
+      attributeId: BigInt(230012),
+      categoryId: BigInt(230001),
+      name: "Xuất xứ",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Việt Nam" },
+        { value_id: 2, original_value_name: "Indonesia" },
+        { value_id: 3, original_value_name: "Trung Quốc" },
+      ],
+    },
+    {
+      attributeId: BigInt(230013),
+      categoryId: BigInt(230001),
+      name: "Chất liệu thân trên",
+      isMandatory: false,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Da bò thật" },
+        { value_id: 2, original_value_name: "Da tổng hợp PU cao cấp" },
+        { value_id: 3, original_value_name: "Vải lưới dệt Flyknit/Mesh" },
+        { value_id: 4, original_value_name: "Vải Canvas" },
+      ],
+    },
+    {
+      attributeId: BigInt(230014),
+      categoryId: BigInt(230001),
+      name: "Chất liệu đế giày",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Cao su đúc nguyên khối chống trượt" },
+        { value_id: 2, original_value_name: "Đệm khí Air êm ái" },
+        { value_id: 3, original_value_name: "Đệm bọt EVA đàn hồi cao" },
+      ],
+    },
+
+    // 100003: Home & Living (Preserved for tests)
+    {
+      attributeId: BigInt(50003),
+      categoryId: BigInt(100003),
+      name: "Brand",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Saigon Living" },
+        { value_id: 2, original_value_name: "Nordic Minimalist" },
+        { value_id: 3, original_value_name: "Eco Home" },
+      ],
+    },
+    {
+      attributeId: BigInt(50008),
+      categoryId: BigInt(100003),
+      name: "Chất liệu",
+      isMandatory: false,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Gỗ MDF" },
+        { value_id: 2, original_value_name: "Gỗ sồi tự nhiên" },
+        { value_id: 3, original_value_name: "Thép sơn tĩnh điện" },
+      ],
+    },
+
+    // 310001: Bàn Ghế Làm Việc
+    {
+      attributeId: BigInt(310011),
+      categoryId: BigInt(310001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Hòa Phát" },
+        { value_id: 2, original_value_name: "IBIE" },
+        { value_id: 3, original_value_name: "D'Ergo" },
+        { value_id: 4, original_value_name: "Sihoo" },
+        { value_id: 5, original_value_name: "OEM Nội Thất" },
+      ],
+    },
+    {
+      attributeId: BigInt(310012),
+      categoryId: BigInt(310001),
+      name: "Chất liệu",
+      isMandatory: true,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Gỗ công nghiệp MDF phủ Melamine chống nước" },
+        { value_id: 2, original_value_name: "Gỗ cao su tự nhiên ghép thanh" },
+        { value_id: 3, original_value_name: "Khung thép carbon sơn tĩnh điện" },
+      ],
+    },
+    {
+      attributeId: BigInt(310013),
+      categoryId: BigInt(310001),
+      name: "Yêu cầu lắp ráp",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Có (kèm đầy đủ ốc vít và hướng dẫn lắp ráp)" },
+        { value_id: 2, original_value_name: "Không (sản phẩm nguyên khối hoàn thiện)" },
+      ],
+    },
+    {
+      attributeId: BigInt(310014),
+      categoryId: BigInt(310001),
+      name: "Hạn bảo hành",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "6 tháng" },
+        { value_id: 2, original_value_name: "12 tháng" },
+        { value_id: 3, original_value_name: "24 tháng" },
+        { value_id: 4, original_value_name: "36 tháng" },
+      ],
+    },
+
+    // 320001: Xoong Nồi & Chảo Chống Dính
+    {
+      attributeId: BigInt(320011),
+      categoryId: BigInt(320001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Tefal" },
+        { value_id: 2, original_value_name: "Elmich" },
+        { value_id: 3, original_value_name: "Fivestar" },
+        { value_id: 4, original_value_name: "Sunhouse" },
+        { value_id: 5, original_value_name: "Lock&Lock" },
+      ],
+    },
+    {
+      attributeId: BigInt(320012),
+      categoryId: BigInt(320001),
+      name: "Chất liệu",
+      isMandatory: true,
+      inputType: "COMBO_BOX",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Inox 304 cao cấp 3 đáy" },
+        { value_id: 2, original_value_name: "Hợp kim nhôm đúc nguyên khối" },
+        { value_id: 3, original_value_name: "Gang tráng men sứ" },
+      ],
+    },
+    {
+      attributeId: BigInt(320013),
+      categoryId: BigInt(320001),
+      name: "Loại bếp sử dụng",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Dùng được cho mọi loại bếp kể cả bếp từ" },
+        { value_id: 2, original_value_name: "Bếp ga và bếp hồng ngoại" },
+      ],
+    },
+    {
+      attributeId: BigInt(320014),
+      categoryId: BigInt(320001),
+      name: "Đường kính chảo/nồi",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "18cm" },
+        { value_id: 2, original_value_name: "20cm" },
+        { value_id: 3, original_value_name: "24cm" },
+        { value_id: 4, original_value_name: "26cm" },
+        { value_id: 5, original_value_name: "28cm" },
+      ],
+    },
+
+    // 410001: Serum & Tinh Chất Dưỡng Da
+    {
+      attributeId: BigInt(410011),
+      categoryId: BigInt(410001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "La Roche-Posay" },
+        { value_id: 2, original_value_name: "Paula's Choice" },
+        { value_id: 3, original_value_name: "The Ordinary" },
+        { value_id: 4, original_value_name: "Kiehl's" },
+        { value_id: 5, original_value_name: "Klairs" },
+        { value_id: 6, original_value_name: "CeraVe" },
+        { value_id: 7, original_value_name: "Skin1004" },
+      ],
+    },
+    {
+      attributeId: BigInt(410012),
+      categoryId: BigInt(410001),
+      name: "Hạn sử dụng",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "24 tháng kể từ NSX" },
+        { value_id: 2, original_value_name: "36 tháng kể từ NSX" },
+      ],
+    },
+    {
+      attributeId: BigInt(410013),
+      categoryId: BigInt(410001),
+      name: "Loại da phù hợp",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Mọi loại da" },
+        { value_id: 2, original_value_name: "Da dầu mụn" },
+        { value_id: 3, original_value_name: "Da khô thiếu nước" },
+        { value_id: 4, original_value_name: "Da nhạy cảm kích ứng" },
+      ],
+    },
+    {
+      attributeId: BigInt(410014),
+      categoryId: BigInt(410001),
+      name: "Dung tích",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "15ml" },
+        { value_id: 2, original_value_name: "30ml" },
+        { value_id: 3, original_value_name: "50ml" },
+        { value_id: 4, original_value_name: "100ml" },
+      ],
+    },
+    {
+      attributeId: BigInt(410015),
+      categoryId: BigInt(410001),
+      name: "Xuất xứ",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Pháp" },
+        { value_id: 2, original_value_name: "Mỹ" },
+        { value_id: 3, original_value_name: "Hàn Quốc" },
+        { value_id: 4, original_value_name: "Nhật Bản" },
+        { value_id: 5, original_value_name: "Canada" },
+        { value_id: 6, original_value_name: "Việt Nam" },
+      ],
+    },
+
+    // 410002: Kem Chống Nắng
+    {
+      attributeId: BigInt(410021),
+      categoryId: BigInt(410002),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Anessa" },
+        { value_id: 2, original_value_name: "La Roche-Posay" },
+        { value_id: 3, original_value_name: "Skin1004" },
+        { value_id: 4, original_value_name: "Cell Fusion C" },
+        { value_id: 5, original_value_name: "Sunplay Skin Aqua" },
+      ],
+    },
+    {
+      attributeId: BigInt(410022),
+      categoryId: BigInt(410002),
+      name: "Chỉ số chống nắng",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "SPF 50+ PA++++" },
+        { value_id: 2, original_value_name: "SPF 50+ PA+++" },
+        { value_id: 3, original_value_name: "SPF 30+ PA+++" },
+      ],
+    },
+    {
+      attributeId: BigInt(410023),
+      categoryId: BigInt(410002),
+      name: "Hạn sử dụng",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "24 tháng kể từ NSX" },
+        { value_id: 2, original_value_name: "36 tháng kể từ NSX" },
+      ],
+    },
+
+    // 420001: Son Môi & Son Dưỡng
+    {
+      attributeId: BigInt(420011),
+      categoryId: BigInt(420001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "3CE" },
+        { value_id: 2, original_value_name: "MAC" },
+        { value_id: 3, original_value_name: "Romand" },
+        { value_id: 4, original_value_name: "Black Rouge" },
+        { value_id: 5, original_value_name: "Dior" },
+        { value_id: 6, original_value_name: "YSL" },
+        { value_id: 7, original_value_name: "DHC" },
+      ],
+    },
+    {
+      attributeId: BigInt(420012),
+      categoryId: BigInt(420001),
+      name: "Hạn sử dụng",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "24 tháng kể từ NSX" },
+        { value_id: 2, original_value_name: "36 tháng kể từ NSX" },
+      ],
+    },
+    {
+      attributeId: BigInt(420013),
+      categoryId: BigInt(420001),
+      name: "Chất son",
+      isMandatory: false,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Son kem lì Velvet/Tint" },
+        { value_id: 2, original_value_name: "Son thỏi lì Matte" },
+        { value_id: 3, original_value_name: "Son bóng dưỡng ẩm Juicy Tint" },
+        { value_id: 4, original_value_name: "Son sáp dưỡng có màu" },
+      ],
+    },
+
+    // 510001: Nồi Chiên Không Dầu
+    {
+      attributeId: BigInt(510011),
+      categoryId: BigInt(510001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Philips" },
+        { value_id: 2, original_value_name: "Tefal" },
+        { value_id: 3, original_value_name: "Lock&Lock" },
+        { value_id: 4, original_value_name: "Kalite" },
+        { value_id: 5, original_value_name: "Xiaomi" },
+        { value_id: 6, original_value_name: "Mishio" },
+      ],
+    },
+    {
+      attributeId: BigInt(510012),
+      categoryId: BigInt(510001),
+      name: "Công suất",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "1400W" },
+        { value_id: 2, original_value_name: "1500W" },
+        { value_id: 3, original_value_name: "1800W" },
+        { value_id: 4, original_value_name: "2000W" },
+        { value_id: 5, original_value_name: "2200W" },
+      ],
+    },
+    {
+      attributeId: BigInt(510013),
+      categoryId: BigInt(510001),
+      name: "Dung tích",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "3.5L" },
+        { value_id: 2, original_value_name: "4.5L" },
+        { value_id: 3, original_value_name: "5.5L" },
+        { value_id: 4, original_value_name: "6.5L" },
+        { value_id: 5, original_value_name: "10L" },
+        { value_id: 6, original_value_name: "12L" },
+      ],
+    },
+    {
+      attributeId: BigInt(510014),
+      categoryId: BigInt(510001),
+      name: "Hạn bảo hành",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "12 tháng" },
+        { value_id: 2, original_value_name: "24 tháng" },
+      ],
+    },
+
+    // 510002: Ấm Siêu Tốc & Bình Đun
+    {
+      attributeId: BigInt(510021),
+      categoryId: BigInt(510002),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Philips" },
+        { value_id: 2, original_value_name: "Sunhouse" },
+        { value_id: 3, original_value_name: "Bear" },
+        { value_id: 4, original_value_name: "Delites" },
+        { value_id: 5, original_value_name: "Tefal" },
+      ],
+    },
+    {
+      attributeId: BigInt(510022),
+      categoryId: BigInt(510002),
+      name: "Dung tích",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "1.5L" },
+        { value_id: 2, original_value_name: "1.7L" },
+        { value_id: 3, original_value_name: "1.8L" },
+        { value_id: 4, original_value_name: "2.0L" },
+      ],
+    },
+    {
+      attributeId: BigInt(510023),
+      categoryId: BigInt(510002),
+      name: "Hạn bảo hành",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "12 tháng" },
+        { value_id: 2, original_value_name: "24 tháng" },
+      ],
+    },
+
+    // 520001: Máy Lọc Không Khí
+    {
+      attributeId: BigInt(520011),
+      categoryId: BigInt(520001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Xiaomi" },
+        { value_id: 2, original_value_name: "Sharp" },
+        { value_id: 3, original_value_name: "Coway" },
+        { value_id: 4, original_value_name: "Levoit" },
+        { value_id: 5, original_value_name: "Panasonic" },
+      ],
+    },
+    {
+      attributeId: BigInt(520012),
+      categoryId: BigInt(520001),
+      name: "Diện tích sử dụng",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "15 - 25m²" },
+        { value_id: 2, original_value_name: "25 - 40m²" },
+        { value_id: 3, original_value_name: "40 - 60m²" },
+        { value_id: 4, original_value_name: "> 60m²" },
+      ],
+    },
+    {
+      attributeId: BigInt(520013),
+      categoryId: BigInt(520001),
+      name: "Hạn bảo hành",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "12 tháng" },
+        { value_id: 2, original_value_name: "24 tháng" },
+      ],
+    },
+
+    // 610001: Hạt Dinh Dưỡng & Ngũ Cốc
+    {
+      attributeId: BigInt(610011),
+      categoryId: BigInt(610001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Granola Farm" },
+        { value_id: 2, original_value_name: "Macca Đắk Lắk" },
+        { value_id: 3, original_value_name: "Hạt Điều Bình Phước" },
+        { value_id: 4, original_value_name: "No Brand" },
+      ],
+    },
+    {
+      attributeId: BigInt(610012),
+      categoryId: BigInt(610001),
+      name: "Hạn sử dụng",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "6 tháng" },
+        { value_id: 2, original_value_name: "9 tháng" },
+        { value_id: 3, original_value_name: "12 tháng" },
+      ],
+    },
+    {
+      attributeId: BigInt(610013),
+      categoryId: BigInt(610001),
+      name: "Trọng lượng tịnh",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "250g" },
+        { value_id: 2, original_value_name: "500g" },
+        { value_id: 3, original_value_name: "1kg" },
+      ],
+    },
+    {
+      attributeId: BigInt(610014),
+      categoryId: BigInt(610001),
+      name: "Xuất xứ",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Việt Nam" },
+        { value_id: 2, original_value_name: "Mỹ" },
+        { value_id: 3, original_value_name: "Úc" },
+      ],
+    },
+
+    // 620001: Cà Phê & Trà Thượng Hạng
+    {
+      attributeId: BigInt(620011),
+      categoryId: BigInt(620001),
+      name: "Thương hiệu",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Trung Nguyên Legend" },
+        { value_id: 2, original_value_name: "Highlands Coffee" },
+        { value_id: 3, original_value_name: "Đồi Trà Cầu Đất" },
+        { value_id: 4, original_value_name: "Phúc Long" },
+        { value_id: 5, original_value_name: "No Brand" },
+      ],
+    },
+    {
+      attributeId: BigInt(620012),
+      categoryId: BigInt(620001),
+      name: "Hạn sử dụng",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "12 tháng" },
+        { value_id: 2, original_value_name: "18 tháng" },
+        { value_id: 3, original_value_name: "24 tháng" },
+      ],
+    },
+    {
+      attributeId: BigInt(620013),
+      categoryId: BigInt(620001),
+      name: "Trọng lượng",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "250g" },
+        { value_id: 2, original_value_name: "340g" },
+        { value_id: 3, original_value_name: "500g" },
+        { value_id: 4, original_value_name: "1kg" },
+      ],
+    },
+    {
+      attributeId: BigInt(620014),
+      categoryId: BigInt(620001),
+      name: "Xuất xứ",
+      isMandatory: true,
+      inputType: "DROP_DOWN",
+      valueListJson: [
+        { value_id: 1, original_value_name: "Buôn Ma Thuột - Đắk Lắk" },
+        { value_id: 2, original_value_name: "Cầu Đất - Lâm Đồng" },
+        { value_id: 3, original_value_name: "Thái Nguyên" },
+        { value_id: 4, original_value_name: "Bảo Lộc - Lâm Đồng" },
+      ],
+    },
+  ];
+
+  for (const attr of categoryAttributesData) {
+    await prisma.categoryAttribute.upsert({
+      where: { attributeId: attr.attributeId },
+      update: {
+        categoryId: attr.categoryId,
+        name: attr.name,
+        isMandatory: attr.isMandatory,
+        inputType: attr.inputType,
+        valueListJson: attr.valueListJson,
+      },
+      create: {
+        attributeId: attr.attributeId,
+        categoryId: attr.categoryId,
+        name: attr.name,
+        isMandatory: attr.isMandatory,
+        inputType: attr.inputType,
+        valueListJson: attr.valueListJson,
+      },
+    });
+  }
+  console.log(`✓ Ensured Shopee 3-Level Category Tree & Rich Attributes (${treeCategoriesData.length} categories, ${categoryAttributesData.length} attributes)`);
 
   // 5. Seed Diverse Product Catalog
   const productsToSeed = [

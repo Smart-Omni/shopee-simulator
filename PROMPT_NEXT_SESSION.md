@@ -11,10 +11,10 @@ We are continuing development on the **Shopee Open API v2 Simulator** (`shopee-s
 
 ### 1. Context & Technical Baseline
 - **Backend Simulator (`shopee-simulator/`):**
-  - **Current Version:** v1.11.0 (Phases 1 through 14 complete, Cloud Media Storage via Google Drive/Local, Automated CI/CD, Tri-Persona vi-VN Testbed on port 8080, Dynamic Logistics Carrier Calculation Engine, Multi-Shop Storefront & Fulfillment APIs).
+  - **Current Version:** v1.12.0 (Phases 1 through 14 complete, Cloud Media Storage via Google Drive/Local, Automated CI/CD, Tri-Persona vi-VN Testbed on port 8080, Dynamic Logistics Carrier Calculation Engine, Multi-Shop Storefront & Fulfillment APIs, Shopee 3-Level Category Tree Hierarchy with 39 Categories and 77 Mandatory/Key Attributes).
   - **Docker Containers:** `shopee-mock-server` on port 8080, `shopee-mock-postgres` on port 5432 (PostgreSQL 16).
   - **Test Baseline:** 540 / 540 passing assertions (100% pass rate). Run `cd shopee-simulator && npm test` to verify backend health.
-  - **Git Branch:** `feature/media-upload-support` (or `develop`).
+  - **Git Branch:** `feature/category-tree-and-attributes`.
 - **Frontend Client (`shopiz/`):**
   - **Framework:** React 19, Vite 6, React Router 7, CSS Modules, Lucide React, Axios.
   - **Git Branch:** `backend-integration` (commit in small chunks per project conventions).
