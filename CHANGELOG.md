@@ -7,6 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
+- Implemented Phase 18: **Seller Voucher Management and Layer B Simulator APIs** (`/api/v2/simulator/voucher/*`) supporting all 7 official Shopee voucher usecases:
+  - `GET /api/v2/simulator/voucher/config`: returns shop-specific voucher prefix and metadata for supported usecases.
+  - `GET /api/v2/simulator/voucher/list` & `/vouchers`: returns paginated vouchers, keyword search by name or code, status filter (`all`, `ongoing`, `upcoming`, `expired`), and live aggregate status counts.
+  - `GET /api/v2/simulator/voucher/detail`: provides complete voucher breakdown, applicable product models and prices, and order redemption counts.
+  - `POST /api/v2/simulator/voucher/create`: creates shop-wide, product-specific, private, Shopee Live, Shopee Video, New Customer, and Returning Customer vouchers with full validation (code prefix, time periods, minimum spend rules, Shopee Coins rejection via `voucher.voucher_coin_error`).
+  - `POST /api/v2/simulator/voucher/update`: updates editable voucher fields and linked item relations.
+  - `POST /api/v2/simulator/voucher/end`: ends ongoing vouchers early.
+  - `POST /api/v2/simulator/voucher/delete`: soft-deletes upcoming vouchers.
+  - `GET /api/v2/simulator/voucher/orders`: returns orders that redeemed the specific voucher.
+- Added database schema fields: `Shop.voucherPrefix` (4-char shop prefix: `SMAR`, `HANO`, `SAIG`), `Order.sellerVoucherCode`, `Voucher.targetVoucher` (1: new buyer, 2: repeat buyer 1 order, 3: repeat buyer 2 orders).
+- Added Phase 18 automated test suite (`test/phase18_vouchers.spec.ts`, 18 assertions, 100% pass) and wired to `npm test`.
+- Implemented Shopiz Seller Center **Mã Giảm Giá Của Shop** (`?tab=marketing_vouchers` / `?tab=vouchers`):
+  - State A (Landing page): 3 grouped voucher card sections (`Cải thiện tỷ lệ chuyển đổi`, `Kênh hiển thị Voucher`, `Khách hàng mục tiêu`), with expandable/collapsible toggle (`Thu gọn` / `Mở rộng`).
+  - State B (List view): Primary tabs (`Danh sách mã giảm giá` & `Voucher Package`), status sub-tabs with live counters, search by voucher name or code, comprehensive table with badges, formatted discounts, usage metrics with info tooltips, and row action links (`Chi tiết`, `Đơn hàng`, `Sao chép`, `Kết thúc`, `Xóa`).
+  - State C (Workflow form): 3 structured cards (`Thông tin cơ bản`, `Thiết lập mã giảm giá`, `Hiển thị mã giảm giá và các sản phẩm áp dụng`), Shopee Coins visibly disabled with tooltip, interactive Smart Voucher switch, item selection modal (`ProductSelectModal`) for product vouchers, and sticky bottom action bar.
+  - Modals: `VoucherDetailModal` for breakdown and `VoucherOrdersModal` for associated order history.
+- Added Playwright integration test suite `scripts/verify-vouchers-page.mjs` (`npm run check:seller-vouchers`, 100% pass).
 - Added shop-scoped Layer B review summary and paginated review filtering by response status, star rating, date, product, order, and buyer. The summary reports current and previous 30-day review counts/rates, unanswered low-star reviews, and reviews since the caller's last visit.
 - Added `Order.completedAt`, backfilled it from escrow release/update timestamps, and populate it for new completions so review-rate cohorts use a stable completion date.
 - Added Phase 17 review-management API coverage (15 assertions) and Swagger documentation; the Layer B reply helper now requires and verifies `shop_id`.
