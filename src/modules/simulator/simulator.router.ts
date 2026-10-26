@@ -2247,9 +2247,9 @@ function calculateUsecase(voucher: {
   voucherPurpose: number;
   targetVoucher?: number | null;
 }): number {
+  if (voucher.voucherPurpose === 3) return 9; // follow prize voucher
   if (voucher.voucherPurpose === 1 || voucher.targetVoucher === 1) return 3; // new buyer voucher
   if (voucher.voucherPurpose === 6 || (voucher.targetVoucher && voucher.targetVoucher >= 2)) return 4; // repeat buyer voucher
-  if (voucher.voucherPurpose === 3) return 9; // follow prize voucher
   const channels = Array.isArray(voucher.displayChannelList) ? voucher.displayChannelList : [];
   if (channels.length === 0) return 5; // private voucher
   if (channels.includes(4)) return 6; // live voucher
@@ -2267,7 +2267,7 @@ function resolveVoucherUsecaseName(usecase: number): string {
     case 5: return "Voucher riêng tư";
     case 6: return "Voucher Shopee Live";
     case 7: return "Voucher Shopee Video";
-    case 9: return "Ưu đãi Follower";
+    case 9: return "Voucher Ưu Đãi Follower";
     default: return "Mã giảm giá toàn Shop";
   }
 }
@@ -2649,6 +2649,10 @@ simulatorRouter.post("/api/v2/simulator/voucher/create", async (req: Request, re
     } else if (usecaseNum === 4) { // Repeat buyer
       finalPurpose = 6;
       finalTargetVoucher = finalTargetVoucher >= 2 ? finalTargetVoucher : 2;
+    } else if (usecaseNum === 9) { // Follow prize
+      finalPurpose = 3;
+      finalTargetVoucher = 0;
+      finalChannels = [1];
     }
 
     let displayStartDateTime: Date | null = null;

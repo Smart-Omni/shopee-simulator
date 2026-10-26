@@ -229,6 +229,23 @@ async function run() {
     });
     assert(repeatBuyerRes.error === "", "Create Repeat Buyer voucher succeeds");
 
+    const followerVoucherRes = await request("/api/v2/simulator/voucher/create", {
+      method: "POST",
+      body: {
+        shop_id: shopId,
+        voucher_name: `Follower Prize ${uniqueSuffix}`,
+        usecase: 9,
+        reward_type: 1,
+        discount_amount: 15000,
+        min_basket_price: 100000,
+        usage_quantity: 50,
+        start_time: Math.floor(Date.now() / 1000) - 60,
+        end_time: Math.floor(Date.now() / 1000) + 86400 * 30
+      }
+    });
+    assert(followerVoucherRes.error === "", "Create Follower Prize voucher succeeds");
+    assert(typeof followerVoucherRes.response.voucher_code === "string" && followerVoucherRes.response.voucher_code.length > 0, "Follower voucher code auto-generated");
+
     // 11. Voucher List API & Status Counts
     const listRes = await request(`/api/v2/simulator/voucher/list?shop_id=${shopId}&page_size=20`);
     assert(listRes.error === "", "List vouchers endpoint succeeds");
