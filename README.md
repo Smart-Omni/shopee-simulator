@@ -158,6 +158,21 @@ The established backend baseline is **555 passing assertions** across the origin
 - `POST /api/v2/simulator/shop/vacation`: Blocks new order checkout and promotional campaign creation for shops on vacation.
 
 ### 11. Dual-Persona Interface & Vietnamese Localization (`vi-VN`)
+
+### 12. Chat Management, Auto-Reply & Official Seller Chat APIs (Phase 19)
+- **Signed Layer A Official Partner APIs (`/api/v2/sellerchat/*`):**
+  - `GET /api/v2/sellerchat/get_conversation_list`: Paginated list of active conversations with unread counts and latest message snippets.
+  - `GET /api/v2/sellerchat/get_one_conversation`: Detailed conversation metadata and buyer identity.
+  - `GET /api/v2/sellerchat/get_message`: Paginated message thread history.
+  - `POST /api/v2/sellerchat/send_message`: Manual seller message dispatch to buyer.
+  - `POST /api/v2/sellerchat/send_autoreply_message`: Automated reply dispatch with `is_auto_reply: true`.
+  - `POST /api/v2/sellerchat/read_conversation`: Acknowledge messages and clear unread counters.
+- **Layer B Chat Configuration & Performance (`/api/v2/simulator/chat/*`):**
+  - `GET /api/v2/simulator/chat/performance`: Returns 30-day chat performance metrics (`chat_count`, `chat_count_compare`, `response_rate`, `response_time`).
+  - `GET /api/v2/simulator/chat/auto_reply` & `POST /api/v2/simulator/chat/auto_reply`: Manage standard greeting and after-hours auto-reply messages. Automatically triggers on incoming buyer messages with strict 24-hour rate-limiting per buyer.
+  - `GET /api/v2/simulator/chat/quick_reply` & `POST /api/v2/simulator/chat/quick_reply`: Manage personal quick reply templates (up to 25 groups max). Seeded with 13 authentic Vietnamese templates in "Nhóm Tin nhắn chung".
+- **Floating Seller Webchat Widget:** Persistent right-side dock pill in Seller Center with unread badges, full conversation sidebar, quick-reply pill bar, and interactive messaging.
+- **Verification:** `npm run test:phase19` (33 assertions) and `npm run check:chat-management` (11 Playwright E2E checks).
 - **1-Click Seeded Login**: Welcome screen supporting instant fast login for 3 seeded shops and 3 seeded buyers with strict view isolation.
 - **Slide-Out Integration Console**: Developer controls (OAuth, webhooks, fault injection) isolated into a slide-out drawer (`🛠️ Bảng Kiểm Thử`).
 - **Authentic Vietnamese Copy**: 100% of simulator UI copy standardized in official Shopee Vietnam terminology (*Kênh Người Bán*, *Sàn Mua Sắm Shopee*, *Chờ lấy hàng*, *Đang giao*, *Đã giao*, *Hủy đơn*, *Đã đánh giá*).

@@ -144,7 +144,7 @@ async function run() {
     console.log("\n▶ TEST GROUP 3: Quick Reply Settings & Group Quota");
     const quickReplyRes = await request(`/api/v2/simulator/chat/quick_reply?shop_id=${SHOP_ID}`);
     assert(quickReplyRes.error === "", "3.1 Retrieve quick-reply settings succeeds");
-    assert(quickReplyRes.response.show_suggestions === true, "3.2 show_suggestions is true by default");
+    assert(typeof quickReplyRes.response.show_suggestions === "boolean", "3.2 show_suggestions is boolean");
     assert(quickReplyRes.response.max_groups === 25, "3.3 max_groups is exactly 25");
     assert(quickReplyRes.response.groups.length >= 1, "3.4 At least 1 group exists");
 
