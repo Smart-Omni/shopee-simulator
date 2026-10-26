@@ -1868,17 +1868,19 @@ async function main() {
   }
   console.log(`✓ Seeded completed orders with released escrow and reviews for all shops`);
 
-  // 9. Seed Buyer Accounts & Addresses for Shopiz Frontend
+  // 9. Seed Buyer & Seller Accounts for Shopiz Frontend
   const salt = crypto.randomBytes(16).toString("hex");
   const defaultPasswordHash = `${salt}:${crypto.scryptSync("Shopiz@123", salt, 64).toString("hex")}`;
 
-  const demoBuyers = [
+  const demoAccounts = [
     {
       id: BigInt(1001),
       username: "demo",
       email: "demo@shopiz.com",
       phone: "0901234567",
       name: "Demo Shopper",
+      role: "buyer",
+      shopId: null,
       passwordHash: defaultPasswordHash,
       addresses: [
         {
@@ -1909,6 +1911,8 @@ async function main() {
       email: "alex@shopiz.com",
       phone: "0912345678",
       name: "Alex Nguyen",
+      role: "buyer",
+      shopId: null,
       passwordHash: defaultPasswordHash,
       addresses: [
         {
@@ -1929,6 +1933,8 @@ async function main() {
       email: "c@shopiz.com",
       phone: "0912345679",
       name: "Le Van C",
+      role: "buyer",
+      shopId: null,
       passwordHash: defaultPasswordHash,
       addresses: [
         {
@@ -1942,10 +1948,54 @@ async function main() {
           isDefault: true
         }
       ]
+    },
+    {
+      id: BigInt(2001),
+      username: "seller",
+      email: "seller@shopiz.com",
+      phone: "0909999999",
+      name: "SmartOmni Merchant",
+      role: "seller",
+      shopId: BigInt(727720655),
+      passwordHash: defaultPasswordHash,
+      addresses: [
+        {
+          recipientName: "SmartOmni Merchant Hub",
+          recipientPhone: "0909999999",
+          addressLine: "123 Le Duan Street, District 1",
+          district: "District 1",
+          city: "Ho Chi Minh City",
+          state: "Ho Chi Minh City",
+          zipcode: "700000",
+          isDefault: true
+        }
+      ]
+    },
+    {
+      id: BigInt(2002),
+      username: "hanoiseller",
+      email: "hanoi@shopiz.com",
+      phone: "0908888888",
+      name: "Hanoi Streetwear Merchant",
+      role: "seller",
+      shopId: BigInt(839910244),
+      passwordHash: defaultPasswordHash,
+      addresses: [
+        {
+          recipientName: "Hanoi Streetwear Hub",
+          recipientPhone: "0908888888",
+          addressLine: "88 Hang Bong, Hoan Kiem",
+          district: "Hoan Kiem District",
+          city: "Hanoi",
+          state: "Hanoi",
+          zipcode: "100000",
+          isDefault: true
+        }
+      ]
     }
   ];
 
-  for (const b of demoBuyers) {
+  for (const b of demoAccounts) {
     const user = await prisma.buyerUser.upsert({
       where: { id: b.id },
       update: {
@@ -1953,6 +2003,8 @@ async function main() {
         email: b.email,
         phone: b.phone,
         name: b.name,
+        role: b.role,
+        shopId: b.shopId,
         passwordHash: b.passwordHash
       },
       create: {
@@ -1961,6 +2013,8 @@ async function main() {
         email: b.email,
         phone: b.phone,
         name: b.name,
+        role: b.role,
+        shopId: b.shopId,
         passwordHash: b.passwordHash
       }
     });
@@ -1990,7 +2044,7 @@ async function main() {
       }
     }
   }
-  console.log(`✓ Seeded Shopiz demo buyer accounts (demo, alex) and default addresses`);
+  console.log(`✓ Seeded Shopiz demo buyer and seller accounts (demo, alex, seller, hanoiseller)`);
 
   console.log("Database seeding completed successfully!");
 }

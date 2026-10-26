@@ -52,6 +52,12 @@ buyerRouter.post("/api/v2/simulator/auth/login", async (req: Request, res: Respo
       return;
     }
 
+    let shopName: string | null = null;
+    if (user.shopId) {
+      const shop = await prisma.shop.findUnique({ where: { shopId: user.shopId } });
+      shopName = shop?.shopName || null;
+    }
+
     const token = `sim_jwt_${user.id}_${Date.now()}`;
 
     res.json(createShopeeSuccessResponse({
@@ -63,6 +69,9 @@ buyerRouter.post("/api/v2/simulator/auth/login", async (req: Request, res: Respo
         email: user.email,
         phone: user.phone,
         avatar_url: user.avatarUrl,
+        role: user.role || "buyer",
+        shop_id: user.shopId ? Number(user.shopId) : null,
+        shop_name: shopName,
         addresses: user.addresses.map((a) => ({
           id: a.id,
           recipient_name: a.recipientName,
@@ -193,6 +202,12 @@ buyerRouter.get("/api/v2/simulator/buyer/profile", async (req: Request, res: Res
       return;
     }
 
+    let shopName: string | null = null;
+    if (user.shopId) {
+      const shop = await prisma.shop.findUnique({ where: { shopId: user.shopId } });
+      shopName = shop?.shopName || null;
+    }
+
     res.json(createShopeeSuccessResponse({
       user: {
         id: Number(user.id),
@@ -201,6 +216,9 @@ buyerRouter.get("/api/v2/simulator/buyer/profile", async (req: Request, res: Res
         email: user.email,
         phone: user.phone,
         avatar_url: user.avatarUrl,
+        role: user.role || "buyer",
+        shop_id: user.shopId ? Number(user.shopId) : null,
+        shop_name: shopName,
         addresses: user.addresses.map((a) => ({
           id: a.id,
           recipient_name: a.recipientName,
