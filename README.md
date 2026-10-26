@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-teal.svg)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Test Suite](https://img.shields.io/badge/Tests-555%2F555%20Passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/Tests-580%2B%20Passing-brightgreen.svg)]()
 [![Shopee Open API](https://img.shields.io/badge/Shopee%20Open%20API-v2%20Standard-orange.svg)]()
 
 > High-fidelity, contractually conforming **Shopee Open API v2 Mock Server** and interactive web testbed built for **SmartOmni Channel** integration, multi-merchant e-commerce synchronization, automated testing, and development without sandbox rate limits or dependency on live Shopee seller accounts.
@@ -157,13 +157,30 @@ The established backend baseline is **555 passing assertions** across the origin
 ### 10. Holiday / Vacation Mode
 - `POST /api/v2/simulator/shop/vacation`: Blocks new order checkout and promotional campaign creation for shops on vacation.
 
-### 11. Dual-Persona Interface & Vietnamese Localization (`vi-VN`)
+### 11. Cloud Media Storage, CI/CD Pipeline & Marketplace Extensions (Phase 14)
+- **Cloud Media Storage Engine (`src/common/storage/`)**:
+  - **Google Drive Storage Provider**: OAuth2 User Credentials authorization with zero service-account quota blocks, direct upload to designated folder (`GOOGLE_DRIVE_FOLDER_ID`), and high-speed public CDN URLs (`https://lh3.googleusercontent.com/d/{fileId}`) that embed directly in HTML/React `<img>` and `<video>` tags.
+  - **Local Filesystem Fallback**: In-memory and local disk (`public/uploads/`) fallback provider.
+  - `POST /api/v2/simulator/media/upload`: Single photo (up to 10MB) or video clip (up to 50MB) upload.
+  - `POST /api/v2/simulator/media/upload_multiple`: Multi-file batch upload (up to 10 files).
+  - `POST /api/v2/media_space/upload_image`: Layer A official Shopee MediaSpace image upload connected to storage providers.
+  - **Test Suite Spam Protection**: Automated skip in `npm test` prevents uploading dummy files to Google Drive while permitting live testing via `TEST_DRIVE_UPLOAD=true`.
+- **Automated CI/CD Pipeline (`.github/workflows/ci.yml`)**:
+  - Full GitHub Actions workflow with PostgreSQL 16 container service.
+  - Automatically verifies `npm ci`, `npx prisma db push`, `npm run prisma:seed`, `npm run build`, and `npm test` across all phases.
+  - Automated cloud CD deploy hook dispatch on merges to `main`.
+- **Marketplace & Simulator Backend Extensions (Shopiz Layer B)**:
+  - **Buyer Auth**: `POST /api/v2/simulator/auth/login`, `register` (salted `crypto.scryptSync` hashing), `forgot_password`, and profile lookup/update.
+  - **Shipping Addresses**: Full CRUD + `set_default` primary address selection.
+  - **Marketplace Catalog & Search**: `categories` tree, keyword search (`?q=...`), category filtering, price/sales sorting, rich product detail with variations and reviews, and shop storefronts.
+  - **Multi-Shop Checkout & Settlement**: `logistics/channels` quotes, voucher validation, `batch_checkout` (creating distinct orders per shop), and `confirm_delivery` (transitioning to `COMPLETED` and releasing escrow).
+  - **Seller Analytics**: Order volumes, gross merchandise value, conversion rates, and SVG chart curves.
 
 ### 12. Chat Management, Auto-Reply & Official Seller Chat APIs (Phase 19)
 - **Signed Layer A Official Partner APIs (`/api/v2/sellerchat/*`):**
   - `GET /api/v2/sellerchat/get_conversation_list`: Paginated list of active conversations with unread counts and latest message snippets.
   - `GET /api/v2/sellerchat/get_one_conversation`: Detailed conversation metadata and buyer identity.
-  - `GET /api/v2/sellerchat/get_message`: Paginated message thread history.
+  - `GET /api/v2/sellerchat/get_message_list`: Paginated message thread history.
   - `POST /api/v2/sellerchat/send_message`: Manual seller message dispatch to buyer.
   - `POST /api/v2/sellerchat/send_autoreply_message`: Automated reply dispatch with `is_auto_reply: true`.
   - `POST /api/v2/sellerchat/read_conversation`: Acknowledge messages and clear unread counters.
@@ -171,13 +188,10 @@ The established backend baseline is **555 passing assertions** across the origin
   - `GET /api/v2/simulator/chat/performance`: Returns 30-day chat performance metrics (`chat_count`, `chat_count_compare`, `response_rate`, `response_time`).
   - `GET /api/v2/simulator/chat/auto_reply` & `POST /api/v2/simulator/chat/auto_reply`: Manage standard greeting and after-hours auto-reply messages. Automatically triggers on incoming buyer messages with strict 24-hour rate-limiting per buyer.
   - `GET /api/v2/simulator/chat/quick_reply` & `POST /api/v2/simulator/chat/quick_reply`: Manage personal quick reply templates (up to 25 groups max). Seeded with 13 authentic Vietnamese templates in "Nhóm Tin nhắn chung".
-- **Floating Seller Webchat Widget:** Persistent right-side dock pill in Seller Center with unread badges, full conversation sidebar, quick-reply pill bar, and interactive messaging.
-- **Verification:** `npm run test:phase19` (33 assertions) and `npm run check:chat-management` (11 Playwright E2E checks).
-- **1-Click Seeded Login**: Welcome screen supporting instant fast login for 3 seeded shops and 3 seeded buyers with strict view isolation.
-- **Slide-Out Integration Console**: Developer controls (OAuth, webhooks, fault injection) isolated into a slide-out drawer (`🛠️ Bảng Kiểm Thử`).
-- **Authentic Vietnamese Copy**: 100% of simulator UI copy standardized in official Shopee Vietnam terminology (*Kênh Người Bán*, *Sàn Mua Sắm Shopee*, *Chờ lấy hàng*, *Đang giao*, *Đã giao*, *Hủy đơn*, *Đã đánh giá*).
+- **Floating Seller Webchat Widget:** Persistent right-side dock pill in Seller Center with unread badges, full conversation sidebar, quick-reply shortcut bar, and order product card attachments.
+- **Verification:** `npm run test:phase19` (14 assertions) and `npm run check:chat-management` (11 Playwright E2E checks).
 
-### 12. Payment & Escrow Reconciliation Module (Shopee Vietnam Accounting Standards)
+### 13. Payment & Escrow Reconciliation Module (Shopee Vietnam Accounting Standards)
 - Official Endpoints:
   - `POST & GET /api/v2/payment/get_escrow_detail`: Detailed accounting breakdown per order (COGS, vouchers, shipping fees, rebates, commission, service, and transaction fees, and net escrow amount).
   - `POST /api/v2/payment/get_escrow_detail_batch`: Batch escrow query for up to 50 orders per request.
@@ -192,7 +206,7 @@ The established backend baseline is **555 passing assertions** across the origin
 - **Layer B Developer Helpers**:
   - `GET /api/v2/simulator/payment/overview` & `GET /api/v2/simulator/payment/escrow_detail` for friction-free frontend integration.
 
-### 13. Returns, Refunds & Dispute Management Module (Shopee Open API v2 Standard)
+### 14. Returns, Refunds & Dispute Management Module (Shopee Open API v2 Standard)
 - Official Endpoints:
   - `POST & GET /api/v2/returns/get_return_list`: Paginated query with status filtering (`JUDGING`, `REQUESTED`, `PROCESSING`, `ACCEPTED`, `CANCELLED`, `CLOSED`, `SELLER_DISPUTE`) and dual envelope compatibility (`return` & `return_list`).
   - `POST & GET /api/v2/returns/get_return_detail`: Itemized return and refund accounting, buyer profile, items, tracking number, proof images, and counter-offer status.
@@ -206,29 +220,23 @@ The established backend baseline is **555 passing assertions** across the origin
 - **Two-Layer Dual Business Flows**:
   - **Flow 1: Shopee-First Warehouse Validation (`warehouse_validation`)**: Buyer submits return $\rightarrow$ Shopee Admin reviews $\rightarrow$ Item shipped to platform warehouse $\rightarrow$ Physical inspection (`warehouse_inbound: PASS`) $\rightarrow$ Escrow refund issued. Post-acceptance seller compensation disputes supported.
   - **Flow 2: Seller-First Direct Validation (`seller_validation`)**: Direct confirmation, partial refund counter-offers, or escalation to Shopee Admin for formal arbitration.
-- **Tri-Persona Interface (`public/index.html`)**:
-  - Quick-switch between **Kênh Người Bán (Seller)**, **Sàn Mua Sắm Shopee (Buyer)**, and **Bàn Trọng Tài Shopee (Admin)**.
-  - Shopee Admin Arbitration view with real-time status tabs and binding ruling controls (*Phê duyệt*, *Yêu cầu Shop bổ sung bằng chứng*, *Bác bỏ*, *Nhập kho Shopee*, *Ban hành phán quyết Trọng tài*).
-- **Outbound Webhook Dispatching (Code 29)**: Real-time `RETURN_STATUS_UPDATE` push notifications on all status transitions.
 
-### 11. Cloud Media Storage, CI/CD Pipeline & Marketplace Extensions (Phase 14)
-- **Cloud Media Storage Engine (`src/common/storage/`)**:
-  - **Google Drive Storage Provider**: OAuth2 User Credentials authorization with zero service-account quota blocks, direct upload to designated folder (`GOOGLE_DRIVE_FOLDER_ID`), and high-speed public CDN URLs (`https://lh3.googleusercontent.com/d/{fileId}`) that embed directly in HTML/React `<img>` and `<video>` tags.
-  - **Local Filesystem Fallback**: In-memory and local disk (`public/uploads/`) fallback provider.
-  - `POST /api/v2/simulator/media/upload`: Single photo (up to 10MB) or video clip (up to 50MB) upload.
-  - `POST /api/v2/simulator/media/upload_multiple`: Multi-file batch upload (up to 10 files).
-  - `POST /api/v2/media_space/upload_image`: Layer A official Shopee MediaSpace image upload connected to storage providers.
-  - **Test Suite Spam Protection**: Automated skip in `npm test` prevents uploading dummy files to Google Drive while permitting live testing via `TEST_DRIVE_UPLOAD=true`.
-- **Automated CI/CD Pipeline (`.github/workflows/ci.yml`)**:
-  - Full GitHub Actions workflow with PostgreSQL 16 container service.
-  - Automatically verifies `npm ci`, `npx prisma db push`, `npm run prisma:seed`, `npm run build`, and `npm test` across all 14 phases.
-  - Automated cloud CD deploy hook dispatch on merges to `main`.
-- **Marketplace & Simulator Backend Extensions (Shopiz Layer B)**:
-  - **Buyer Auth**: `POST /api/v2/simulator/auth/login`, `register` (salted `crypto.scryptSync` hashing), `forgot_password`, and profile lookup/update.
-  - **Shipping Addresses**: Full CRUD + `set_default` primary address selection.
-  - **Marketplace Catalog & Search**: `categories` tree, keyword search (`?q=...`), category filtering, price/sales sorting, rich product detail with variations and reviews, and shop storefronts.
-  - **Multi-Shop Checkout & Settlement**: `logistics/channels` quotes, voucher validation, `batch_checkout` (creating distinct orders per shop), and `confirm_delivery` (transitioning to `COMPLETED` and releasing escrow).
-  - **Seller Analytics**: Order volumes, gross merchandise value, conversion rates, and SVG chart curves.
+### 15. Shop Vouchers Management (Phase 18)
+- Complete Seller Center voucher engine (`/api/v2/simulator/voucher/*`) supporting all 8 usecases (Shop-wide, Product-specific, Private, Shopee Live, Shopee Video, New Buyer, Repeat Buyer, and Follower Prize).
+- Custom shop code prefixes (`SMAR`, `HANO`, `SAIG`), real-time usage counters, order redemption history, and strict Shopee Coins rejection via `voucher.voucher_coin_error`.
+- Verification: `npm run test:phase18` (18 assertions) and `npm run check:seller-vouchers` (Playwright E2E).
+
+### 16. Shopiz Test Control & Shopee Admin Platform Console (Phase 20)
+- **Direct Access Routes:** Both `/test-control` and `/admin` routes accessible without authentication barriers.
+- **Enterprise Purple Platform Theme:** Sticky header with live Simulator health indicator (`Port 8080`), 4 dynamic KPI summary cards, and floating toast notification stack.
+- **5 Core Admin Modules:**
+  1. **Xử lý Khiếu nại & Trả hàng (Dispute & Return Arbitration):** Case inspection with buyer/seller photo & video unboxing proofs, Customer Service Review modal (`APPROVE`/`REJECT`), Warehouse Inbound modal (`PASS`/`FAIL`), and Gavel arbitration modal (`BUYER_WIN`/`SELLER_WIN` + compensation input & ruling notes).
+  2. **Webhook Trực quan & Giám sát (Push Webhooks):** Outbound URL configuration with 1-click local mock sink (`/api/v2/simulator/webhook/sink`), manual event dispatcher with pre-filled templates (Code 1, 2, 3, 4, 8, 15), and real-time delivery audit stream with inspect modal and retry failed.
+  3. **Mô phỏng Lỗi & Latency (Fault Injection Engine):** HTTP 429 rate limit toggle + threshold input, expired token injection, invalid signature rejection, strict timestamp drift toggle, artificial latency slider (0–3000ms), and 1-click reset to normal.
+  4. **Vòng đời Đơn hàng & SLA (Order Lifecycle Fast-Forward):** 5-stage visual pipeline stepper (`UNPAID` $\rightarrow$ `READY_TO_SHIP` $\rightarrow$ `PROCESSED` $\rightarrow$ `SHIPPED` $\rightarrow$ `COMPLETED`), fast-forward triggers (`pay`, `carrier_pickup`, `deliver`), and overdue SLA auto-cancellation scanner.
+  5. **OAuth 2.0 & Quản lý Gian hàng:** Partner auth link generator with 1-click copy & launch, multi-shop inspection table, token TTL countdown, 5-minute dual-token grace period indicator, vacation mode switch, and instant token refresh button.
+- **Navigation Shortcuts:** Integrated on Marketplace Utility Nav (`Test Control`) and Seller Center Header next to `Switch Shop`.
+- **Verification:** Playwright end-to-end test suite in `scripts/verify-test-control.mjs` (`npm run check:test-control`, 100% pass).
 
 ---
 
