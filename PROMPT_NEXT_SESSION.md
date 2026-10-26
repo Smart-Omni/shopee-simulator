@@ -12,23 +12,23 @@ We are continuing development on the **Shopee Open API v2 Simulator** (`shopee-s
 ### 1. Current Repository State & Baseline
 - **Backend Simulator (`shopee-simulator/`):**
   - Shopee Open API v2 mock server with Layer A signed partner APIs and Layer B simulator/integration APIs.
-  - Current baseline: 555 passing assertions across 17 test phases.
+  - Current baseline: 573 passing assertions across 18 test phases.
   - Docker services: `shopee-mock-server` on port 8080 and `shopee-mock-postgres` on port 5432 (PostgreSQL 16).
-  - Branch: `feature/category-tree-and-attributes`.
+  - Branch: `feature/shop-vouchers`.
 - **Frontend Client (`shopiz/`):**
   - React 19, Vite 6, React Router 7, monochrome Shopiz design tokens, authentic Vietnamese (`vi-VN`) Seller Center console.
   - Reverse proxy: `/api/*` and `/uploads/*` forwarded to `http://127.0.0.1:8080`.
   - Branch: `backend-integration`.
-- **Latest pushed simulator commits:** `eda90f7` (seller review management APIs) and `b8a6a0b` (review documentation).
-- **Latest pushed Shopiz commits:** `b5eb31e` (review management page) and `07e5b05` (review documentation).
+- **Latest pushed simulator commits:** `65f2fac` (voucher management APIs) and `92f2238` (voucher documentation).
+- **Latest pushed Shopiz commits:** `9f7d4e5` (Shop Vouchers management page) and `3ca27b5` (voucher documentation).
 
 ### 2. What Has Been Done
 - **OAuth 2.0 Kernel & HMAC Auth (Phases 1–2):** 4-hour access tokens, 5-minute dual-token grace periods, HMAC-SHA256 signature enforcement on all signed Layer A endpoints.
 - **Product Catalog, Category Trees & Attributes (Phases 3, 9, 15, 16):** 3-level Shopee category hierarchy (42 categories), 77 mandatory/key attributes, 2-tier variation Cartesian grids, unlist/relist lifecycle, product extra info metrics (views, unique likes, completed sales).
 - **Orders, Shipping & Logistics (Phases 4, 5, 8, 10):** 7-stage order lifecycle, dynamic SPX carrier rate calculation engine by weight and region, thermal PDF Air Waybill generation with Code128 barcodes, overdue auto-cancellation.
-- **Marketing, Reviews & Chat (Phases 7, 11, 17):** Vouchers and discount promotions, buyer-seller chat threads, buyer order reviews, shop review dashboard with rolling 30-day comparisons, and official seller replies.
+- **Marketing, Reviews & Chat (Phases 7, 11, 17, 18):** Vouchers and discount promotions, buyer-seller chat threads, buyer order reviews, shop review dashboard with rolling 30-day comparisons, official seller replies, and complete **Shop Vouchers Management (Mã Giảm Giá Của Shop)** supporting all 7 Shopee usecases, custom code prefixes (`SMAR`, `HANO`, `SAIG`), product selection modal, order redemption history, and strict Shopee Coins (`Hoàn Xu`) grey-out protection.
 - **Escrow Reconciliation & Disputes (Phases 12–13):** Mathematical escrow release ledger, return/refund dispute flow with proof uploads and admin arbitration desk.
-- **Seller Center Console (`/seller`):** Authentic 7-group Vietnamese sidebar, multi-shop switcher (`/seller/select-shop`), All Orders management with CSV export and shipment arrangement, All Products with 2-tier variant expansion and creation/edit editor, Returns & Disputes management, and Review Management dashboard.
+- **Seller Center Console (`/seller`):** Authentic 7-group Vietnamese sidebar, multi-shop switcher (`/seller/select-shop`), All Orders management with CSV export and shipment arrangement, All Products with 2-tier variant expansion and creation/edit editor, Returns & Disputes management, Review Management dashboard, and Shop Vouchers console (`?tab=marketing_vouchers` / `?tab=vouchers`).
 
 ### 3. Reference Documentation & Specifications
 When analyzing requirements, designing features, or updating documentation, consult and maintain these authoritative project files:
@@ -55,6 +55,7 @@ When analyzing requirements, designing features, or updating documentation, cons
 - Backend Tests: `cd shopee-simulator && npm test`
 - Backend Compile: `cd shopee-simulator && npm run build`
 - Frontend Integration: `cd shopiz && npm run check:integration`
+- Seller Shop Vouchers: `cd shopiz && npm run check:seller-vouchers`
 - Seller Review Management: `cd shopiz && npm run check:reviews`
 - Seller All Orders: `cd shopiz && npm run check:all-orders`
 - Seller All Products: `cd shopiz && npm run check:products-page`
@@ -76,6 +77,7 @@ First inspect both repositories and the relevant UI/API references, confirm the 
 | **Compile Backend TypeScript** | `cd shopee-simulator && npm run build` |
 | **Synchronize Live Backend Container** | `cd shopee-simulator && docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker restart shopee-mock-server` |
 | **Verify Frontend Integration** | `cd shopiz && npm run check:integration` |
+| **Verify Shop Vouchers Suite** | `cd shopiz && npm run check:seller-vouchers` |
 | **Verify Review Management** | `cd shopiz && npm run check:reviews` |
 | **Verify All Orders Suite** | `cd shopiz && npm run check:all-orders` |
 | **Verify Products Page Suite** | `cd shopiz && npm run check:products-page` |
