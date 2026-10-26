@@ -1,4 +1,4 @@
-import { google, drive_v3 } from "googleapis";
+import { drive, drive_v3, auth } from "googleapis/build/src/apis/drive";
 import { Readable } from "stream";
 import * as path from "path";
 import * as fs from "fs";
@@ -18,9 +18,9 @@ export class GoogleDriveStorageProvider implements IStorageProvider {
     const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
 
     if (clientId && clientSecret && refreshToken) {
-      const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+      const oauth2Client = new auth.OAuth2(clientId, clientSecret);
       oauth2Client.setCredentials({ refresh_token: refreshToken });
-      this.drive = google.drive({ version: "v3", auth: oauth2Client });
+      this.drive = drive({ version: "v3", auth: oauth2Client });
       return;
     }
 
@@ -32,12 +32,12 @@ export class GoogleDriveStorageProvider implements IStorageProvider {
       throw new Error(`Google credentials not found. Provide OAuth2 credentials or Service Account at: ${resolvedPath}`);
     }
 
-    const auth = new google.auth.GoogleAuth({
+    const authClient = new auth.GoogleAuth({
       keyFile: resolvedPath,
       scopes: ["https://www.googleapis.com/auth/drive"]
     });
 
-    this.drive = google.drive({ version: "v3", auth });
+    this.drive = drive({ version: "v3", auth: authClient });
   }
 
   async uploadFile(file: Express.Multer.File, options?: { folderId?: string }): Promise<UploadResult> {
