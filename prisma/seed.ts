@@ -30,21 +30,24 @@ async function main() {
       shopName: "SmartOmni Official Flagship",
       region: "VN",
       status: "NORMAL",
-      isVacation: false
+      isVacation: false,
+      voucherPrefix: "SMAR"
     },
     {
       shopId: BigInt(839910244),
       shopName: "Hanoi Streetwear Co.",
       region: "VN",
       status: "NORMAL",
-      isVacation: false
+      isVacation: false,
+      voucherPrefix: "HANO"
     },
     {
       shopId: BigInt(910283751),
       shopName: "Saigon Modern Living",
       region: "VN",
       status: "NORMAL",
-      isVacation: false
+      isVacation: false,
+      voucherPrefix: "SAIG"
     }
   ];
 
@@ -60,7 +63,8 @@ async function main() {
       update: {
         shopName: s.shopName,
         region: s.region,
-        status: s.status
+        status: s.status,
+        voucherPrefix: s.voucherPrefix
       },
       create: {
         shopId: s.shopId,
@@ -69,6 +73,7 @@ async function main() {
         region: s.region,
         status: s.status,
         isVacation: s.isVacation,
+        voucherPrefix: s.voucherPrefix,
         accessToken,
         accessTokenExpiresAt: new Date(now.getTime() + expireIn * 1000),
         refreshToken,
