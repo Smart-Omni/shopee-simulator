@@ -1,6 +1,6 @@
 # 🚀 Shopee Open API v2 Simulator & Shopiz Client — Next Session Kickoff Prompt
 
-Use this prompt when initiating a new coding or pairing session with an AI coding assistant (Antigravity or any LLM agent). It eliminates context decay, establishes the technical baseline, and guarantees immediate productive pairing.
+Use this prompt when starting a new coding or pairing session with an AI coding assistant. It establishes the current repository state, completed technical baseline, reference locations, and working protocols.
 
 ---
 
@@ -9,52 +9,61 @@ Use this prompt when initiating a new coding or pairing session with an AI codin
 ```markdown
 We are continuing development on the **Shopee Open API v2 Simulator** (`shopee-simulator/`) and the integrated **Shopiz Marketplace & Seller Center client** (`shopiz/`).
 
-### 1. Context & Technical Baseline
+### 1. Current Repository State & Baseline
 - **Backend Simulator (`shopee-simulator/`):**
-  - **Current Version:** v1.12.0 (Phases 1 through 14 complete, Cloud Media Storage via Google Drive/Local, Automated CI/CD, Tri-Persona vi-VN Testbed on port 8080, Dynamic Logistics Carrier Calculation Engine, Multi-Shop Storefront & Fulfillment APIs, Shopee 3-Level Category Tree Hierarchy with 39 Categories and 77 Mandatory/Key Attributes).
-  - **Docker Containers:** `shopee-mock-server` on port 8080, `shopee-mock-postgres` on port 5432 (PostgreSQL 16).
-  - **Test Baseline:** 540 / 540 passing assertions (100% pass rate). Run `cd shopee-simulator && npm test` to verify backend health.
-  - **Git Branch:** `feature/category-tree-and-attributes`.
+  - Shopee Open API v2 mock server with Layer A signed partner APIs and Layer B simulator/integration APIs.
+  - Current baseline: 555 passing assertions across 17 test phases.
+  - Docker services: `shopee-mock-server` on port 8080 and `shopee-mock-postgres` on port 5432 (PostgreSQL 16).
+  - Branch: `feature/category-tree-and-attributes`.
 - **Frontend Client (`shopiz/`):**
-  - **Framework:** React 19, Vite 6, React Router 7, CSS Modules, Lucide React, Axios.
-  - **Git Branch:** `backend-integration` (commit in small chunks per project conventions).
-  - **Key Pages & Capabilities:**
-    - Marketplace Storefront (`/`, `/search`, `/product/:id`, `/collection/mall`, `/collection/flash-deals`).
-    - Dynamic Carrier Rate Calculation (`POST /api/v2/simulator/logistics/calculate_fee`) on Product and Checkout pages based on recipient city (`SPX Express`, `SPX Instant`, `SPX Economy`).
-    - Live Interactive Chat (`ChatDialog.jsx`, `chatService.js`) with shop/product/order context pinning.
-    - Multi-Shop Storefronts (`/shop/727720655`, `/shop/839910244`, `/shop/910283751`) with live ratings, followers, joined duration, and dynamic campaign vouchers.
-    - Buyer Purchases (`/account/purchases`) with Contact Seller live chat, Delivery Confirmation (escrow release), and 5-star reviews.
-    - Multi-Address Checkout with PostgreSQL synchronization (`addressService.js`).
-    - Multi-Shop Seller Center Portal (`/seller/select-shop` and `ShopSelectPage.jsx`) with instant "Switch Shop" shortcuts.
-    - Seller Center Control Console (`/seller`) with live backend orders, "Arrange Shipment" (`POST /simulator/order/ship`), printable Air Waybill PDFs (`GET /simulator/order/download_awb`), catalog inventory toggle unlist (`POST /simulator/product/toggle_unlist`), and marketing campaign vouchers.
-  - **Test Baseline:** 100% pass across all Playwright suites:
-    - `npm run check:shop-select`
-    - `npm run check:seller`
-    - `npm run check:checkout`
-    - `npm run check:purchases`
-    - `npm run check:shipping-chat`
-    - `npm run check:integration`
+  - React 19, Vite 6, React Router 7, monochrome Shopiz design tokens, authentic Vietnamese (`vi-VN`) Seller Center console.
+  - Reverse proxy: `/api/*` and `/uploads/*` forwarded to `http://127.0.0.1:8080`.
+  - Branch: `backend-integration`.
+- **Latest pushed simulator commits:** `eda90f7` (seller review management APIs) and `b8a6a0b` (review documentation).
+- **Latest pushed Shopiz commits:** `b5eb31e` (review management page) and `07e5b05` (review documentation).
 
-### 2. Architecture & Rules of Engagement
-- **Small Commits Rule:** Always commit code in small, well-scoped atomic chunks following the Conventional Commits specification.
+### 2. What Has Been Done
+- **OAuth 2.0 Kernel & HMAC Auth (Phases 1–2):** 4-hour access tokens, 5-minute dual-token grace periods, HMAC-SHA256 signature enforcement on all signed Layer A endpoints.
+- **Product Catalog, Category Trees & Attributes (Phases 3, 9, 15, 16):** 3-level Shopee category hierarchy (42 categories), 77 mandatory/key attributes, 2-tier variation Cartesian grids, unlist/relist lifecycle, product extra info metrics (views, unique likes, completed sales).
+- **Orders, Shipping & Logistics (Phases 4, 5, 8, 10):** 7-stage order lifecycle, dynamic SPX carrier rate calculation engine by weight and region, thermal PDF Air Waybill generation with Code128 barcodes, overdue auto-cancellation.
+- **Marketing, Reviews & Chat (Phases 7, 11, 17):** Vouchers and discount promotions, buyer-seller chat threads, buyer order reviews, shop review dashboard with rolling 30-day comparisons, and official seller replies.
+- **Escrow Reconciliation & Disputes (Phases 12–13):** Mathematical escrow release ledger, return/refund dispute flow with proof uploads and admin arbitration desk.
+- **Seller Center Console (`/seller`):** Authentic 7-group Vietnamese sidebar, multi-shop switcher (`/seller/select-shop`), All Orders management with CSV export and shipment arrangement, All Products with 2-tier variant expansion and creation/edit editor, Returns & Disputes management, and Review Management dashboard.
+
+### 3. Reference Documentation & Specifications
+When analyzing requirements, designing features, or updating documentation, consult and maintain these authoritative project files:
+
+- **Protocol & Master API Index:** `SHOPEE_SIMULATOR_SPEC_AND_API_INDEX.md` (authoritative protocol blueprint covering 452 APIs, 35 webhooks, data schemas, and error codes).
+- **UI Descriptions & Layout Specifications:** `UI-description/` (screen-by-screen specifications, layouts, controls, and workflows for authentic Shopee Vietnam interfaces).
+  - *Rule:* Always check `UI-description/` first for the target screen. If a UI description does not exist for an assigned screen, request it before inventing proprietary layouts.
+- **Official API Endpoint References:** `api-reference/` (raw crawled Shopee Open API v2 endpoint models, parameters, error codes, and sample payloads).
+- **Backend Changelog & Architecture:** `shopee-simulator/CHANGELOG.md` and `shopee-simulator/README.md`.
+- **Frontend Architecture & Client Docs:** `shopiz/README.md`.
+- **Workspace Engineering Runbook:** `.agents/skills/shopee-simulator/SKILL.md` (protocol rules, BigInt polyfills, localization standards, and container synchronization).
+
+*Documentation Maintenance Invariant:* Whenever implementing or modifying features, always file and update the corresponding documentation in `SHOPEE_SIMULATOR_SPEC_AND_API_INDEX.md`, `shopee-simulator/CHANGELOG.md`, and `shopiz/README.md`.
+
+### 4. Architecture & Rules of Engagement
+- **Small Commits:** Make atomic, well-scoped commits following Conventional Commits (`feat(...)`, `fix(...)`, `docs(...)`, `test(...)`). Do not merge branches unless explicitly requested.
 - **Two-Layer Backend Architecture:**
-  - **Layer A (`/api/v2/{module}/{action}`)**: Official partner endpoints with strict HMAC-SHA256 signature verification (`shopeeAuthGuard`), standard Shopee envelope `{ error, message, response, request_id }`, and official error codes.
-  - **Layer B (`/api/v2/simulator/*`)**: Public simulator helpers, Buyer actions, and Shopiz integration routes in `src/modules/simulator/simulator.router.ts`.
-- **UI Platform & Localization Standards:**
-  - Browser testbed is at `shopee-simulator/public/index.html` (port 8080) with authentic Vietnamese copy (`vi-VN`).
-  - Shopiz marketplace and Seller Center are in `shopiz/` (port 5173) with clean monochrome styling.
-  - All developer explanations, code comments, and git commits MUST remain in **English**.
-- **Docker Container Build Hygiene:**
-  - Whenever updating TypeScript in `shopee-simulator/src/`, compile with `npm run build` and synchronize into the container:
-    `docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker restart shopee-mock-server`
+  - **Layer A (`/api/v2/{module}/{action}`):** Official partner endpoints with strict HMAC-SHA256 signature verification (`shopeeAuthGuard`), standard Shopee response envelope (`{ error, message, response, request_id }`), and documented error codes.
+  - **Layer B (`/api/v2/simulator/*`):** Public simulator helpers, Buyer actions, and Shopiz integration routes (primarily in `src/modules/simulator/simulator.router.ts`).
+- **Localization:** All user-facing UI text, buttons, modals, labels, and toasts in the simulator testbed and Shopiz Seller Center MUST use authentic Vietnamese (`vi-VN`). Assistant responses, commit messages, code comments, and documentation remain in English.
+- **Backend Build Hygiene:** When TypeScript under `shopee-simulator/src/` changes, run `npm run build`; synchronize `dist/` and `public/index.html` into the running container (`shopee-mock-server`), then restart the container.
 
-### 3. Key Reference Documentation
-- **Master Protocol Spec & API Index:** `SHOPEE_SIMULATOR_SPEC_AND_API_INDEX.md`
-- **Backend Changelog:** `shopee-simulator/CHANGELOG.md`
-- **Frontend Documentation:** `shopiz/README.md`
-- **Workspace Skill:** `.agents/skills/shopee-simulator/SKILL.md`
+### 5. Verification Commands
+- Backend Tests: `cd shopee-simulator && npm test`
+- Backend Compile: `cd shopee-simulator && npm run build`
+- Frontend Integration: `cd shopiz && npm run check:integration`
+- Seller Review Management: `cd shopiz && npm run check:reviews`
+- Seller All Orders: `cd shopiz && npm run check:all-orders`
+- Seller All Products: `cd shopiz && npm run check:products-page`
+- Seller Returns & Disputes: `cd shopiz && npm run check:returns-page`
+- Seller Pagination: `cd shopiz && npm run check:seller-pagination`
+- Seller Multi-Shop Selector: `cd shopiz && npm run check:shop-select`
 
-Please confirm that you have checked the repositories, verified baseline health via `npm test` and `npm run check:integration`, and are ready for the next task.
+First inspect both repositories and the relevant UI/API references, confirm the current branch and working tree, then report baseline status and state that you are ready for the next task.
+```
 ```
 
 ---
@@ -65,11 +74,12 @@ Please confirm that you have checked the repositories, verified baseline health 
 | :--- | :--- |
 | **Verify Backend Tests** | `cd shopee-simulator && npm test` |
 | **Compile Backend TypeScript** | `cd shopee-simulator && npm run build` |
-| **Synchronize Live Backend Container** | `docker cp shopee-simulator/dist/. shopee-mock-server:/app/dist/ && docker restart shopee-mock-server` |
+| **Synchronize Live Backend Container** | `cd shopee-simulator && docker cp dist/. shopee-mock-server:/app/dist/ && docker cp public/index.html shopee-mock-server:/app/public/index.html && docker restart shopee-mock-server` |
 | **Verify Frontend Integration** | `cd shopiz && npm run check:integration` |
-| **Verify Multi-Shop Selector** | `cd shopiz && npm run check:shop-select` |
-| **Verify Seller Center Suite** | `cd shopiz && SHOPIZ_URL="http://127.0.0.1:5173" node scripts/verify-seller.mjs` |
-| **Verify Dynamic Shipping & Live Chat** | `cd shopiz && npm run check:shipping-chat` |
-| **Verify Checkout Suite** | `cd shopiz && npm run check:checkout` |
+| **Verify Review Management** | `cd shopiz && npm run check:reviews` |
+| **Verify All Orders Suite** | `cd shopiz && npm run check:all-orders` |
+| **Verify Products Page Suite** | `cd shopiz && npm run check:products-page` |
+| **Verify Returns & Disputes** | `cd shopiz && npm run check:returns-page` |
+| **Verify Seller Pagination** | `cd shopiz && npm run check:seller-pagination` |
+| **Verify Multi-Shop Switcher** | `cd shopiz && npm run check:shop-select` |
 | **Verify Purchases Suite** | `cd shopiz && npm run check:purchases` |
-

@@ -76,6 +76,18 @@ export const simulatorSwaggerPaths: Record<string, any> = {
       responses: { "200": { description: "Catalog product list" } }
     }
   },
+  "/api/v2/simulator/product/extra_info": {
+    get: {
+      tags: ["Simulator Control"],
+      summary: "Get Shopiz Product Metrics",
+      description: "Shop-safe metrics integration for Shopiz. Accepts 1–50 item IDs and returns the same sales, views, likes, and review metrics as the signed Shopee endpoint.",
+      parameters: [
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "item_id_list", in: "query", required: true, description: "Comma-separated IDs; maximum 50", schema: { type: "string" } }
+      ],
+      responses: { "200": { description: "Returns item_list metrics" } }
+    }
+  },
   "/api/v2/simulator/product/create": {
     post: {
       tags: ["Simulator Control"],
@@ -573,23 +585,46 @@ export const simulatorSwaggerPaths: Record<string, any> = {
   "/api/v2/simulator/reviews": {
     get: {
       tags: ["Reviews"],
-      summary: "List Store Reviews",
-      parameters: [{ name: "shop_id", in: "query", required: true, schema: { type: "integer" } }],
-      responses: { "200": { description: "Array of store reviews" } }
+      summary: "List Paginated Store Reviews",
+      description: "Shop-scoped review list with status, star, search and date filters. Cursor is an offset in this simulator helper.",
+      parameters: [
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "page_size", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+        { name: "cursor", in: "query", schema: { type: "integer", minimum: 0, default: 0 } },
+        { name: "status", in: "query", schema: { type: "string", enum: ["ALL", "NEED_REPLY", "REPLIED"] } },
+        { name: "rating_star_list", in: "query", schema: { type: "string", example: "1,2,5" } },
+        { name: "keyword", in: "query", schema: { type: "string", description: "Search product name, order SN, or buyer username" } },
+        { name: "date_from", in: "query", schema: { type: "string", format: "date-time" } },
+        { name: "date_to", in: "query", schema: { type: "string", format: "date-time" } }
+      ],
+      responses: { "200": { description: "Paginated review list and filtered status/star counts" } }
+    }
+  },
+  "/api/v2/simulator/reviews/summary": {
+    get: {
+      tags: ["Reviews"],
+      summary: "Get Shop Review Dashboard Summary",
+      description: "Returns shop rating and 30-day/current-versus-previous review metrics, negative unanswered reviews, and reviews since last visit.",
+      parameters: [
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "last_visit_at", in: "query", schema: { type: "integer", description: "Unix timestamp in seconds" } }
+      ],
+      responses: { "200": { description: "Review dashboard metrics for the selected shop" } }
     }
   },
   "/api/v2/simulator/review/reply": {
     post: {
       tags: ["Reviews"],
-      summary: "Simulator Seller Reply to Review",
+      summary: "Simulator Seller Reply to Shop Review",
       requestBody: {
         required: true,
         content: {
           "application/json": {
             schema: {
               type: "object",
-              required: ["comment_id", "reply"],
+              required: ["shop_id", "comment_id", "reply"],
               properties: {
+                shop_id: { type: "integer" },
                 comment_id: { type: "integer" },
                 reply: { type: "string" }
               }

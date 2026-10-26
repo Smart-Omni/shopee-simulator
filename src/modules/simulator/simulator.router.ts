@@ -9,8 +9,76 @@ import { normalizeReturnReason } from "../returns/returns.constants";
 import { calculateReverseShippingFee } from "../payment/payment.router";
 import { storageService } from "../../common/storage/storage.service";
 import * as crypto from "crypto";
+import { getItemExtraInfo, parseItemIds } from "../product/product-metrics.service";
 
 export const simulatorRouter = Router();
+
+simulatorRouter.get("/api/v2/simulator/product/extra_info", async (req: Request, res: Response): Promise<void> => {
+  const shopRaw = req.query.shop_id;
+  const itemIds = parseItemIds(req.query.item_id_list);
+  if (!shopRaw || !/^\d+$/.test(String(shopRaw)) || !itemIds || itemIds.length > 50) {
+    res.json(createShopeeErrorResponse("error_param", "shop_id and 1-50 valid item IDs are required"));
+    return;
+  }
+  const itemList = await getItemExtraInfo(BigInt(String(shopRaw)), itemIds);
+  if (itemList.length !== new Set(itemIds.map(String)).size) {
+    res.json(createShopeeErrorResponse("error_param", "One or more items do not belong to this shop"));
+    return;
+  }
+  res.json(createShopeeSuccessResponse({ item_list: itemList }));
+});
+
+simulatorRouter.post("/api/v2/simulator/product/view", async (req: Request, res: Response): Promise<void> => {
+  const itemRaw = req.body?.item_id;
+  if (!/^\d+$/.test(String(itemRaw ?? ""))) {
+    res.json(createShopeeErrorResponse("error_param", "A valid item_id is required"));
+    return;
+  }
+  const itemId = BigInt(String(itemRaw));
+  const product = await prisma.product.update({ where: { itemId }, data: { viewCount: { increment: 1 } }, select: { viewCount: true } }).catch(() => null);
+  if (!product) {
+    res.json(createShopeeErrorResponse("error_param", "Product not found"));
+    return;
+  }
+  res.json(createShopeeSuccessResponse({ item_id: Number(itemId), views: product.viewCount }));
+});
+
+simulatorRouter.get("/api/v2/simulator/product/like", async (req: Request, res: Response): Promise<void> => {
+  const itemRaw = req.query.item_id;
+  const buyerRaw = req.query.buyer_user_id;
+  if (!/^\d+$/.test(String(itemRaw ?? "")) || !/^\d+$/.test(String(buyerRaw ?? ""))) {
+    res.json(createShopeeErrorResponse("error_param", "item_id and buyer_user_id are required"));
+    return;
+  }
+  const itemId = BigInt(String(itemRaw));
+  const buyerUserId = BigInt(String(buyerRaw));
+  const [liked, likes] = await Promise.all([
+    prisma.productLike.findUnique({ where: { itemId_buyerUserId: { itemId, buyerUserId } } }),
+    prisma.productLike.count({ where: { itemId } })
+  ]);
+  res.json(createShopeeSuccessResponse({ item_id: Number(itemId), liked: Boolean(liked), likes }));
+});
+
+simulatorRouter.post("/api/v2/simulator/product/like", async (req: Request, res: Response): Promise<void> => {
+  const { item_id: itemRaw, buyer_user_id: buyerRaw } = req.body || {};
+  if (!/^\d+$/.test(String(itemRaw ?? "")) || !/^\d+$/.test(String(buyerRaw ?? ""))) {
+    res.json(createShopeeErrorResponse("error_param", "item_id and buyer_user_id are required"));
+    return;
+  }
+  const itemId = BigInt(String(itemRaw));
+  const buyerUserId = BigInt(String(buyerRaw));
+  const key = { itemId_buyerUserId: { itemId, buyerUserId } };
+  let liked: boolean;
+  if (await prisma.productLike.findUnique({ where: key })) {
+    await prisma.productLike.delete({ where: key });
+    liked = false;
+  } else {
+    await prisma.productLike.create({ data: { itemId, buyerUserId } });
+    liked = true;
+  }
+  const likes = await prisma.productLike.count({ where: { itemId } });
+  res.json(createShopeeSuccessResponse({ item_id: Number(itemId), liked, likes }));
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -230,7 +298,17 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
       is_vacation: Boolean(p.shop?.isVacation),
       item_name: p.itemName,
       item_status: p.itemStatus,
+      category_id: Number(p.categoryId),
       description: p.description,
+      item_sku: p.itemSku,
+      gtin: p.gtin,
+      video_url: p.videoUrl,
+      image_ratio: p.imageRatio,
+      product_condition: p.productCondition,
+      is_preorder: p.isPreorder,
+      preorder_days_to_ship: p.preorderDaysToShip,
+      attribute_list: p.attributesJson,
+      shipping_options: p.shippingOptionsJson,
       category_name: p.category?.categoryName || "General",
       original_price: Number(p.originalPrice),
       current_price: promoPrice !== null ? promoPrice : Number(p.originalPrice),
@@ -289,7 +367,7 @@ simulatorRouter.get("/api/v2/simulator/product/detail", async (req: Request, res
       include: {
         shop: true,
         category: true,
-        models: true,
+        models: { orderBy: { modelId: "asc" } },
         comments: {
           orderBy: { createdAt: "desc" },
           take: 10
@@ -363,6 +441,15 @@ simulatorRouter.get("/api/v2/simulator/product/detail", async (req: Request, res
         currency: p.currency,
         weight: Number(p.weight || 0.5),
         dimensions: p.dimensionsJson,
+        item_sku: p.itemSku,
+        gtin: p.gtin,
+        video_url: p.videoUrl,
+        image_ratio: p.imageRatio,
+        product_condition: p.productCondition,
+        is_preorder: p.isPreorder,
+        preorder_days_to_ship: p.preorderDaysToShip,
+        attribute_list: p.attributesJson,
+        shipping_options: p.shippingOptionsJson,
         images: p.imagesJson,
         has_model: p.hasModel,
         tier_variation: p.tierVariationJson,
@@ -418,6 +505,114 @@ simulatorRouter.get("/api/v2/simulator/product/detail", async (req: Request, res
   }
 });
 
+// Shopiz seller editor update endpoint. Kept in Layer B; official signed endpoints remain unchanged.
+simulatorRouter.post("/api/v2/simulator/product/update", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const body = req.body || {};
+    if (!body.item_id || !body.shop_id || !String(body.item_name || "").trim()) {
+      res.json(createShopeeErrorResponse("error_param", "item_id, shop_id, and item_name are required"));
+      return;
+    }
+    const itemId = BigInt(body.item_id);
+    const shopId = BigInt(body.shop_id);
+    const product = await prisma.product.findFirst({
+      where: { itemId, shopId },
+      include: { shop: true, models: { orderBy: { modelId: "asc" }, include: { _count: { select: { orderItems: true, discountItemModels: true } } } } }
+    });
+    if (!product) {
+      res.json(createShopeeErrorResponse("error_not_found", "Product not found for this shop"));
+      return;
+    }
+    if (String(body.item_name).trim().length > 120) {
+      res.json(createShopeeErrorResponse("error_param", "Product name must not exceed 120 characters"));
+      return;
+    }
+    if (body.product_workflow && product.shop.isVacation && body.item_status === "NORMAL") {
+      res.json(createShopeeErrorResponse("error_business", "Products can only be saved unlisted while the shop is on holiday"));
+      return;
+    }
+    if (body.item_status && !["NORMAL", "UNLIST"].includes(String(body.item_status))) {
+      res.json(createShopeeErrorResponse("error_param", "item_status must be NORMAL or UNLIST"));
+      return;
+    }
+    const categoryId = BigInt(body.category_id);
+    const category = await prisma.category.findUnique({ where: { categoryId }, include: { attributes: true } });
+    if (!category || category.hasChildren) {
+      res.json(createShopeeErrorResponse("error_param", "Select a valid leaf category"));
+      return;
+    }
+    const attributes = Array.isArray(body.attribute_list) ? body.attribute_list : [];
+    for (const attribute of category.attributes.filter((entry) => entry.isMandatory)) {
+      if (!attributes.some((value: any) => Number(value.attribute_id) === Number(attribute.attributeId) && Array.isArray(value.attribute_value_list) && value.attribute_value_list.length)) {
+        res.json(createShopeeErrorResponse("error_param", `Attribute is mandatory: ${attribute.name}`));
+        return;
+      }
+    }
+    if (!Array.isArray(body.shipping_option_ids) || !body.shipping_option_ids.length) {
+      res.json(createShopeeErrorResponse("error_param", "Select at least one shipping option"));
+      return;
+    }
+    const weightGrams = Number(body.package_weight_grams);
+    const price = Number(body.original_price);
+    if (!Number.isFinite(weightGrams) || weightGrams <= 0 || !Number.isFinite(price) || price <= 0 || !String(body.description || "").trim()) {
+      res.json(createShopeeErrorResponse("error_param", "Description, positive package weight, and price are required"));
+      return;
+    }
+    if (!Array.isArray(body.images) || body.images.length < 1 || body.images.length > 9) {
+      res.json(createShopeeErrorResponse("error_param", "Upload between 1 and 9 product images"));
+      return;
+    }
+    const optionIds = body.shipping_option_ids.map(String);
+    const shippingOptions = await prisma.productShippingOption.findMany({ where: { optionId: { in: optionIds }, enabled: true } });
+    if (shippingOptions.length !== new Set(optionIds).size || shippingOptions.some((option) => option.maximumWeightGram !== null && weightGrams > option.maximumWeightGram)) {
+      res.json(createShopeeErrorResponse("error_param", "Selected shipping options are unavailable or exceed their weight limit"));
+      return;
+    }
+    const tiers = Array.isArray(body.tier_variation) ? body.tier_variation : [];
+    const models = Array.isArray(body.models) ? body.models : [];
+    if (tiers.length > 2 || tiers.some((tier: any) => !String(tier.name || "").trim() || !Array.isArray(tier.option_list) || !tier.option_list.length)) {
+      res.json(createShopeeErrorResponse("error_param", "Products support at most 2 valid variation groups"));
+      return;
+    }
+    if (product.models.some((model: any, index: number) => index >= models.length && (model._count.orderItems || model._count.discountItemModels))) {
+      res.json(createShopeeErrorResponse("error_business", "A variation with order or promotion history cannot be removed"));
+      return;
+    }
+    if (product.models.some((model: any, index: number) =>
+      (model._count.orderItems || model._count.discountItemModels) && models[index] && String(models[index].model_name || "Standard") !== model.modelName
+    )) {
+      res.json(createShopeeErrorResponse("error_business", "A variation with order or promotion history cannot be renamed or reordered"));
+      return;
+    }
+    const imageUrls = body.images.map((image: any) => typeof image === "string" ? image : image.url).filter(Boolean);
+    const imagesJson = { image_id_list: imageUrls.map((_: string, index: number) => `product-${itemId}-${index}`), image_url_list: imageUrls };
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.product.update({ where: { itemId }, data: {
+        categoryId, itemName: String(body.item_name).trim(), description: body.description,
+        gtin: body.gtin || null, videoUrl: body.video_url || null, imageRatio: body.image_ratio || "1:1",
+        productCondition: body.product_condition || "NEW", isPreorder: Boolean(body.is_preorder),
+        preorderDaysToShip: body.is_preorder ? Number(body.preorder_days_to_ship) : null,
+        ...(body.item_status ? { itemStatus: body.item_status } : {}), originalPrice: price,
+        weight: weightGrams / 1000, dimensionsJson: body.dimension || {}, attributesJson: attributes,
+        shippingOptionsJson: shippingOptions.map((option) => ({ option_id: option.optionId, option_name: option.optionName, option_group: option.optionGroup, maximum_weight_gram: option.maximumWeightGram })),
+        itemSku: body.item_sku || null, hasModel: tiers.length > 0, tierVariationJson: tiers, imagesJson
+      } });
+      for (let index = 0; index < models.length; index += 1) {
+        const value = models[index];
+        const existing = product.models[index];
+        const data = { modelName: value.model_name || "Standard", modelSku: value.model_sku || null, tierIndex: value.tier_index || [0], originalPrice: Number(value.original_price || price), sellerStock: Number(value.seller_stock || 0) };
+        if (existing) await tx.productModel.update({ where: { modelId: existing.modelId }, data });
+        else await tx.productModel.create({ data: { ...data, itemId } });
+      }
+      for (const removed of product.models.slice(models.length)) await tx.productModel.delete({ where: { modelId: removed.modelId } });
+      return result;
+    });
+    res.json(createShopeeSuccessResponse({ item_id: Number(updated.itemId), item_name: updated.itemName, item_status: updated.itemStatus }));
+  } catch (error: any) {
+    res.json(createShopeeErrorResponse("error_server", error.message || "Failed to update product"));
+  }
+});
+
 // ============================================================================
 // 4C. GET CATEGORIES FOR SHOPIZ DISCOVERY
 // ============================================================================
@@ -451,6 +646,45 @@ simulatorRouter.get("/api/v2/simulator/categories", async (_req: Request, res: R
     }));
   } catch (error: any) {
     res.json(createShopeeErrorResponse("error_server", error.message || "Failed to retrieve categories"));
+  }
+});
+
+// ============================================================================
+// 4C. PRODUCT CREATION CONFIGURATION FOR SHOPIZ
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/product-creation/config", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const shopIdStr = req.query.shop_id as string;
+    if (!shopIdStr || !/^\d+$/.test(shopIdStr)) {
+      res.json(createShopeeErrorResponse("error_param", "A valid shop_id is required"));
+      return;
+    }
+
+    const shop = await prisma.shop.findUnique({ where: { shopId: BigInt(shopIdStr) } });
+    if (!shop) {
+      res.json(createShopeeErrorResponse("error_param", "Shop not found"));
+      return;
+    }
+
+    const shippingOptions = await prisma.productShippingOption.findMany({
+      where: { enabled: true },
+      orderBy: { sortOrder: "asc" }
+    });
+
+    res.json(createShopeeSuccessResponse({
+      shop_id: Number(shop.shopId),
+      is_vacation: shop.isVacation,
+      shipping_options: shippingOptions.map((option) => ({
+        option_id: option.optionId,
+        option_name: option.optionName,
+        option_group: option.optionGroup,
+        partner_label: option.partnerLabel,
+        maximum_weight_gram: option.maximumWeightGram
+      })),
+      product_conditions: [{ value: "NEW", label: "Mới" }]
+    }));
+  } catch (error: any) {
+    res.json(createShopeeErrorResponse("error_server", error.message || "Failed to retrieve product creation configuration"));
   }
 });
 
@@ -1021,7 +1255,19 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
     tier_variation,
     models = [],
     images = [],
-    image_url_list = []
+    image_url_list = [],
+    product_workflow = false,
+    package_weight_grams,
+    dimension,
+    attribute_list = [],
+    gtin,
+    video_url,
+    image_ratio = "1:1",
+    product_condition = "NEW",
+    is_preorder = false,
+    preorder_days_to_ship,
+    shipping_option_ids = [],
+    item_status = "NORMAL"
   } = req.body || {};
 
   if (!item_name) {
@@ -1029,8 +1275,130 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
     return;
   }
 
+  if (product_workflow && (package_weight_grams === undefined || package_weight_grams === null)) {
+    res.json(createShopeeErrorResponse("error_param", "package_weight_grams is required"));
+    return;
+  }
+
   const shopId = BigInt(shop_id);
   const catId = BigInt(category_id);
+
+  let parsedAttributes = attribute_list;
+  if (typeof parsedAttributes === "string") {
+    try { parsedAttributes = JSON.parse(parsedAttributes); } catch { parsedAttributes = []; }
+  }
+
+  let parsedShippingOptionIds = shipping_option_ids;
+  if (typeof parsedShippingOptionIds === "string") {
+    try { parsedShippingOptionIds = JSON.parse(parsedShippingOptionIds); } catch { parsedShippingOptionIds = []; }
+  }
+
+  let packageWeightKg = Number(weight);
+  if (package_weight_grams !== undefined) {
+    const weightGrams = Number(package_weight_grams);
+    if (!Number.isFinite(weightGrams) || weightGrams <= 0) {
+      res.json(createShopeeErrorResponse("error_param", "Package weight must be greater than 0 grams"));
+      return;
+    }
+    packageWeightKg = weightGrams / 1000;
+  }
+
+  let selectedShippingOptions: any[] = [];
+  if (product_workflow) {
+    const shop = await prisma.shop.findUnique({ where: { shopId } });
+    if (!shop) {
+      res.json(createShopeeErrorResponse("error_param", "Shop not found"));
+      return;
+    }
+    if (item_status !== "NORMAL" && item_status !== "UNLIST") {
+      res.json(createShopeeErrorResponse("error_param", "item_status must be NORMAL or UNLIST"));
+      return;
+    }
+    if (shop.isVacation && item_status !== "UNLIST") {
+      res.json(createShopeeErrorResponse("error_business", "Products can only be saved unlisted while the shop is on holiday"));
+      return;
+    }
+    if (String(item_name).trim().length === 0 || String(item_name).length > 120) {
+      res.json(createShopeeErrorResponse("error_param", "Product name is required and must not exceed 120 characters"));
+      return;
+    }
+    if (!Array.isArray(parsedShippingOptionIds) || parsedShippingOptionIds.length === 0) {
+      res.json(createShopeeErrorResponse("error_param", "Select at least one shipping option"));
+      return;
+    }
+    selectedShippingOptions = await prisma.productShippingOption.findMany({
+      where: { optionId: { in: parsedShippingOptionIds.map(String) }, enabled: true }
+    });
+    if (selectedShippingOptions.length !== new Set(parsedShippingOptionIds.map(String)).size) {
+      res.json(createShopeeErrorResponse("error_param", "One or more selected shipping options are unavailable"));
+      return;
+    }
+    if (selectedShippingOptions.some((option) => option.maximumWeightGram !== null && Number(package_weight_grams) > option.maximumWeightGram)) {
+      res.json(createShopeeErrorResponse("error_param", "Package weight exceeds the selected shipping option limit"));
+      return;
+    }
+    if (!Array.isArray(parsedAttributes)) {
+      res.json(createShopeeErrorResponse("error_param", "Attributes must be an array"));
+      return;
+    }
+    if (Number(original_price) <= 0 || !Number.isFinite(Number(original_price))) {
+      res.json(createShopeeErrorResponse("error_param", "Product price must be greater than 0"));
+      return;
+    }
+    if (!["NEW"].includes(String(product_condition))) {
+      res.json(createShopeeErrorResponse("error_param", "Unsupported product condition"));
+      return;
+    }
+    if (image_ratio !== "1:1" && image_ratio !== "3:4") {
+      res.json(createShopeeErrorResponse("error_param", "image_ratio must be 1:1 or 3:4"));
+      return;
+    }
+    if (Boolean(is_preorder) && (!Number.isInteger(Number(preorder_days_to_ship)) || Number(preorder_days_to_ship) < 5 || Number(preorder_days_to_ship) > 15)) {
+      res.json(createShopeeErrorResponse("error_param", "preorder_days_to_ship must be an integer from 5 to 15"));
+      return;
+    }
+    if (!Boolean(is_preorder) && preorder_days_to_ship != null) {
+      res.json(createShopeeErrorResponse("error_param", "preorder_days_to_ship is only allowed for pre-order products"));
+      return;
+    }
+    if (!String(description).trim()) {
+      res.json(createShopeeErrorResponse("error_param", "Product description is required"));
+      return;
+    }
+    const category = await prisma.category.findUnique({
+      where: { categoryId: catId },
+      include: { attributes: true }
+    });
+    if (!category || category.hasChildren) {
+      res.json(createShopeeErrorResponse("error_param", "Select a valid leaf category"));
+      return;
+    }
+    const mandatoryAttributes = category.attributes.filter((attribute) => attribute.isMandatory);
+    for (const attribute of mandatoryAttributes) {
+      const supplied = parsedAttributes.find((entry: any) => Number(entry.attribute_id) === Number(attribute.attributeId));
+      if (!supplied || !Array.isArray(supplied.attribute_value_list) || supplied.attribute_value_list.length === 0) {
+        res.json(createShopeeErrorResponse("error_param", `Attribute is mandatory: ${attribute.name} (id: ${attribute.attributeId})`));
+        return;
+      }
+    }
+    for (const supplied of parsedAttributes) {
+      const definition = category.attributes.find((attribute) => Number(attribute.attributeId) === Number(supplied.attribute_id));
+      if (!definition || !Array.isArray(supplied.attribute_value_list)) {
+        res.json(createShopeeErrorResponse("error_param", "Attribute does not belong to the selected category"));
+        return;
+      }
+      if (["DROP_DOWN", "MULTI_SELECT"].includes(definition.inputType)) {
+        const allowedValues = Array.isArray(definition.valueListJson) ? definition.valueListJson as any[] : [];
+        const invalidValue = supplied.attribute_value_list.some((value: any) =>
+          !allowedValues.some((allowed: any) => String(allowed.value_id) === String(value.value_id))
+        );
+        if (invalidValue) {
+          res.json(createShopeeErrorResponse("error_param", `Invalid value for category attribute: ${definition.name}`));
+          return;
+        }
+      }
+    }
+  }
 
   let parsedModels = models;
   if (typeof models === "string") {
@@ -1049,6 +1417,16 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
     } catch {
       parsedTierVariation = undefined;
     }
+  }
+  if (product_workflow && Array.isArray(parsedTierVariation) && parsedTierVariation.length > 2) {
+    res.json(createShopeeErrorResponse("error_param", "Shopee products support at most 2 variation groups"));
+    return;
+  }
+  if (product_workflow && parsedTierVariation !== undefined && (!Array.isArray(parsedTierVariation) || parsedTierVariation.some((tier: any) =>
+    !String(tier?.name || "").trim() || !Array.isArray(tier?.option_list) || tier.option_list.length === 0 || tier.option_list.some((option: any) => !String(option?.option || "").trim())
+  ))) {
+    res.json(createShopeeErrorResponse("error_param", "Each product variation group requires a name and at least one value"));
+    return;
   }
 
   // Process media: uploaded files or passed URLs
@@ -1093,6 +1471,10 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
   }
 
   const uniqueUrls = Array.from(new Set(finalImageUrls.filter(Boolean)));
+  if (product_workflow && (uniqueUrls.length === 0 || uniqueUrls.length > 9)) {
+    res.json(createShopeeErrorResponse("error_param", "Upload between 1 and 9 product images"));
+    return;
+  }
   const effectiveUrls = uniqueUrls.length > 0 ? uniqueUrls : ["https://cf.shopee.vn/file/custom_product_image"];
   const imageIdList = effectiveUrls.map((_, idx) => `vn-11134201-7rd5z-${Date.now().toString(36)}-${idx}`);
 
@@ -1124,9 +1506,24 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
       categoryId: catId,
       itemName: item_name,
       description,
+      gtin: gtin || null,
+      videoUrl: video_url || null,
+      imageRatio: image_ratio,
+      productCondition: product_condition,
+      isPreorder: Boolean(is_preorder),
+      preorderDaysToShip: Boolean(is_preorder) ? Number(preorder_days_to_ship) : null,
+      itemStatus: product_workflow ? item_status : "NORMAL",
       originalPrice: effectiveBasePrice,
       currency: "VND",
-      weight: Number(weight),
+      weight: packageWeightKg,
+      dimensionsJson: dimension || undefined,
+      attributesJson: product_workflow ? parsedAttributes : undefined,
+      shippingOptionsJson: product_workflow ? selectedShippingOptions.map((option) => ({
+        option_id: option.optionId,
+        option_name: option.optionName,
+        option_group: option.optionGroup,
+        maximum_weight_gram: option.maximumWeightGram
+      })) : undefined,
       itemSku: item_sku || `SKU-${Date.now()}`,
       hasModel,
       tierVariationJson: parsedTierVariation || undefined,
@@ -1164,6 +1561,7 @@ simulatorRouter.post("/api/v2/simulator/product/create", upload.any(), async (re
     item_id: Number(product.itemId),
     item_name: product.itemName,
     has_model: product.hasModel,
+    item_status: product.itemStatus,
     images: imagesJson
   }));
 });
@@ -1345,7 +1743,7 @@ simulatorRouter.post("/api/v2/simulator/order/deliver", async (req: Request, res
   const now = new Date();
   await prisma.order.update({
     where: { orderSn: order_sn },
-    data: { orderStatus: OrderStatus.COMPLETED, updatedAt: now, escrowReleaseTime: now }
+    data: { orderStatus: OrderStatus.COMPLETED, updatedAt: now, escrowReleaseTime: now, completedAt: now }
   });
 
   for (const pkg of order.packages) {
@@ -2134,41 +2532,146 @@ simulatorRouter.post("/api/v2/simulator/review/create", async (req: Request, res
 simulatorRouter.get("/api/v2/simulator/reviews", async (req: Request, res: Response): Promise<void> => {
   try {
     const shopIdStr = req.query.shop_id as string | undefined;
-    const itemIdStr = req.query.item_id as string | undefined;
-
-    const whereClause: any = {};
-    if (shopIdStr && shopIdStr.toUpperCase() !== "ALL") {
-      whereClause.shopId = BigInt(shopIdStr);
+    if (!shopIdStr || !/^\d+$/.test(shopIdStr)) {
+      res.json(createShopeeErrorResponse("error_param", "A valid shop_id is required"));
+      return;
     }
-    if (itemIdStr) {
-      whereClause.itemId = BigInt(itemIdStr);
+    const shopId = BigInt(shopIdStr);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size) || 20));
+    const cursor = Math.max(0, Number(req.query.cursor) || 0);
+    const status = String(req.query.status || "ALL").toUpperCase();
+    if (!Number.isInteger(pageSize) || !Number.isInteger(cursor) || !["ALL", "NEED_REPLY", "REPLIED"].includes(status)) {
+      res.json(createShopeeErrorResponse("error_param", "Invalid review pagination or status filter"));
+      return;
     }
 
-    const reviews = await prisma.productComment.findMany({
-      where: whereClause,
-      include: {
-        product: true
-      },
-      orderBy: { commentId: "desc" }
-    });
+    const where: any = { shopId };
+    const dateFrom = req.query.date_from ? new Date(String(req.query.date_from)) : null;
+    const dateTo = req.query.date_to ? new Date(String(req.query.date_to)) : null;
+    if ((dateFrom && Number.isNaN(dateFrom.getTime())) || (dateTo && Number.isNaN(dateTo.getTime())) || (dateFrom && dateTo && dateFrom > dateTo)) {
+      res.json(createShopeeErrorResponse("error_param", "Review date range is invalid"));
+      return;
+    }
+    if (dateFrom || dateTo) where.createdAt = { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) };
+
+    const ratingsRaw = String(req.query.rating_star_list || "").trim();
+    const ratings = ratingsRaw ? ratingsRaw.split(",").map(Number) : [];
+    if (ratings.some((rating) => !Number.isInteger(rating) || rating < 1 || rating > 5)) {
+      res.json(createShopeeErrorResponse("error_param", "rating_star_list must contain ratings from 1 to 5"));
+      return;
+    }
+    if (ratings.length) where.ratingStar = { in: [...new Set(ratings)] };
+
+    const keyword = String(req.query.keyword || "").trim();
+    if (keyword) where.OR = [
+      { orderSn: { contains: keyword, mode: "insensitive" } },
+      { buyerUsername: { contains: keyword, mode: "insensitive" } },
+      { product: { itemName: { contains: keyword, mode: "insensitive" } } }
+    ];
+    const commonWhere = { ...where };
+    if (status === "NEED_REPLY") where.reply = null;
+    if (status === "REPLIED") where.reply = { not: null };
+
+    const [reviews, totalCount, needReplyCount, repliedCount, starCounts] = await Promise.all([
+      prisma.productComment.findMany({
+        where,
+        include: { product: { select: { itemName: true, imagesJson: true, models: true } } },
+        orderBy: [{ createdAt: "desc" }, { commentId: "desc" }],
+        skip: cursor,
+        take: pageSize
+      }),
+      prisma.productComment.count({ where }),
+      prisma.productComment.count({ where: { ...commonWhere, reply: null } }),
+      prisma.productComment.count({ where: { ...commonWhere, reply: { not: null } } }),
+      prisma.productComment.groupBy({ by: ["ratingStar"], where: commonWhere, _count: { _all: true } })
+    ]);
+    const stars: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+    for (const row of starCounts) stars[String(row.ratingStar)] = row._count._all;
 
     res.json(createShopeeSuccessResponse({
-      reviews: reviews.map(r => ({
-        comment_id: Number(r.commentId),
-        order_sn: r.orderSn,
-        item_id: Number(r.itemId),
-        item_name: r.product?.itemName || `Item ${r.itemId}`,
-        model_id: r.modelId ? Number(r.modelId) : 0,
-        buyer_username: r.buyerUsername,
-        rating_star: r.ratingStar,
-        comment: r.comment,
-        reply: r.reply,
-        reply_time: r.replyTime ? Math.floor(r.replyTime.getTime() / 1000) : null,
-        create_time: Math.floor(r.createdAt.getTime() / 1000)
-      }))
+      reviews: reviews.map((r) => {
+        const images = r.product?.imagesJson as any;
+        const imageList = Array.isArray(images?.image_url_list) ? images.image_url_list : [];
+        const model = r.modelId ? r.product?.models.find((entry) => entry.modelId === r.modelId) : null;
+        return {
+          comment_id: Number(r.commentId), order_sn: r.orderSn, item_id: Number(r.itemId),
+          item_name: r.product?.itemName || `Item ${r.itemId}`, item_image: imageList[0] || null,
+          model_id: r.modelId ? Number(r.modelId) : 0, model_name: model?.modelName || null,
+          buyer_username: r.buyerUsername, rating_star: r.ratingStar, comment: r.comment,
+          images: Array.isArray(r.imagesJson) ? r.imagesJson : [], reply: r.reply,
+          reply_time: r.replyTime ? Math.floor(r.replyTime.getTime() / 1000) : null,
+          create_time: Math.floor(r.createdAt.getTime() / 1000)
+        };
+      }),
+      pagination: { cursor, page_size: pageSize, total_count: totalCount, next_cursor: cursor + reviews.length < totalCount ? String(cursor + reviews.length) : "", more: cursor + reviews.length < totalCount },
+      counts: { all: totalCount, need_reply: needReplyCount, replied: repliedCount, stars }
     }));
   } catch (err: any) {
     res.json(createShopeeErrorResponse("server_error", err.message || "Failed to fetch reviews"));
+  }
+});
+
+// ============================================================================
+// SIMULATOR HELPER: REVIEW DASHBOARD SUMMARY
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/reviews/summary", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const shopRaw = String(req.query.shop_id || "");
+    if (!/^\d+$/.test(shopRaw)) {
+      res.json(createShopeeErrorResponse("error_param", "A valid shop_id is required"));
+      return;
+    }
+    const shopId = BigInt(shopRaw);
+    const now = new Date();
+    const currentFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const previousFrom = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const lastVisitRaw = req.query.last_visit_at ? Number(req.query.last_visit_at) : null;
+    const lastVisit = lastVisitRaw && Number.isFinite(lastVisitRaw) && lastVisitRaw > 0 ? new Date(lastVisitRaw * 1000) : null;
+    const [shop, currentReviews, previousReviews, currentOrders, previousOrders, negativePending, recentCount] = await Promise.all([
+      prisma.shop.findUnique({ where: { shopId }, select: { rating: true, ratingCount: true } }),
+      prisma.productComment.findMany({ where: { shopId, createdAt: { gte: currentFrom, lte: now } }, select: { ratingStar: true, orderSn: true } }),
+      prisma.productComment.findMany({ where: { shopId, createdAt: { gte: previousFrom, lt: currentFrom } }, select: { ratingStar: true, orderSn: true } }),
+      prisma.order.findMany({ where: { shopId, orderStatus: OrderStatus.COMPLETED, completedAt: { gte: currentFrom, lte: now } }, select: { orderSn: true } }),
+      prisma.order.findMany({ where: { shopId, orderStatus: OrderStatus.COMPLETED, completedAt: { gte: previousFrom, lt: currentFrom } }, select: { orderSn: true } }),
+      prisma.productComment.count({ where: { shopId, ratingStar: { in: [1, 2] }, reply: null } }),
+      lastVisit ? prisma.productComment.count({ where: { shopId, createdAt: { gt: lastVisit } } }) : Promise.resolve(0)
+    ]);
+    if (!shop) {
+      res.json(createShopeeErrorResponse("error_param", "Shop not found"));
+      return;
+    }
+    const buildMetrics = async (reviews: typeof currentReviews, orders: { orderSn: string }[]) => {
+      const orderSns = new Set(orders.map((order) => order.orderSn));
+      const orderReviews = orderSns.size ? await prisma.productComment.findMany({
+        where: { shopId, orderSn: { in: [...orderSns] } },
+        select: { orderSn: true }
+      }) : [];
+      const reviewedOrderSns = new Set(orderReviews.map((review) => review.orderSn));
+      const reviewedOrders = [...reviewedOrderSns].filter((orderSn) => orderSns.has(orderSn)).length;
+      const positive = reviews.filter((review) => review.ratingStar >= 4).length;
+      return {
+        review_count: reviews.length,
+        review_rate: orders.length ? (reviewedOrders / orders.length) * 100 : null,
+        positive_review_rate: reviews.length ? (positive / reviews.length) * 100 : null
+      };
+    };
+    const [current, previous] = await Promise.all([buildMetrics(currentReviews, currentOrders), buildMetrics(previousReviews, previousOrders)]);
+    const change = (currentValue: number | null, previousValue: number | null) => currentValue === null || previousValue === null || previousValue === 0
+      ? null
+      : Number((((currentValue - previousValue) / Math.abs(previousValue)) * 100).toFixed(2));
+    res.json(createShopeeSuccessResponse({
+      rating: Number(shop.rating), rating_count: shop.ratingCount,
+      period: { current_from: Math.floor(currentFrom.getTime() / 1000), current_to: Math.floor(now.getTime() / 1000), previous_from: Math.floor(previousFrom.getTime() / 1000), previous_to: Math.floor(currentFrom.getTime() / 1000) },
+      metrics: {
+        review_count: { value: current.review_count, previous: previous.review_count, change_percent: change(current.review_count, previous.review_count) },
+        review_rate: { value: current.review_rate, previous: previous.review_rate, change_percent: change(current.review_rate, previous.review_rate) },
+        positive_review_rate: { value: current.positive_review_rate, previous: previous.positive_review_rate, change_percent: change(current.positive_review_rate, previous.positive_review_rate) }
+      },
+      negative_reviews_needing_reply: negativePending,
+      recent_reviews_since_last_visit: recentCount
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to load review summary"));
   }
 });
 
@@ -2177,10 +2680,10 @@ simulatorRouter.get("/api/v2/simulator/reviews", async (req: Request, res: Respo
 // ============================================================================
 simulatorRouter.post("/api/v2/simulator/review/reply", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { comment_id, reply } = req.body || {};
+    const { comment_id, reply, shop_id } = req.body || {};
 
-    if (!comment_id) {
-      res.json(createShopeeErrorResponse("error_param", "comment_id is required"));
+    if (!comment_id || !/^\d+$/.test(String(shop_id || ""))) {
+      res.json(createShopeeErrorResponse("error_param", "comment_id and a valid shop_id are required"));
       return;
     }
 
@@ -2190,8 +2693,8 @@ simulatorRouter.post("/api/v2/simulator/review/reply", async (req: Request, res:
       return;
     }
 
-    const comment = await prisma.productComment.findUnique({
-      where: { commentId: BigInt(comment_id) }
+    const comment = await prisma.productComment.findFirst({
+      where: { commentId: BigInt(comment_id), shopId: BigInt(String(shop_id)) }
     });
 
     if (!comment) {
