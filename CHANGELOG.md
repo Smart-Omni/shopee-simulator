@@ -9,7 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 - Added shop-scoped Layer B review summary and paginated review filtering by response status, star rating, date, product, order, and buyer. The summary reports current and previous 30-day review counts/rates, unanswered low-star reviews, and reviews since the caller's last visit.
 - Added `Order.completedAt`, backfilled it from escrow release/update timestamps, and populate it for new completions so review-rate cohorts use a stable completion date.
-- Added Phase 17 review-management API coverage and Swagger documentation; the Layer B reply helper now requires and verifies `shop_id`.
+- Added Phase 17 review-management API coverage (15 assertions) and Swagger documentation; the Layer B reply helper now requires and verifies `shop_id`.
+- Implemented Shopiz Seller Center's **Quản lý Đánh Giá** page with live summary metrics, review filters/search/date range, paginated records, order-ID copy, inline seller replies, loading/empty/error states, and responsive layout. The unsupported review-reward tool is omitted.
+- Added Shopiz `check:reviews` browser verification for the dashboard, status controls, empty-search result, and filter reset. The simulator container was migrated and synchronized with the new API/schema.
 - Implemented the signed Layer A simulator route `GET /api/v2/product/get_item_extra_info`, including HMAC-SHA256 enforcement, required `item_id_list` validation, support for up to 50 IDs, JSON-encoded or comma-separated lists, and shop ownership checks.
 - Added Shopiz-safe `GET /api/v2/simulator/product/extra_info` plus buyer product-view and like endpoints. Layer A and Layer B share the same metric aggregation service.
 - Persisted product detail views and unique buyer/product likes in PostgreSQL. Sales report lifetime quantity from completed orders; ratings and review counts aggregate stored product reviews, with zero values when none exist.

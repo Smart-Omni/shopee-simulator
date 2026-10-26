@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-teal.svg)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Test Suite](https://img.shields.io/badge/Tests-540%2F540%20Passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/Tests-555%2F555%20Passing-brightgreen.svg)]()
 [![Shopee Open API](https://img.shields.io/badge/Shopee%20Open%20API-v2%20Standard-orange.svg)]()
 
 > High-fidelity, contractually conforming **Shopee Open API v2 Mock Server** and interactive web testbed built for **SmartOmni Channel** integration, multi-merchant e-commerce synchronization, automated testing, and development without sandbox rate limits or dependency on live Shopee seller accounts.
@@ -69,7 +69,7 @@ The simulator implements a **Two-Layer Dual Architecture**:
 
 ## 🚀 Supported Modules & Capabilities
 
-The established backend baseline is **540 passing assertions** across the original test phases. Phase 16 adds a dedicated product-metrics integration suite (`npm run test:phase16`).
+The established backend baseline is **555 passing assertions** across the original test phases and the review-management suite. Phase 16 covers product metrics (`npm run test:phase16`); Phase 17 covers seller review management (`npm run test:phase17`).
 
 ### 1. Authentication & Dual-Token Grace Period (OAuth 2.0)
 - `POST /api/v2/public/get_token_by_resend_code`: Exchange authorization code for initial `access_token` and `refresh_token`.
@@ -145,6 +145,10 @@ The established backend baseline is **540 passing assertions** across the origin
 - Post-order 1–5 star reviews on `COMPLETED` orders with strict duplicate rejection (`product.duplicate_request`).
 - Dynamic shop rating recalculation (`Shop.rating` and `Shop.ratingCount`).
 - Seller reply management with duplicate reply prevention.
+- **Shopiz Review Management (Layer B):** `GET /api/v2/simulator/reviews/summary?shop_id=...&last_visit_at=...` returns the shop rating, latest-30-day and previous-30-day values, unanswered 1–2 star count, and reviews since the supplied Unix timestamp. `GET /api/v2/simulator/reviews` requires `shop_id` and supports `page_size` (1–100), offset `cursor`, `status` (`ALL`, `NEED_REPLY`, `REPLIED`), comma-separated `rating_star_list`, `keyword` (product name/order SN/buyer username), and ISO `date_from` / `date_to`.
+- The simulator defines review rate as distinct completed orders with at least one review divided by completed orders in the same completion window (`Order.completedAt`). Positive-review rate is 4–5 star reviews divided by reviews created in that period. A zero or unavailable comparison baseline returns `change_percent: null`; unavailable rates return `value: null` for the UI to render as `—`.
+- `POST /api/v2/simulator/review/reply` accepts `shop_id`, `comment_id`, and `reply`, and verifies the review belongs to that shop. The signed Shopee Layer A endpoints remain unchanged.
+- `npm run test:phase17` covers shop isolation, filters/counts, pagination, period summaries, recent reviews, and reply validation.
 
 ### 9. Live Customer Chat & Inquiries
 - Real-time in-app Buyer $\leftrightarrow$ Seller messaging drawer (`POST /api/v2/simulator/chat/send`, `GET /api/v2/simulator/chat/messages`, `GET /api/v2/simulator/chat/conversations`, `POST /api/v2/simulator/chat/mark_read`).
