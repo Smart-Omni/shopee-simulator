@@ -101,6 +101,20 @@ model LogisticsChannel {
   @@map("logistics_channels")
 }
 
+model ProductShippingOption {
+  optionId          String   @id
+  optionName        String
+  optionGroup       String
+  partnerLabel      String
+  maximumWeightGram Int?
+  sortOrder         Int      @default(0)
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("product_shipping_options")
+}
+
 // ----------------------------------------------------
 // 3. PRODUCT CATALOG, CATEGORIES & ATTRIBUTES
 // ----------------------------------------------------
@@ -136,7 +150,14 @@ model Product {
   itemName          String
   description       String   @db.Text
   itemSku           String?
+  gtin              String?
+  videoUrl          String?
+  imageRatio        String    @default("1:1")
+  productCondition  String    @default("NEW")
+  isPreorder        Boolean   @default(false)
+  preorderDaysToShip Int?
   itemStatus        String   @default("NORMAL") // NORMAL, UNLIST, BANNED, DELETED
+  viewCount         Int      @default(0)
   originalPrice     Decimal  @db.Decimal(15, 2)
   currency          String   @default("VND")
   weight            Decimal  @default(0.5) @db.Decimal(10, 2)
@@ -145,6 +166,7 @@ model Product {
   attributesJson    Json?    // [{ attribute_id, attribute_value_list: [{ value_id }] }]
   hasModel          Boolean  @default(false)
   tierVariationJson Json?   // [{ name: "Color", option_list: [{ option: "Red" }] }]
+  shippingOptionsJson Json?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -155,6 +177,7 @@ model Product {
   discountItems     DiscountItem[]
   voucherItems      VoucherItem[]
   comments          ProductComment[]
+  likes             ProductLike[]
 
   @@index([shopId, itemStatus, updatedAt])
   @@map("products")
@@ -230,6 +253,7 @@ model Order {
   payTime              DateTime?
   shipByDate           DateTime?
   escrowReleaseTime    DateTime?
+  completedAt          DateTime?
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
 
@@ -240,6 +264,7 @@ model Order {
   comments             ProductComment[]
 
   @@index([shopId, orderStatus, createdAt])
+  @@index([shopId, orderStatus, completedAt])
   @@index([shopId, escrowReleaseTime])
   @@map("orders")
 }
@@ -599,8 +624,21 @@ model BuyerUser {
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
   addresses    BuyerAddress[]
+  productLikes ProductLike[]
 
   @@map("buyer_users")
+}
+
+model ProductLike {
+  itemId      BigInt
+  buyerUserId BigInt
+  createdAt   DateTime  @default(now())
+  product     Product   @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+  buyer       BuyerUser @relation(fields: [buyerUserId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, buyerUserId])
+  @@index([buyerUserId])
+  @@map("product_likes")
 }
 
 model BuyerAddress {

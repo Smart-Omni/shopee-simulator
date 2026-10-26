@@ -10,6 +10,8 @@ jobs:
   test:
     name: Build & Run Full Test Suite
     runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: "--max-old-space-size=4096"
 
     services:
       postgres:
@@ -52,7 +54,7 @@ jobs:
       - name: Verify TypeScript Compilation
         run: npm run build
 
-      - name: Run Full 14-Phase Test Suite
+      - name: Run Full Test Suite (Phases 1-17)
         env:
           DATABASE_URL: postgresql://shopee:shopee_mock_password@localhost:5432/shopee_mock_db?schema=public
           SKIP_DRIVE_UPLOAD: "true"

@@ -5975,7 +5975,7 @@
 
     async function loadShopReviews() {
       try {
-        const res = await fetch(`/api/v2/simulator/reviews?shop_id=${activeShopId}`);
+        const res = await fetch(`/api/v2/simulator/reviews?shop_id=${activeShopId}&page_size=100`);
         const data = await res.json();
         const reviews = data.response?.reviews || [];
         const countBadge = document.getElementById('reviews-count-badge');
@@ -6055,6 +6055,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            shop_id: activeShopId,
             comment_id: commentId,
             reply: replyText
           })

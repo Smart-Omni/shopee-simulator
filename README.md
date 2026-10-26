@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-teal.svg)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Test Suite](https://img.shields.io/badge/Tests-540%2F540%20Passing-brightgreen.svg)]()
+[![Test Suite](https://img.shields.io/badge/Tests-555%2F555%20Passing-brightgreen.svg)]()
 [![Shopee Open API](https://img.shields.io/badge/Shopee%20Open%20API-v2%20Standard-orange.svg)]()
 
 > High-fidelity, contractually conforming **Shopee Open API v2 Mock Server** and interactive web testbed built for **SmartOmni Channel** integration, multi-merchant e-commerce synchronization, automated testing, and development without sandbox rate limits or dependency on live Shopee seller accounts.
@@ -69,7 +69,7 @@ The simulator implements a **Two-Layer Dual Architecture**:
 
 ## 🚀 Supported Modules & Capabilities
 
-The simulator has completed **Phases 1 through 14** with **509 automated assertions passing (100%)**:
+The established backend baseline is **555 passing assertions** across the original test phases and the review-management suite. Phase 16 covers product metrics (`npm run test:phase16`); Phase 17 covers seller review management (`npm run test:phase17`).
 
 ### 1. Authentication & Dual-Token Grace Period (OAuth 2.0)
 - `POST /api/v2/public/get_token_by_resend_code`: Exchange authorization code for initial `access_token` and `refresh_token`.
@@ -99,6 +99,15 @@ The simulator has completed **Phases 1 through 14** with **509 automated asserti
   - `POST /api/v2/product/delete_item`: Soft-deletes listings (`SELLER_DELETE`) for both `NORMAL` and `UNLIST` products with official Shopee 90-day retention query support.
   - Storefront catalog filter: `GET /api/v2/simulator/products?view_mode=buyer` automatically hides unlisted items.
   - `POST /api/v2/simulator/product/quick_update_stock`: Instant stock adjustment per SKU model.
+
+### 3A. Product Extra Metrics (Phase 16)
+- **Signed Layer A simulator route:** `GET /api/v2/product/get_item_extra_info` accepts a required `item_id_list` with no more than 50 IDs. The list may be comma-separated or JSON-encoded. The signed shop must own every requested item.
+- The local crawled Shopee reference disagrees on this endpoint's HTTP method: its front matter says `PUT`, the master API index says `POST`, and its cURL examples use `GET`. The simulator currently follows `GET`; verify the production method against Shopee Open Platform before using this route as a production contract.
+- **Shopee metric fields:** `sale`, `views`, `likes`, `rating_star`, and `comment_count` are returned per item in the standard Shopee response envelope.
+- **Metric semantics:** `sale` is lifetime purchased quantity in completed orders only; `views` counts product detail visits; `likes` counts unique buyer/product records; rating and comment count are derived from stored product reviews and return zero when no reviews exist.
+- **Shopiz Layer B helpers:** `GET /api/v2/simulator/product/extra_info` returns the same metrics for 1–50 shop-owned item IDs. `POST /api/v2/simulator/product/view` increments a product view. `GET` and `POST /api/v2/simulator/product/like` read or toggle a buyer's persisted like.
+- The Layer B buyer ID follows the simulator's existing client-supplied buyer convention; the Shopiz interface gates likes behind its sign-in state.
+- **Verification:** `npm run test:phase16` covers signatures, ID validation and limits, shop isolation, completed-order sales, review aggregation, zero-review products, persisted views, duplicate-safe likes, and Layer A/Layer B parity.
 
 ### 4. Order Management, Multi-Shop Cart & SLA Deadlines
 - Official Endpoints: `get_order_list`, `get_order_detail`, `cancel_order`, `handle_buyer_cancellation`.
@@ -136,6 +145,10 @@ The simulator has completed **Phases 1 through 14** with **509 automated asserti
 - Post-order 1–5 star reviews on `COMPLETED` orders with strict duplicate rejection (`product.duplicate_request`).
 - Dynamic shop rating recalculation (`Shop.rating` and `Shop.ratingCount`).
 - Seller reply management with duplicate reply prevention.
+- **Shopiz Review Management (Layer B):** `GET /api/v2/simulator/reviews/summary?shop_id=...&last_visit_at=...` returns the shop rating, latest-30-day and previous-30-day values, unanswered 1–2 star count, and reviews since the supplied Unix timestamp. `GET /api/v2/simulator/reviews` requires `shop_id` and supports `page_size` (1–100), offset `cursor`, `status` (`ALL`, `NEED_REPLY`, `REPLIED`), comma-separated `rating_star_list`, `keyword` (product name/order SN/buyer username), and ISO `date_from` / `date_to`.
+- The simulator defines review rate as distinct completed orders with at least one review divided by completed orders in the same completion window (`Order.completedAt`). Positive-review rate is 4–5 star reviews divided by reviews created in that period. A zero or unavailable comparison baseline returns `change_percent: null`; unavailable rates return `value: null` for the UI to render as `—`.
+- `POST /api/v2/simulator/review/reply` accepts `shop_id`, `comment_id`, and `reply`, and verifies the review belongs to that shop. The signed Shopee Layer A endpoints remain unchanged.
+- `npm run test:phase17` covers shop isolation, filters/counts, pagination, period summaries, recent reviews, and reply validation.
 
 ### 9. Live Customer Chat & Inquiries
 - Real-time in-app Buyer $\leftrightarrow$ Seller messaging drawer (`POST /api/v2/simulator/chat/send`, `GET /api/v2/simulator/chat/messages`, `GET /api/v2/simulator/chat/conversations`, `POST /api/v2/simulator/chat/mark_read`).

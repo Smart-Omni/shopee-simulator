@@ -136,6 +136,58 @@ async function main() {
   }
   console.log(`✓ Ensured 3 Logistics Channels`);
 
+  // Product pickup methods shown in the Shopiz seller product editor.
+  const productShippingOptions = [
+    {
+      optionId: "pickup_point",
+      optionName: "Điểm nhận hàng",
+      optionGroup: "Lấy hàng chủ động",
+      partnerLabel: "ĐỐI TÁC SHOPEE",
+      maximumWeightGram: 10000,
+      sortOrder: 1,
+      enabled: true
+    },
+    {
+      optionId: "viettel_smartbox",
+      optionName: "Tủ nhận hàng - Viettel Smartbox",
+      optionGroup: "Lấy hàng chủ động",
+      partnerLabel: "ĐỐI TÁC SHOPEE",
+      maximumWeightGram: 10000,
+      sortOrder: 2,
+      enabled: true
+    },
+    ...[
+      ["same_day_express", "2. Hỏa Tốc", "Hỏa Tốc", 3],
+      ["same_day_delivery", "3. Trong Ngày", "Trong Ngày", 4],
+      ["fast_delivery", "4. Nhanh", "Nhanh", 5],
+      ["bulky_goods", "5. Hàng Cồng Kềnh", "Hàng Cồng Kềnh", 6]
+    ].map(([optionId, optionGroup, optionName, sortOrder]) => ({
+      optionId: String(optionId),
+      optionName: String(optionName),
+      optionGroup: String(optionGroup),
+      partnerLabel: "ĐỐI TÁC SHOPEE",
+      maximumWeightGram: null,
+      sortOrder: Number(sortOrder),
+      enabled: true
+    }))
+  ];
+
+  for (const option of productShippingOptions) {
+    await prisma.productShippingOption.upsert({
+      where: { optionId: option.optionId },
+      update: {
+        optionName: option.optionName,
+        optionGroup: option.optionGroup,
+        partnerLabel: option.partnerLabel,
+        maximumWeightGram: option.maximumWeightGram,
+        sortOrder: option.sortOrder,
+        enabled: option.enabled
+      },
+      create: option
+    });
+  }
+  console.log(`✓ Ensured ${productShippingOptions.length} product shipping options`);
+
   // 4. Seed Shopee 3-Level Category Tree & Rich Attributes
   const treeCategoriesData = [
     // ------------------------------------------------------------------------

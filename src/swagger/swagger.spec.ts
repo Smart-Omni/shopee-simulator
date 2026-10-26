@@ -354,6 +354,22 @@ export const swaggerDocument = {
         }
       }
     },
+    "/api/v2/product/get_item_extra_info": {
+      get: {
+        tags: ["Product"],
+        summary: "Get Item Extra Info",
+        description: "Returns lifetime completed-order sales, views, likes, average rating, and review count for up to 50 shop-owned items.",
+        parameters: [
+          { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+          { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+          { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "sign", in: "query", required: true, schema: { type: "string" } },
+          { name: "item_id_list", in: "query", required: true, description: "Comma-separated IDs; maximum 50", schema: { type: "string" } }
+        ],
+        responses: { "200": { description: "Returns item_list with sale, views, likes, rating_star, and comment_count" } }
+      }
+    },
     "/api/v2/product/get_model_list": {
       get: {
         tags: ["Product"],
