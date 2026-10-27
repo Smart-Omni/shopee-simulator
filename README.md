@@ -238,6 +238,28 @@ The established backend baseline is **555 passing assertions** across the origin
 - **Navigation Shortcuts:** Integrated on Marketplace Utility Nav (`Test Control`) and Seller Center Header next to `Switch Shop`.
 - **Verification:** Playwright end-to-end test suite in `scripts/verify-test-control.mjs` (`npm run check:test-control`, 100% pass).
 
+### 17. Quản lý Chat & Real-Time Live Messaging (Phase 19)
+- **Layer A Official Partner APIs (`/api/v2/sellerchat/*`)**:
+  - `GET /api/v2/sellerchat/get_conversation_list`: Conversation summaries with unread counters and latest messages.
+  - `GET /api/v2/sellerchat/get_one_conversation`: Detailed conversation status and thread metadata.
+  - `GET /api/v2/sellerchat/get_message`: Message thread history with pagination and order/product cards.
+  - `POST /api/v2/sellerchat/send_message`: Real-time bidirectional buyer-seller messaging (text, product card, order card).
+  - `POST /api/v2/sellerchat/send_autoreply_message`: Out-of-hours automatic response generation.
+  - `POST /api/v2/sellerchat/read_conversation`: Acknowledges and zeroes unread conversation counters.
+- **Layer B Simulator Chat Management (`/api/v2/simulator/chat/*`)**:
+  - `GET /api/v2/simulator/chat/performance`: Chat response rate and SLA metrics.
+  - `GET & POST /api/v2/simulator/chat/auto_reply`: Auto-reply configuration, standard greetings, and out-of-office schedules.
+  - `GET & POST /api/v2/simulator/chat/quick_reply`: Quick reply shortcuts and message templates.
+- **Frontend Integration in Shopiz**:
+  - Floating bottom-right chat launcher widget with badge and unread counters.
+  - Chat drawer and dockable floating window with active conversations, search, message timeline, product attachment previews, and quick response drawer.
+  - Sub-views in Seller Center: `Quản lý Chat` (`?tab=chat_management`), `Tin nhắn tự động` (`?tab=chat_auto_reply`), `Tin nhắn nhanh` (`?tab=chat_quick_reply`).
+
+### 18. 100% Swagger OpenAPI 3.0 Documentation Coverage
+- **182 Active Endpoints Exposed**: 100% of all registered Express route operations across both Layer A (Official HMAC-guarded) and Layer B (Simulator / Admin / Buyer / Webhook) are documented in OpenAPI 3.0 specification.
+- **Interactive Documentation**: Available at `http://localhost:8080/docs` (Swagger UI) and `http://localhost:8080/docs-json` (Raw OpenAPI 3.0 JSON).
+- **Automated Parity Verification**: Integrated route reflection script verifies bidirectional zero-drift between Express router stack and Swagger spec dictionary.
+
 ---
 
 ## 📚 Official Shopee Documentation & API Index

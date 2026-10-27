@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
+- **100% Swagger OpenAPI Coverage**: Fully documented all 182 active Express route operations across both official Shopee Open API v2 endpoints and Simulator / Admin / Buyer experience endpoints in OpenAPI 3.0:
+  - Created `src/swagger/swagger.chat.ts`: documented all Layer A seller chat endpoints (`/api/v2/sellerchat/*`) and Simulator chat control endpoints (`/api/v2/simulator/chat/*`).
+  - Created `src/swagger/swagger.admin.ts`: documented admin arbitration overview (`/api/v2/simulator/returns`), customer service claim reviews (`/api/v2/simulator/admin/returns/review`), warehouse inbound inspections (`/warehouse_inbound`), and dispute arbitrations (`/arbitrate_dispute`), as well as interactive returns lifecycle simulation endpoints (`/api/v2/simulator/returns/*`).
+  - Created `src/swagger/swagger.buyer.ts`: documented fast login, registration, password recovery, buyer profile, multiple shipping addresses management, catalog browsing, cart checkout, delivery confirmation, shop details, analytics, escrow payment, and media upload.
+  - Updated `src/swagger/swagger.vouchers.ts`: documented all Layer B voucher simulator routes (`/api/v2/simulator/voucher/*`).
+  - Updated `src/swagger/swagger.payment.ts`: documented escrow details and escrow query endpoints (`/api/v2/payment/get_escrow_detail`, `get_escrow_list`).
+  - Updated `src/swagger/swagger.returns.ts` and `src/swagger/swagger.spec.ts`: added dual `GET` query method documentation for return lists, return details, dispute reasons, available solutions, proof documents, airway bill generation status, and binary PDF airway bill download.
+  - Added official product unlist (`/api/v2/product/unlist_item`) and delete (`/api/v2/product/delete_item`) endpoints.
+  - Cleaned up obsolete draft return paths from `src/swagger/swagger.simulator.ts`.
+
 - Implemented Phase 18: **Seller Voucher Management and Layer B Simulator APIs** (`/api/v2/simulator/voucher/*`) supporting all 8 official Shopee voucher usecases:
   - `GET /api/v2/simulator/voucher/config`: returns shop-specific voucher prefix and metadata for supported usecases (including `usecase = 9`, `Voucher Ưu Đãi Follower`).
   - `GET /api/v2/simulator/voucher/list` & `/vouchers`: returns paginated vouchers, keyword search by name or code, status filter (`all`, `ongoing`, `upcoming`, `expired`), and live aggregate status counts.
