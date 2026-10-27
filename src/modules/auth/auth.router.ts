@@ -10,7 +10,7 @@ export const authRouter = Router();
 // ============================================================================
 // 1. MOCK SELLER OAUTH AUTHORIZATION SCREEN / REDIRECT
 // ============================================================================
-authRouter.get("/auth", async (req: Request, res: Response) => {
+authRouter.get(["/auth", "/api/v2/shop/auth_partner"], async (req: Request, res: Response) => {
   const partnerIdStr = (req.query.partner_id as string) || "";
   const redirectUri = (req.query.redirect_uri as string) || (req.query.redirect as string) || "";
   const state = (req.query.state as string) || "";

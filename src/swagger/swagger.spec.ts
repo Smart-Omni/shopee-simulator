@@ -54,6 +54,25 @@ export const swaggerDocument = {
         }
       }
     },
+    "/api/v2/shop/auth_partner": {
+      get: {
+        tags: ["Public & Auth"],
+        summary: "Official Shopee Partner Authorization Consent URL",
+        description: "Official Shopee Open API v2 consent endpoint. Renders the mock consent screen and redirects with code, shop_id, and state.",
+        parameters: [
+          { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "redirect_uri", in: "query", required: true, schema: { type: "string" } },
+          { name: "sign", in: "query", schema: { type: "string" } },
+          { name: "timestamp", in: "query", schema: { type: "integer" } },
+          { name: "state", in: "query", schema: { type: "string" } },
+          { name: "auto_confirm", in: "query", schema: { type: "boolean" } }
+        ],
+        responses: {
+          "302": { description: "Redirect to client redirect_uri with code and shop_id" },
+          "200": { description: "HTML consent screen" }
+        }
+      }
+    },
     "/api/v2/auth/token/get": {
       post: {
         tags: ["Public & Auth"],
