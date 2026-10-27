@@ -66,7 +66,18 @@ async function runTests() {
     assert(loginUsernameRes.json.error === "", "1.1 Login with username 'demo' succeeds");
     assert(loginUsernameRes.json.response.user.username === "demo", "1.1 Returns username 'demo'");
     assert(loginUsernameRes.json.response.user.id === 1001, "1.1 Returns buyer ID 1001");
+    assert(loginUsernameRes.json.response.user.role === "buyer", "1.1 Returns role 'buyer'");
     assert(loginUsernameRes.json.response.user.addresses.length >= 1, "1.1 Returns user address book");
+
+    // 1.1b Login with seller account
+    const loginSellerRes = await request("/api/v2/simulator/auth/login", {
+      method: "POST",
+      body: { identity: "seller", password: "Shopiz@123" }
+    });
+    assert(loginSellerRes.json.error === "", "1.1b Login with username 'seller' succeeds");
+    assert(loginSellerRes.json.response.user.role === "seller", "1.1b Returns role 'seller'");
+    assert(loginSellerRes.json.response.user.shop_id === 727720655, "1.1b Returns shop_id 727720655");
+    assert(loginSellerRes.json.response.user.shop_name === "SmartOmni Official Flagship", "1.1b Returns shop_name");
 
     // 1.2 Login with email
     const loginEmailRes = await request("/api/v2/simulator/auth/login", {
@@ -141,6 +152,15 @@ async function runTests() {
     });
     assert(updateProfileRes.json.error === "", "1.9 Update buyer profile succeeds");
     assert(updateProfileRes.json.response.user.name === "Demo Shopper Updated", "1.9 Updated name returned");
+
+    // Restore original name for subsequent suites
+    await request("/api/v2/simulator/buyer/profile", {
+      method: "PUT",
+      body: {
+        buyer_id: 1001,
+        name: "Demo Shopper"
+      }
+    });
 
     // ============================================================================
     // TEST GROUP 2: BUYER SHIPPING ADDRESS MANAGEMENT

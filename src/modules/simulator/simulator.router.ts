@@ -2007,14 +2007,6 @@ simulatorRouter.get("/api/v2/simulator/promotions", async (req: Request, res: Re
   const shopId = BigInt(shopIdStr);
   const now = new Date();
 
-  function getDynamicPromoStatus(status: PromotionStatus, startTime: Date, endTime: Date): string {
-    if (status === PromotionStatus.DELETED) return "deleted";
-    if (status === PromotionStatus.EXPIRED) return "expired";
-    if (now < startTime) return "upcoming";
-    if (now > endTime) return "expired";
-    return "ongoing";
-  }
-
   // Find non-deleted discounts
   const discounts = await prisma.discount.findMany({
     where: {
@@ -2236,15 +2228,325 @@ simulatorRouter.post("/api/v2/simulator/discount/delete", async (req: Request, r
   }
 });
 
+function getDynamicPromoStatus(status: PromotionStatus, startTime: Date, endTime: Date): string {
+  if (status === PromotionStatus.DELETED) return "deleted";
+  if (status === PromotionStatus.EXPIRED) return "expired";
+  const now = new Date();
+  if (now < startTime) return "upcoming";
+  if (now > endTime) return "expired";
+  return "ongoing";
+}
+
 // ============================================================================
-// SIMULATOR HELPER: CREATE VOUCHER
+// SIMULATOR VOUCHER HELPERS & SHOPIZ INTEGRATION APIS
 // ============================================================================
+
+function calculateUsecase(voucher: {
+  voucherType: number;
+  displayChannelList: any;
+  voucherPurpose: number;
+  targetVoucher?: number | null;
+}): number {
+  if (voucher.voucherPurpose === 3) return 9; // follow prize voucher
+  if (voucher.voucherPurpose === 1 || voucher.targetVoucher === 1) return 3; // new buyer voucher
+  if (voucher.voucherPurpose === 6 || (voucher.targetVoucher && voucher.targetVoucher >= 2)) return 4; // repeat buyer voucher
+  const channels = Array.isArray(voucher.displayChannelList) ? voucher.displayChannelList : [];
+  if (channels.length === 0) return 5; // private voucher
+  if (channels.includes(4)) return 6; // live voucher
+  if (channels.includes(3)) return 7; // video voucher
+  if (voucher.voucherType === 2) return 2; // product voucher
+  return 1; // shop voucher
+}
+
+function resolveVoucherUsecaseName(usecase: number): string {
+  switch (usecase) {
+    case 1: return "Mã giảm giá toàn Shop";
+    case 2: return "Voucher sản phẩm";
+    case 3: return "Voucher Khách hàng mới";
+    case 4: return "Voucher Khách hàng mua lại";
+    case 5: return "Voucher riêng tư";
+    case 6: return "Voucher Shopee Live";
+    case 7: return "Voucher Shopee Video";
+    case 9: return "Voucher Ưu Đãi Follower";
+    default: return "Mã giảm giá toàn Shop";
+  }
+}
+
+// 1. GET VOUCHER CONFIG: GET /api/v2/simulator/voucher/config
+simulatorRouter.get("/api/v2/simulator/voucher/config", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const shopIdStr = (req.query.shop_id as string) || "727720655";
+    const shopId = BigInt(shopIdStr);
+    const shop = await prisma.shop.findUnique({ where: { shopId } });
+    if (!shop) {
+      res.json(createShopeeErrorResponse("error_param", "Shop not found"));
+      return;
+    }
+
+    const defaultPrefix = shop.voucherPrefix || shop.shopName.replace(/[^A-Za-z]/g, "").slice(0, 4).toUpperCase() || "SMAR";
+
+    res.json(createShopeeSuccessResponse({
+      shop_id: Number(shop.shopId),
+      shop_name: shop.shopName,
+      voucher_prefix: defaultPrefix,
+      is_vacation: shop.isVacation,
+      supported_usecases: [
+        { id: 1, key: "shop", title: "Voucher toàn Shop", desc: "Voucher áp dụng cho tất cả sản phẩm trong Shop của bạn", section: "conversion" },
+        { id: 2, key: "product", title: "Voucher sản phẩm", desc: "Voucher chỉ áp dụng cho những sản phẩm nhất định mà Shop chọn", section: "conversion" },
+        { id: 5, key: "private", title: "Voucher riêng tư", desc: "Voucher áp dụng cho nhóm Khách hàng Shop muốn thông qua mã Voucher", section: "channel" },
+        { id: 6, key: "live", title: "Voucher Shopee Live", desc: "Voucher độc quyền áp dụng các sản phẩm trong livestream của Shop", section: "channel" },
+        { id: 7, key: "video", title: "Voucher Shopee Video", desc: "Voucher áp dụng độc quyền cho các sản phẩm trên Video của Shop", section: "channel" },
+        { id: 3, key: "new_buyer", title: "Voucher Khách hàng mới", desc: "Voucher nhằm thu hút Khách hàng mới và Khách hàng tiềm năng", section: "audience" },
+        { id: 4, key: "repeat_buyer", title: "Voucher Khách hàng mua lại", desc: "Voucher nhằm thu hút khách hàng mục tiêu có đơn mua lại tại Shop", section: "audience" },
+        { id: 9, key: "follow_prize", title: "Ưu đãi Follower", desc: "Khuyến khích người mua theo dõi Shop bằng cách tặng Voucher cho người theo dõi mới", section: "audience" }
+      ]
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to fetch voucher config"));
+  }
+});
+
+// 2. GET VOUCHER LIST: GET /api/v2/simulator/voucher/list & GET /api/v2/simulator/vouchers
+const handleVoucherList = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const shopIdStr = (req.query.shop_id as string) || "727720655";
+    const shopId = BigInt(shopIdStr);
+    const statusParam = ((req.query.status as string) || "all").toLowerCase();
+    const searchType = ((req.query.search_type as string) || "name").toLowerCase();
+    const keyword = (req.query.keyword as string || "").trim();
+    const pageNo = Math.max(1, parseInt((req.query.page_no as string) || "1", 10));
+    const pageSize = Math.min(100, Math.max(1, parseInt((req.query.page_size as string) || "10", 10)));
+    const offset = (pageNo - 1) * pageSize;
+
+    const now = new Date();
+
+    // Auto-sync status transitions based on time
+    await prisma.voucher.updateMany({
+      where: {
+        shopId,
+        status: PromotionStatus.UPCOMING,
+        startTime: { lte: now },
+        endTime: { gte: now }
+      },
+      data: { status: PromotionStatus.ONGOING }
+    });
+
+    await prisma.voucher.updateMany({
+      where: {
+        shopId,
+        status: { in: [PromotionStatus.UPCOMING, PromotionStatus.ONGOING] },
+        endTime: { lt: now }
+      },
+      data: { status: PromotionStatus.EXPIRED }
+    });
+
+    // Base query for non-deleted vouchers of this shop
+    const baseWhere: any = {
+      shopId,
+      status: { not: PromotionStatus.DELETED }
+    };
+
+    // Aggregate counts by status
+    const [countAll, countUpcoming, countOngoing, countExpired] = await Promise.all([
+      prisma.voucher.count({ where: baseWhere }),
+      prisma.voucher.count({ where: { ...baseWhere, status: PromotionStatus.UPCOMING } }),
+      prisma.voucher.count({ where: { ...baseWhere, status: PromotionStatus.ONGOING } }),
+      prisma.voucher.count({ where: { ...baseWhere, status: PromotionStatus.EXPIRED } })
+    ]);
+
+    // Apply status filter
+    const queryWhere: any = { ...baseWhere };
+    if (statusParam === "upcoming") {
+      queryWhere.status = PromotionStatus.UPCOMING;
+    } else if (statusParam === "ongoing") {
+      queryWhere.status = PromotionStatus.ONGOING;
+    } else if (statusParam === "expired") {
+      queryWhere.status = PromotionStatus.EXPIRED;
+    }
+
+    // Apply keyword search
+    if (keyword) {
+      if (searchType === "code") {
+        queryWhere.voucherCode = { contains: keyword, mode: "insensitive" };
+      } else {
+        queryWhere.voucherName = { contains: keyword, mode: "insensitive" };
+      }
+    }
+
+    const [totalFiltered, vouchers] = await Promise.all([
+      prisma.voucher.count({ where: queryWhere }),
+      prisma.voucher.findMany({
+        where: queryWhere,
+        include: {
+          items: {
+            include: {
+              product: {
+                include: { models: true }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        skip: offset,
+        take: pageSize
+      })
+    ]);
+
+    const more = offset + vouchers.length < totalFiltered;
+
+    const mappedVouchers = vouchers.map(v => {
+      const dynStatus = getDynamicPromoStatus(v.status, v.startTime, v.endTime);
+      const usecase = calculateUsecase({
+        voucherType: v.voucherType,
+        displayChannelList: v.displayChannelList,
+        voucherPurpose: v.voucherPurpose,
+        targetVoucher: (v as any).targetVoucher
+      });
+
+      return {
+        voucher_id: Number(v.voucherId),
+        voucher_code: v.voucherCode,
+        voucher_name: v.voucherName,
+        voucher_type: v.voucherType,
+        reward_type: v.rewardType,
+        usecase,
+        usecase_name: resolveVoucherUsecaseName(usecase),
+        target_voucher: (v as any).targetVoucher || 0,
+        voucher_purpose: v.voucherPurpose,
+        status: dynStatus,
+        discount_amount: v.discountAmount ? Number(v.discountAmount) : 0,
+        percentage: v.percentage || 0,
+        max_price: v.maxPrice ? Number(v.maxPrice) : 0,
+        min_basket_price: Number(v.minBasketPrice || 0),
+        usage_quantity: v.usageQuantity,
+        current_usage: v.currentUsage,
+        start_time: Math.floor(v.startTime.getTime() / 1000),
+        end_time: Math.floor(v.endTime.getTime() / 1000),
+        display_start_time: v.displayStartTime ? Math.floor(v.displayStartTime.getTime() / 1000) : 0,
+        display_channel_list: v.displayChannelList || [1],
+        item_count: v.items.length,
+        item_id_list: v.items.map(it => Number(it.itemId)),
+        items: v.items.map(it => ({
+          item_id: Number(it.itemId),
+          item_name: it.product?.itemName || `Item ${it.itemId}`,
+          item_sku: it.product?.itemSku || "",
+          price: it.product?.originalPrice ? Number(it.product.originalPrice) : 0,
+          stock: it.product?.models ? it.product.models.reduce((sum: number, m: any) => sum + (m.sellerStock || 0), 0) : 0
+        }))
+      };
+    });
+
+    res.json(createShopeeSuccessResponse({
+      total: totalFiltered,
+      page_no: pageNo,
+      page_size: pageSize,
+      more,
+      status_counts: {
+        all: countAll,
+        upcoming: countUpcoming,
+        ongoing: countOngoing,
+        expired: countExpired
+      },
+      vouchers: mappedVouchers
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to list vouchers"));
+  }
+};
+
+simulatorRouter.get("/api/v2/simulator/voucher/list", handleVoucherList);
+simulatorRouter.get("/api/v2/simulator/vouchers", handleVoucherList);
+
+// 3. GET VOUCHER DETAIL: GET /api/v2/simulator/voucher/detail
+simulatorRouter.get("/api/v2/simulator/voucher/detail", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const voucherIdParam = req.query.voucher_id as string;
+    if (!voucherIdParam) {
+      res.json(createShopeeErrorResponse("error_param", "voucher_id is required"));
+      return;
+    }
+
+    const voucherId = BigInt(voucherIdParam);
+    const voucher = await prisma.voucher.findUnique({
+      where: { voucherId },
+      include: {
+        shop: true,
+        items: {
+          include: {
+            product: {
+              include: { models: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!voucher || voucher.status === PromotionStatus.DELETED) {
+      res.json(createShopeeErrorResponse("error_param", "Voucher not found"));
+      return;
+    }
+
+    const usecase = calculateUsecase({
+      voucherType: voucher.voucherType,
+      displayChannelList: voucher.displayChannelList,
+      voucherPurpose: voucher.voucherPurpose,
+      targetVoucher: (voucher as any).targetVoucher
+    });
+
+    // Count associated orders
+    const orderCount = await prisma.order.count({
+      where: {
+        shopId: voucher.shopId,
+        sellerVoucherCode: voucher.voucherCode
+      }
+    });
+
+    res.json(createShopeeSuccessResponse({
+      voucher_id: Number(voucher.voucherId),
+      voucher_code: voucher.voucherCode,
+      voucher_name: voucher.voucherName,
+      voucher_type: voucher.voucherType,
+      reward_type: voucher.rewardType,
+      usecase,
+      usecase_name: resolveVoucherUsecaseName(usecase),
+      target_voucher: (voucher as any).targetVoucher || 0,
+      voucher_purpose: voucher.voucherPurpose,
+      status: getDynamicPromoStatus(voucher.status, voucher.startTime, voucher.endTime),
+      discount_amount: voucher.discountAmount ? Number(voucher.discountAmount) : 0,
+      percentage: voucher.percentage || 0,
+      max_price: voucher.maxPrice ? Number(voucher.maxPrice) : 0,
+      min_basket_price: Number(voucher.minBasketPrice || 0),
+      usage_quantity: voucher.usageQuantity,
+      current_usage: voucher.currentUsage,
+      start_time: Math.floor(voucher.startTime.getTime() / 1000),
+      end_time: Math.floor(voucher.endTime.getTime() / 1000),
+      display_start_time: voucher.displayStartTime ? Math.floor(voucher.displayStartTime.getTime() / 1000) : 0,
+      display_channel_list: voucher.displayChannelList || [1],
+      order_count: orderCount,
+      voucher_prefix: voucher.shop?.voucherPrefix || "SMAR",
+      item_count: voucher.items.length,
+      item_id_list: voucher.items.map(it => Number(it.itemId)),
+      items: voucher.items.map(it => ({
+        item_id: Number(it.itemId),
+        item_name: it.product?.itemName || `Item ${it.itemId}`,
+        item_sku: it.product?.itemSku || "",
+        price: it.product?.originalPrice ? Number(it.product.originalPrice) : 0,
+        stock: it.product?.models ? it.product.models.reduce((sum: number, m: any) => sum + (m.sellerStock || 0), 0) : 0
+      }))
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to get voucher detail"));
+  }
+});
+
+// 4. CREATE VOUCHER: POST /api/v2/simulator/voucher/create
 simulatorRouter.post("/api/v2/simulator/voucher/create", async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       shop_id = 727720655,
       voucher_name,
       voucher_code,
+      usecase = 1,
       voucher_type = 1,
       reward_type = 1,
       discount_amount,
@@ -2253,21 +2555,46 @@ simulatorRouter.post("/api/v2/simulator/voucher/create", async (req: Request, re
       min_basket_price = 0,
       usage_quantity = 100,
       start_time,
-      end_time
+      end_time,
+      display_channel_list,
+      display_start_time,
+      item_id_list,
+      target_voucher = 0,
+      voucher_purpose = 0
     } = req.body || {};
 
-    if (!voucher_name || !voucher_code) {
-      res.json(createShopeeErrorResponse("error_param", "voucher_name and voucher_code are required"));
+    if (!voucher_name || typeof voucher_name !== "string" || !voucher_name.trim()) {
+      res.json(createShopeeErrorResponse("error_param", "voucher_name is required"));
       return;
     }
 
-    const codeStr = String(voucher_code).toUpperCase().trim();
-    if (!/^[A-Za-z0-9]{1,5}$/.test(codeStr)) {
-      res.json(createShopeeErrorResponse("voucher.voucher_code_error", "Voucher code must be 1 to 5 alphanumeric characters"));
+    // Shopee Coins constraint: reward_type = 3 is not supported yet
+    if (Number(reward_type) === 3) {
+      res.json(createShopeeErrorResponse("voucher.voucher_coin_error", "Coin cashback vouchers are not supported currently"));
       return;
     }
 
     const shopId = BigInt(shop_id);
+    const shop = await prisma.shop.findUnique({ where: { shopId } });
+    if (!shop) {
+      res.json(createShopeeErrorResponse("error_param", "Shop not found"));
+      return;
+    }
+
+    // Determine voucher code
+    let codeStr = "";
+    if (voucher_code) {
+      codeStr = String(voucher_code).toUpperCase().trim();
+      if (!/^[A-Za-z0-9]{1,10}$/.test(codeStr)) {
+        res.json(createShopeeErrorResponse("voucher.voucher_code_error", "Voucher code must be 1 to 5 alphanumeric characters"));
+        return;
+      }
+    } else {
+      // Auto-generate code for Live (6) / Video (7) or omitted code
+      const prefix = shop.voucherPrefix || "VCH";
+      codeStr = `${prefix}${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
     const startDate = typeof start_time === "number" ? new Date(start_time * 1000) : new Date(start_time);
     const endDate = typeof end_time === "number" ? new Date(end_time * 1000) : new Date(end_time);
 
@@ -2277,14 +2604,20 @@ simulatorRouter.post("/api/v2/simulator/voucher/create", async (req: Request, re
     }
 
     if (endDate <= startDate) {
-      res.json(createShopeeErrorResponse("error_param", "End time must be after start time"));
+      res.json(createShopeeErrorResponse("voucher.voucher_time_period_error", "End time must be after start time"));
+      return;
+    }
+
+    // Min basket price validation for fixed amount
+    if (Number(reward_type) === 1 && discount_amount && min_basket_price > 0 && Number(discount_amount) > Number(min_basket_price)) {
+      res.json(createShopeeErrorResponse("voucher.voucher_min_price_error", "Min_basket_price must be higher than the fix amount if Min_basket_price is not 0."));
       return;
     }
 
     const now = new Date();
     const initialStatus = now < startDate ? PromotionStatus.UPCOMING : (now > endDate ? PromotionStatus.EXPIRED : PromotionStatus.ONGOING);
 
-    // Check duplicate voucher code for same shop
+    // Duplicate check
     const existing = await prisma.voucher.findFirst({
       where: {
         shopId,
@@ -2298,12 +2631,43 @@ simulatorRouter.post("/api/v2/simulator/voucher/create", async (req: Request, re
       return;
     }
 
+    // Derive display_channel_list based on usecase if not explicitly provided
+    let finalChannels: number[] = Array.isArray(display_channel_list) ? display_channel_list : [1];
+    let finalPurpose = Number(voucher_purpose || 0);
+    let finalTargetVoucher = Number(target_voucher || 0);
+    const usecaseNum = Number(usecase || 1);
+
+    if (usecaseNum === 5) { // Private
+      finalChannels = [];
+    } else if (usecaseNum === 6) { // Live
+      finalChannels = [4];
+    } else if (usecaseNum === 7) { // Video
+      finalChannels = [3];
+    } else if (usecaseNum === 3) { // New buyer
+      finalPurpose = 1;
+      finalTargetVoucher = 1;
+    } else if (usecaseNum === 4) { // Repeat buyer
+      finalPurpose = 6;
+      finalTargetVoucher = finalTargetVoucher >= 2 ? finalTargetVoucher : 2;
+    } else if (usecaseNum === 9) { // Follow prize
+      finalPurpose = 3;
+      finalTargetVoucher = 0;
+      finalChannels = [1];
+    }
+
+    let displayStartDateTime: Date | null = null;
+    if (display_start_time) {
+      displayStartDateTime = typeof display_start_time === "number" ? new Date(display_start_time * 1000) : new Date(display_start_time);
+    }
+
+    const determinedVoucherType = (usecaseNum === 2 || (Array.isArray(item_id_list) && item_id_list.length > 0)) ? 2 : Number(voucher_type || 1);
+
     const voucher = await prisma.voucher.create({
       data: {
         shopId,
         voucherCode: codeStr,
         voucherName: voucher_name.trim(),
-        voucherType: Number(voucher_type),
+        voucherType: determinedVoucherType,
         rewardType: Number(reward_type),
         discountAmount: discount_amount !== undefined && discount_amount !== null && discount_amount !== "" ? Number(discount_amount) : null,
         percentage: percentage !== undefined && percentage !== null && percentage !== "" ? Number(percentage) : null,
@@ -2313,24 +2677,114 @@ simulatorRouter.post("/api/v2/simulator/voucher/create", async (req: Request, re
         currentUsage: 0,
         startTime: startDate,
         endTime: endDate,
+        displayChannelList: finalChannels,
+        displayStartTime: displayStartDateTime,
+        voucherPurpose: finalPurpose,
+        targetVoucher: finalTargetVoucher,
         status: initialStatus
       }
     });
+
+    // Associate items if product voucher
+    if (determinedVoucherType === 2 && Array.isArray(item_id_list) && item_id_list.length > 0) {
+      for (const itemId of item_id_list) {
+        await prisma.voucherItem.create({
+          data: {
+            voucherId: voucher.voucherId,
+            itemId: BigInt(itemId)
+          }
+        }).catch(err => console.warn(`Failed to link item ${itemId} to voucher:`, err.message));
+      }
+    }
 
     res.json(createShopeeSuccessResponse({
       voucher_id: Number(voucher.voucherId),
       voucher_code: voucher.voucherCode,
       voucher_name: voucher.voucherName,
-      status: voucher.status.toLowerCase()
+      status: voucher.status.toLowerCase(),
+      usecase: usecaseNum
     }));
   } catch (err: any) {
     res.json(createShopeeErrorResponse("server_error", err.message || "Failed to create voucher"));
   }
 });
 
-// ============================================================================
-// SIMULATOR HELPER: END VOUCHER
-// ============================================================================
+// 5. UPDATE VOUCHER: POST /api/v2/simulator/voucher/update
+simulatorRouter.post("/api/v2/simulator/voucher/update", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      voucher_id,
+      shop_id,
+      voucher_name,
+      usage_quantity,
+      end_time,
+      min_basket_price,
+      item_id_list,
+      display_channel_list
+    } = req.body || {};
+
+    if (!voucher_id) {
+      res.json(createShopeeErrorResponse("error_param", "voucher_id is required"));
+      return;
+    }
+
+    const voucherId = BigInt(voucher_id);
+    const voucher = await prisma.voucher.findUnique({ where: { voucherId } });
+    if (!voucher || voucher.status === PromotionStatus.DELETED) {
+      res.json(createShopeeErrorResponse("error_param", "Voucher not found"));
+      return;
+    }
+
+    if (shop_id && voucher.shopId !== BigInt(shop_id)) {
+      res.json(createShopeeErrorResponse("error_param", "Voucher belongs to a different shop"));
+      return;
+    }
+
+    const updateData: any = {};
+    if (voucher_name && typeof voucher_name === "string" && voucher_name.trim()) {
+      updateData.voucherName = voucher_name.trim();
+    }
+    if (usage_quantity !== undefined) {
+      updateData.usageQuantity = Math.max(1, Number(usage_quantity));
+    }
+    if (end_time) {
+      const endDate = typeof end_time === "number" ? new Date(end_time * 1000) : new Date(end_time);
+      if (!isNaN(endDate.getTime())) updateData.endTime = endDate;
+    }
+    if (min_basket_price !== undefined) {
+      updateData.minBasketPrice = Number(min_basket_price);
+    }
+    if (Array.isArray(display_channel_list)) {
+      updateData.displayChannelList = display_channel_list;
+    }
+
+    await prisma.voucher.update({
+      where: { voucherId },
+      data: updateData
+    });
+
+    if (voucher.voucherType === 2 && Array.isArray(item_id_list)) {
+      await prisma.voucherItem.deleteMany({ where: { voucherId } });
+      for (const itemId of item_id_list) {
+        await prisma.voucherItem.create({
+          data: {
+            voucherId,
+            itemId: BigInt(itemId)
+          }
+        }).catch(err => console.warn("Failed to link item:", err.message));
+      }
+    }
+
+    res.json(createShopeeSuccessResponse({
+      voucher_id: Number(voucherId),
+      status: "updated"
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to update voucher"));
+  }
+});
+
+// 6. END VOUCHER: POST /api/v2/simulator/voucher/end
 simulatorRouter.post("/api/v2/simulator/voucher/end", async (req: Request, res: Response): Promise<void> => {
   try {
     const { voucher_id } = req.body || {};
@@ -2352,9 +2806,7 @@ simulatorRouter.post("/api/v2/simulator/voucher/end", async (req: Request, res: 
   }
 });
 
-// ============================================================================
-// SIMULATOR HELPER: DELETE VOUCHER
-// ============================================================================
+// 7. DELETE VOUCHER: POST /api/v2/simulator/voucher/delete
 simulatorRouter.post("/api/v2/simulator/voucher/delete", async (req: Request, res: Response): Promise<void> => {
   try {
     const { voucher_id } = req.body || {};
@@ -2369,6 +2821,57 @@ simulatorRouter.post("/api/v2/simulator/voucher/delete", async (req: Request, re
     res.json(createShopeeSuccessResponse({ voucher_id: Number(voucher_id), status: "deleted" }));
   } catch (err: any) {
     res.json(createShopeeErrorResponse("server_error", err.message || "Failed to delete voucher"));
+  }
+});
+
+// 8. GET VOUCHER ORDERS: GET /api/v2/simulator/voucher/orders
+simulatorRouter.get("/api/v2/simulator/voucher/orders", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const shopIdStr = (req.query.shop_id as string) || "727720655";
+    const shopId = BigInt(shopIdStr);
+    const voucherCode = req.query.voucher_code as string;
+    const pageNo = Math.max(1, parseInt((req.query.page_no as string) || "1", 10));
+    const pageSize = Math.min(100, Math.max(1, parseInt((req.query.page_size as string) || "10", 10)));
+    const offset = (pageNo - 1) * pageSize;
+
+    const where: any = { shopId };
+    if (voucherCode) {
+      where.sellerVoucherCode = voucherCode;
+    } else {
+      where.voucherFromSeller = { gt: 0 };
+    }
+
+    const [total, orders] = await Promise.all([
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where,
+        include: {
+          items: { include: { product: true } }
+        },
+        orderBy: { payTime: "desc" },
+        skip: offset,
+        take: pageSize
+      })
+    ]);
+
+    res.json(createShopeeSuccessResponse({
+      total,
+      page_no: pageNo,
+      page_size: pageSize,
+      more: offset + orders.length < total,
+      orders: orders.map(o => ({
+        order_sn: o.orderSn,
+        order_status: o.orderStatus,
+        total_amount: Number(o.totalAmount),
+        voucher_discount: Number(o.voucherFromSeller || 0),
+        seller_voucher_code: o.sellerVoucherCode || voucherCode || "",
+        buyer_username: o.buyerUsername,
+        created_at: o.payTime ? Math.floor(o.payTime.getTime() / 1000) : 0,
+        items_count: o.items.length
+      }))
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to query voucher orders"));
   }
 });
 

@@ -113,6 +113,20 @@ async function runPhase11Tests() {
     // -------------------------------------------------------------
     // Part 1: Buyer-Seller Live Chat Module
     // -------------------------------------------------------------
+    // Ensure standard auto-reply is disabled for pure manual chat test
+    await prisma.shopChatSetting.upsert({
+      where: { shopId: BigInt(SHOP_ID) },
+      update: { standardAutoReplyEnabled: false },
+      create: {
+        shopId: BigInt(SHOP_ID),
+        standardAutoReplyEnabled: false,
+        standardAutoReplyMessage: "Cảm ơn bạn đã nhắn tin cho shop.",
+        offWorkAutoReplyEnabled: false,
+        offWorkAutoReplyMessage: "Cảm ơn bạn đã nhắn tin ngoài giờ.",
+        showQuickReplySuggestions: true
+      }
+    });
+
     const testChatBuyerId = 9999;
     console.log("\n[Test 1] Send Live Chat Message (Buyer -> Seller)");
     const sendBuyerMsgRes = await request("/api/v2/simulator/chat/send", {

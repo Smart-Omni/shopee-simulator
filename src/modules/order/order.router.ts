@@ -725,6 +725,7 @@ export async function createSingleOrderRecord(body: any): Promise<{ success: boo
         orderStatus: order_status as OrderStatus,
         totalAmount: finalTotalAmount,
         voucherFromSeller: voucherDiscount,
+        sellerVoucherCode: voucherDiscount > 0 && voucher_code ? String(voucher_code).trim() : null,
         voucherFromShopee: shopeeShippingRebate,
         shippingCarrier: finalShippingCarrier,
         channelId: BigInt(chosenChannelId),

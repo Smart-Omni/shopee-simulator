@@ -1,5 +1,21 @@
 export const paymentSwaggerPaths: Record<string, any> = {
   "/api/v2/payment/get_escrow_detail": {
+    get: {
+      tags: ["Payment & Escrow"],
+      summary: "Get Order Escrow Detail (GET)",
+      description: "Fetches itemized accounting breakdown for an order via GET request.",
+      parameters: [
+        { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+        { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "sign", in: "query", required: true, schema: { type: "string" } },
+        { name: "order_sn", in: "query", required: true, schema: { type: "string" } }
+      ],
+      responses: {
+        "200": { description: "Itemized escrow income breakdown" }
+      }
+    },
     post: {
       tags: ["Payment & Escrow"],
       summary: "Get Order Escrow Detail",
@@ -167,6 +183,38 @@ export const paymentSwaggerPaths: Record<string, any> = {
             }
           }
         }
+      }
+    },
+    post: {
+      tags: ["Payment & Escrow"],
+      summary: "Get Released Escrow Orders List (POST)",
+      description: "Retrieves list of completed orders whose escrow has been released via POST request.",
+      parameters: [
+        { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+        { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "sign", in: "query", required: true, schema: { type: "string" } }
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["release_time_from", "release_time_to"],
+              properties: {
+                release_time_from: { type: "integer" },
+                release_time_to: { type: "integer" },
+                page_size: { type: "integer", default: 40 },
+                page_no: { type: "integer", default: 1 }
+              }
+            }
+          }
+        }
+      },
+      responses: {
+        "200": { description: "List of orders with released escrow payout" }
       }
     }
   },
