@@ -60,6 +60,7 @@ model Shop {
   vouchers              Voucher[]
   comments              ProductComment[]
   chatMessages          ChatMessage[]
+  chatSetting           ShopChatSetting?
 
   @@map("shops")
 }
@@ -610,6 +611,21 @@ model ChatMessage {
 
   @@index([shopId, buyerUserId, createdAt])
   @@map("chat_messages")
+}
+
+model ShopChatSetting {
+  shopId                     BigInt   @id @map("shop_id")
+  standardAutoReplyEnabled   Boolean  @default(false) @map("standard_auto_reply_enabled")
+  standardAutoReplyMessage   String   @default("Cảm ơn bạn đã nhắn tin cho shop. Shop sẽ phản hồi lại cho bạn trong vòng 30', bạn vui lòng chờ shop 1 tẹo nhé.") @db.Text @map("standard_auto_reply_message")
+  offWorkAutoReplyEnabled    Boolean  @default(false) @map("off_work_auto_reply_enabled")
+  offWorkAutoReplyMessage    String   @default("Cảm ơn bạn đã quan tâm đến sản phẩm của shop. Shop sẽ phản hồi thông tin này trong giờ làm việc sớm nhất có thể.") @db.Text @map("off_work_auto_reply_message")
+  showQuickReplySuggestions  Boolean  @default(true) @map("show_quick_reply_suggestions")
+  quickReplyGroups           Json?    @map("quick_reply_groups")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  shop                       Shop     @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+
+  @@map("shop_chat_settings")
 }
 
 // ----------------------------------------------------

@@ -4,6 +4,9 @@ import { reviewAndLogisticsSwaggerPaths } from "./swagger.reviews";
 import { simulatorSwaggerPaths } from "./swagger.simulator";
 import { paymentSwaggerPaths } from "./swagger.payment";
 import { returnsSwaggerPaths } from "./swagger.returns";
+import { chatSwaggerPaths } from "./swagger.chat";
+import { adminSwaggerPaths } from "./swagger.admin";
+import { buyerSwaggerPaths } from "./swagger.buyer";
 
 export const swaggerDocument = {
   openapi: "3.0.0",
@@ -555,6 +558,111 @@ export const swaggerDocument = {
         }
       }
     },
+    "/api/v2/product/unlist_item": {
+      post: {
+        tags: ["Product"],
+        summary: "Unlist Item",
+        description: "Batch unlist or list items (up to 50 items per request). Setting unlist: true hides the product from search; false makes it NORMAL.",
+        parameters: [
+          { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+          { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+          { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "sign", in: "query", required: true, schema: { type: "string" } }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["item_list"],
+                properties: {
+                  item_list: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      required: ["item_id", "unlist"],
+                      properties: {
+                        item_id: { type: "integer", example: 1001 },
+                        unlist: { type: "boolean", example: true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Success and failure batch results",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: { type: "string", example: "" },
+                    message: { type: "string", example: "" },
+                    response: {
+                      type: "object",
+                      properties: {
+                        failure_list: { type: "array" },
+                        success_list: { type: "array" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/product/delete_item": {
+      post: {
+        tags: ["Product"],
+        summary: "Delete Item",
+        description: "Soft-deletes a product by setting item_status to SELLER_DELETE (with 90-day retention convention). Fails if shop is on vacation.",
+        parameters: [
+          { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+          { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+          { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "sign", in: "query", required: true, schema: { type: "string" } }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["item_id"],
+                properties: {
+                  item_id: { type: "integer", example: 1001 }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Product soft deleted",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: { type: "string", example: "" },
+                    message: { type: "string", example: "" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/order/get_order_list": {
       get: {
         tags: ["Order"],
@@ -813,6 +921,23 @@ export const swaggerDocument = {
       }
     },
     "/api/v2/logistics/get_shipping_document_result": {
+      get: {
+        tags: ["Logistics"],
+        summary: "Get Shipping Document Generation Status (Query)",
+        description: "Poll AWB document task status via GET query parameters.",
+        parameters: [
+          { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+          { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+          { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "sign", in: "query", required: true, schema: { type: "string" } },
+          { name: "order_sn", in: "query", schema: { type: "string" } },
+          { name: "package_number", in: "query", schema: { type: "string" } }
+        ],
+        responses: {
+          "200": { description: "Returns document ready statuses" }
+        }
+      },
       post: {
         tags: ["Logistics"],
         summary: "Get Shipping Document Generation Status",
@@ -844,6 +969,30 @@ export const swaggerDocument = {
       }
     },
     "/api/v2/logistics/download_shipping_document": {
+      get: {
+        tags: ["Logistics"],
+        summary: "Download Printable Airway Bill (AWB) PDF (Query)",
+        description: "Download binary standard printable PDF Airway Bill via GET query parameters.",
+        parameters: [
+          { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+          { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+          { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+          { name: "sign", in: "query", required: true, schema: { type: "string" } },
+          { name: "order_sn", in: "query", required: true, schema: { type: "string" } },
+          { name: "package_number", in: "query", schema: { type: "string" } }
+        ],
+        responses: {
+          "200": {
+            description: "Binary PDF stream (application/pdf)",
+            content: {
+              "application/pdf": {
+                schema: { type: "string", format: "binary" }
+              }
+            }
+          }
+        }
+      },
       post: {
         tags: ["Logistics"],
         summary: "Download Printable Airway Bill (AWB) PDF",
@@ -1001,7 +1150,10 @@ export const swaggerDocument = {
     ...paymentSwaggerPaths,
     ...returnsSwaggerPaths,
     ...reviewAndLogisticsSwaggerPaths,
-    ...simulatorSwaggerPaths
+    ...simulatorSwaggerPaths,
+    ...chatSwaggerPaths,
+    ...adminSwaggerPaths,
+    ...buyerSwaggerPaths
   },
   components: {
     schemas: {

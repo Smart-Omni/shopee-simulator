@@ -1,5 +1,42 @@
 export const returnsSwaggerPaths: Record<string, any> = {
   "/api/v2/returns/get_return_list": {
+    get: {
+      tags: ["Returns & Disputes"],
+      summary: "Get Return List (Query)",
+      description: "Queries list of return and refund requests for the authorized shop with pagination and status filters via GET query parameters.",
+      parameters: [
+        { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+        { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "sign", in: "query", required: true, schema: { type: "string" } },
+        { name: "page_no", in: "query", schema: { type: "integer", default: 1 } },
+        { name: "page_size", in: "query", schema: { type: "integer", default: 20 } },
+        { name: "create_time_from", in: "query", schema: { type: "integer" } },
+        { name: "create_time_to", in: "query", schema: { type: "integer" } },
+        {
+          name: "status",
+          in: "query",
+          schema: {
+            type: "string",
+            enum: [
+              "REQUESTED",
+              "JUDGING",
+              "PROCESSING",
+              "ACCEPTED",
+              "CANCELLED",
+              "CLOSED",
+              "SELLER_DISPUTE"
+            ]
+          }
+        }
+      ],
+      responses: {
+        "200": {
+          description: "List of returns and pagination metadata"
+        }
+      }
+    },
     post: {
       tags: ["Returns & Disputes"],
       summary: "Get Return List",
@@ -89,6 +126,24 @@ export const returnsSwaggerPaths: Record<string, any> = {
     }
   },
   "/api/v2/returns/get_return_detail": {
+    get: {
+      tags: ["Returns & Disputes"],
+      summary: "Get Return Detail (Query)",
+      description: "Fetches full details for a return request via GET query parameters.",
+      parameters: [
+        { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+        { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "sign", in: "query", required: true, schema: { type: "string" } },
+        { name: "return_sn", in: "query", required: true, schema: { type: "string", example: "RET261020A1B2C3" } }
+      ],
+      responses: {
+        "200": {
+          description: "Full return details"
+        }
+      }
+    },
     post: {
       tags: ["Returns & Disputes"],
       summary: "Get Return Detail",
@@ -442,6 +497,24 @@ export const returnsSwaggerPaths: Record<string, any> = {
     }
   },
   "/api/v2/returns/get_return_dispute_reason": {
+    get: {
+      tags: ["Returns & Disputes"],
+      summary: "Get Return Dispute Reason (Query)",
+      description: "Returns the official list of dispute reasons allowed for the given return_sn via GET query parameters.",
+      parameters: [
+        { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+        { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "sign", in: "query", required: true, schema: { type: "string" } },
+        { name: "return_sn", in: "query", required: true, schema: { type: "string" } }
+      ],
+      responses: {
+        "200": {
+          description: "List of allowed dispute reasons"
+        }
+      }
+    },
     post: {
       tags: ["Returns & Disputes"],
       summary: "Get Return Dispute Reason",
@@ -501,6 +574,24 @@ export const returnsSwaggerPaths: Record<string, any> = {
     }
   },
   "/api/v2/returns/get_available_solutions": {
+    get: {
+      tags: ["Returns & Disputes"],
+      summary: "Get Available Solutions (Query)",
+      description: "Returns available resolution options (RETURN_REFUND or REFUND_ONLY) for this return case via GET query parameters.",
+      parameters: [
+        { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+        { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "sign", in: "query", required: true, schema: { type: "string" } },
+        { name: "return_sn", in: "query", required: true, schema: { type: "string" } }
+      ],
+      responses: {
+        "200": {
+          description: "Available solutions"
+        }
+      }
+    },
     post: {
       tags: ["Returns & Disputes"],
       summary: "Get Available Solutions",
@@ -614,6 +705,24 @@ export const returnsSwaggerPaths: Record<string, any> = {
     }
   },
   "/api/v2/returns/query_proof": {
+    get: {
+      tags: ["Returns & Disputes"],
+      summary: "Query Return Proof (Query)",
+      description: "Retrieves list of all proof documents attached by buyer, seller, and warehouse inspector via GET query parameters.",
+      parameters: [
+        { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+        { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "sign", in: "query", required: true, schema: { type: "string" } },
+        { name: "return_sn", in: "query", required: true, schema: { type: "string" } }
+      ],
+      responses: {
+        "200": {
+          description: "Proof documents"
+        }
+      }
+    },
     post: {
       tags: ["Returns & Disputes"],
       summary: "Query Return Proof",

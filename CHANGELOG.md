@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
+- **100% Swagger OpenAPI Coverage**: Fully documented all 182 active Express route operations across both official Shopee Open API v2 endpoints and Simulator / Admin / Buyer experience endpoints in OpenAPI 3.0:
+  - Created `src/swagger/swagger.chat.ts`: documented all Layer A seller chat endpoints (`/api/v2/sellerchat/*`) and Simulator chat control endpoints (`/api/v2/simulator/chat/*`).
+  - Created `src/swagger/swagger.admin.ts`: documented admin arbitration overview (`/api/v2/simulator/returns`), customer service claim reviews (`/api/v2/simulator/admin/returns/review`), warehouse inbound inspections (`/warehouse_inbound`), and dispute arbitrations (`/arbitrate_dispute`), as well as interactive returns lifecycle simulation endpoints (`/api/v2/simulator/returns/*`).
+  - Created `src/swagger/swagger.buyer.ts`: documented fast login, registration, password recovery, buyer profile, multiple shipping addresses management, catalog browsing, cart checkout, delivery confirmation, shop details, analytics, escrow payment, and media upload.
+  - Updated `src/swagger/swagger.vouchers.ts`: documented all Layer B voucher simulator routes (`/api/v2/simulator/voucher/*`).
+  - Updated `src/swagger/swagger.payment.ts`: documented escrow details and escrow query endpoints (`/api/v2/payment/get_escrow_detail`, `get_escrow_list`).
+  - Updated `src/swagger/swagger.returns.ts` and `src/swagger/swagger.spec.ts`: added dual `GET` query method documentation for return lists, return details, dispute reasons, available solutions, proof documents, airway bill generation status, and binary PDF airway bill download.
+  - Added official product unlist (`/api/v2/product/unlist_item`) and delete (`/api/v2/product/delete_item`) endpoints.
+  - Cleaned up obsolete draft return paths from `src/swagger/swagger.simulator.ts`.
+
 - Implemented Phase 18: **Seller Voucher Management and Layer B Simulator APIs** (`/api/v2/simulator/voucher/*`) supporting all 8 official Shopee voucher usecases:
   - `GET /api/v2/simulator/voucher/config`: returns shop-specific voucher prefix and metadata for supported usecases (including `usecase = 9`, `Voucher Ưu Đãi Follower`).
   - `GET /api/v2/simulator/voucher/list` & `/vouchers`: returns paginated vouchers, keyword search by name or code, status filter (`all`, `ongoing`, `upcoming`, `expired`), and live aggregate status counts.
@@ -38,6 +48,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - Synchronized Prisma schema changes with `prisma db push`; product metrics fields and relationships are documented in the simulator data model.
+
+## [1.13.0] - 2026-10-26
+
+### 🎯 Overview
+Implemented **Phase 19: Chat Management, Auto-Reply, Quick Messages & Signed Seller Chat APIs** and **Phase 20: Shopiz Test Control & Shopee Admin Platform Console**, delivering full omnichannel messaging capabilities, persistent seller webchat widgets, and an enterprise administration testbed for dispute arbitration, webhook audits, fault injection, order fast-forwarding, and multi-shop OAuth governance.
+
+### 💬 Phase 19: Chat Management & Seller Chat Partner APIs
+- **Backend Simulator APIs (`/api/v2/simulator/chat/*`):**
+  - `GET /api/v2/simulator/chat/performance`: returns real-time chat metrics including total chat count, period comparison, response rate (`%`), and average response time.
+  - `GET /api/v2/simulator/chat/auto_reply` & `POST /api/v2/simulator/chat/auto_reply`: toggle and persist Standard Auto-Reply message with 24-hour rate limit protection against repeated auto-replies to the same buyer.
+  - `GET /api/v2/simulator/chat/quick_reply` & `POST /api/v2/simulator/chat/quick_reply`: manage up to 25 quick reply groups, pre-seeded with 13 authentic Vietnamese customer service message templates in `Nhóm Tin nhắn chung`.
+- **Signed Layer A Seller Chat Partner APIs (`/api/v2/sellerchat/*`):**
+  - `GET /api/v2/sellerchat/get_conversation_list`: returns paginated conversation threads with unread counters and latest message preview.
+  - `GET /api/v2/sellerchat/get_one_conversation`: retrieves individual conversation details and buyer metadata.
+  - `GET /api/v2/sellerchat/get_message_list`: fetches historical messages for a conversation.
+  - `POST /api/v2/sellerchat/send_message`: sends live seller messages.
+  - `POST /api/v2/sellerchat/send_autoreply_message`: sends automated greetings flagged with `is_auto_reply: true`.
+  - `POST /api/v2/sellerchat/read_conversation`: marks conversation as read and resets unread count to 0.
+- **Shopiz Seller Center Chat Management UI:**
+  - `?tab=chat`: Hiệu quả Chat performance card with "Xem thêm chi tiết" modal and Trợ lý Chat navigation cards (Tin nhắn tự động, Tin nhắn nhanh, Hỏi - Đáp modal).
+  - `?tab=chat_auto_reply`: Tin nhắn tự động switch, 500-char textarea editor, character counters, and live preview card.
+  - `?tab=chat_quick_reply`: Tin nhắn nhanh visibility switch, groups list, create group modal, and inline message management.
+  - Floating Seller Webchat Widget: Persistent bottom-right floating chat drawer with conversations list, active message thread, quick shortcuts bar, and order product attachments.
+- **Verification:** `test/phase19_chat_management.spec.ts` (14 assertions, 100% pass) and `scripts/verify-chat-management.mjs` (`npm run check:chat-management`, 100% pass).
+
+### 🛠️ Phase 20: Test Control & Shopee Admin Platform Console
+- **Direct Access Routes:** Both `/test-control` and `/admin` routes accessible without authentication barriers.
+- **Enterprise Purple Platform Theme:** Sticky header with live Simulator health indicator (`Port 8080`), 4 dynamic KPI summary cards, and floating toast notification stack.
+- **5 Core Admin Modules:**
+  1. **Xử lý Khiếu nại & Trả hàng (Dispute & Return Arbitration):** Case inspection with buyer/seller photo & video unboxing proofs, Customer Service Review modal (`APPROVE`/`REJECT`), Warehouse Inbound modal (`PASS`/`FAIL`), and Gavel arbitration modal (`BUYER_WIN`/`SELLER_WIN` + compensation input & ruling notes).
+  2. **Webhook Trực quan & Giám sát (Push Webhooks):** Outbound URL configuration with 1-click local mock sink (`/api/v2/simulator/webhook/sink`), manual event dispatcher with pre-filled templates (Code 1, 2, 3, 4, 8, 15), and real-time delivery audit stream with inspect modal and retry failed.
+  3. **Mô phỏng Lỗi & Latency (Fault Injection Engine):** HTTP 429 rate limit toggle + threshold input, expired token injection, invalid signature rejection, strict timestamp drift toggle, artificial latency slider (0–3000ms), and 1-click reset to normal.
+  4. **Vòng đời Đơn hàng & SLA (Order Lifecycle Fast-Forward):** 5-stage visual pipeline stepper (`UNPAID` $\rightarrow$ `READY_TO_SHIP` $\rightarrow$ `PROCESSED` $\rightarrow$ `SHIPPED` $\rightarrow$ `COMPLETED`), fast-forward triggers (`pay`, `carrier_pickup`, `deliver`), and overdue SLA auto-cancellation scanner.
+  5. **OAuth 2.0 & Quản lý Gian hàng:** Partner auth link generator with 1-click copy & launch, multi-shop inspection table, token TTL countdown, 5-minute dual-token grace period indicator, vacation mode switch, and instant token refresh button.
+- **Navigation Shortcuts:** Integrated on Marketplace Utility Nav (`Test Control`) and Seller Center Header next to `Switch Shop`.
+- **Verification:** Playwright end-to-end test suite in `scripts/verify-test-control.mjs` (`npm run check:test-control`, 100% pass).
 
 ## [1.12.0] - 2026-10-24
 

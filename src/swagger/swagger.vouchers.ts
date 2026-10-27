@@ -260,5 +260,133 @@ export const voucherSwaggerPaths: Record<string, any> = {
         "200": { description: "Voucher termination response" }
       }
     }
+  },
+
+  // =========================================================================
+  // Simulator Voucher Management Endpoints (Layer B)
+  // =========================================================================
+  "/api/v2/simulator/voucher/config": {
+    get: {
+      tags: ["Voucher"],
+      summary: "Get Shop Voucher Configuration",
+      description: "Returns shop code prefix (e.g. SMAR, HANO, SAIG) and supported voucher usecases.",
+      parameters: [
+        { name: "shop_id", in: "query", schema: { type: "integer", default: 727720655 } }
+      ],
+      responses: {
+        "200": { description: "Voucher configuration and prefix" }
+      }
+    }
+  },
+  "/api/v2/simulator/voucher/list": {
+    get: {
+      tags: ["Voucher"],
+      summary: "List Shop Vouchers with Live Status Counts",
+      description: "Returns paginated vouchers filtered by status (all, ongoing, upcoming, expired), search keywords, and aggregate counters.",
+      parameters: [
+        { name: "shop_id", in: "query", schema: { type: "integer", default: 727720655 } },
+        { name: "status", in: "query", schema: { type: "string", enum: ["all", "ongoing", "upcoming", "expired"], default: "all" } },
+        { name: "keyword", in: "query", schema: { type: "string" } },
+        { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+        { name: "page_size", in: "query", schema: { type: "integer", default: 10 } }
+      ],
+      responses: {
+        "200": { description: "Vouchers list and status_counts object" }
+      }
+    }
+  },
+  "/api/v2/simulator/vouchers": {
+    get: {
+      tags: ["Voucher"],
+      summary: "List Active Vouchers (Alias)",
+      description: "Alias endpoint returning active vouchers for shop or checkout selection.",
+      parameters: [
+        { name: "shop_id", in: "query", schema: { type: "integer" } }
+      ],
+      responses: {
+        "200": { description: "Array of vouchers" }
+      }
+    }
+  },
+  "/api/v2/simulator/voucher/detail": {
+    get: {
+      tags: ["Voucher"],
+      summary: "Get Voucher Detail & Applicable Products",
+      description: "Retrieves complete voucher settings, resolved applicable products/models, and usage stats.",
+      parameters: [
+        { name: "voucher_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "shop_id", in: "query", schema: { type: "integer" } }
+      ],
+      responses: {
+        "200": { description: "Detailed voucher object" }
+      }
+    }
+  },
+  "/api/v2/simulator/voucher/update": {
+    post: {
+      tags: ["Voucher"],
+      summary: "Update Existing Voucher",
+      description: "Updates voucher name, usage quantity, and item associations.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["voucher_id"],
+              properties: {
+                voucher_id: { type: "integer" },
+                voucher_name: { type: "string" },
+                usage_quantity: { type: "integer" },
+                item_id_list: { type: "array", items: { type: "integer" } }
+              }
+            }
+          }
+        }
+      },
+      responses: {
+        "200": { description: "Updated voucher object" }
+      }
+    }
+  },
+  "/api/v2/simulator/voucher/validate": {
+    post: {
+      tags: ["Voucher"],
+      summary: "Validate Voucher for Cart Basket",
+      description: "Validates if a voucher can be redeemed against the cart basket and calculates discount amount.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["voucher_code", "shop_id", "items_subtotal"],
+              properties: {
+                voucher_code: { type: "string" },
+                shop_id: { type: "integer" },
+                items_subtotal: { type: "number" }
+              }
+            }
+          }
+        }
+      },
+      responses: {
+        "200": { description: "Validation result with discount_amount" }
+      }
+    }
+  },
+  "/api/v2/simulator/voucher/orders": {
+    get: {
+      tags: ["Voucher"],
+      summary: "Get Orders Redeemed with Voucher",
+      description: "Returns list of orders that utilized the specified voucher code.",
+      parameters: [
+        { name: "voucher_code", in: "query", required: true, schema: { type: "string" } },
+        { name: "shop_id", in: "query", schema: { type: "integer" } }
+      ],
+      responses: {
+        "200": { description: "List of orders using the voucher" }
+      }
+    }
   }
 };
