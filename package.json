@@ -38,7 +38,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "googleapis": "^187.0.0",
-    "multer": "^2.4.0",
+    "multer": "^2.5.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0"
   },
