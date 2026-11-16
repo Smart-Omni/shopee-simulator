@@ -1992,6 +1992,28 @@ async function main() {
           isDefault: true
         }
       ]
+    },
+    {
+      id: BigInt(2003),
+      username: "saigonseller",
+      email: "saigon@shopiz.com",
+      phone: "0907777777",
+      name: "Saigon Modern Living Merchant",
+      role: "seller",
+      shopId: BigInt(910283751),
+      passwordHash: defaultPasswordHash,
+      addresses: [
+        {
+          recipientName: "Saigon Modern Living Hub",
+          recipientPhone: "0907777777",
+          addressLine: "456 Nguyen Hue, Ben Nghe, District 1",
+          district: "District 1",
+          city: "Ho Chi Minh City",
+          state: "Ho Chi Minh City",
+          zipcode: "700000",
+          isDefault: true
+        }
+      ]
     }
   ];
 
