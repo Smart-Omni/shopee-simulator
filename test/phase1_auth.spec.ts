@@ -138,6 +138,64 @@ async function runTests() {
       const shopInDb = await prisma.shop.findUnique({ where: { shopId: BigInt(SHOP_ID) } });
       assert(shopInDb?.authCode === authCode, "Authorization code is recorded in database");
       assert(shopInDb?.authCodeExpiresAt !== null, "Auth code has expiry timestamp");
+
+      // 4.1 Interactive OAuth Login & Consent Flow (Multi-Tenant Shop Selection)
+      const unauthRes = await request(`/api/v2/shop/auth_partner?partner_id=${PARTNER_ID}&redirect_uri=${encodeURIComponent(redirectUri)}`);
+      assert(unauthRes.status === 200, "Unauthenticated OAuth request renders HTTP 200 Seller Login Screen");
+      assert(unauthRes.text.includes("Đăng nhập để ủy quyền"), "Renders 'Đăng nhập để ủy quyền' title");
+      assert(unauthRes.text.includes("SmartOmni Official Flagship"), "Shows quick login for Shop 1 (727720655)");
+      assert(unauthRes.text.includes("Hanoi Streetwear Co."), "Shows quick login for Shop 2 (839910244)");
+      assert(unauthRes.text.includes("Saigon Modern Living"), "Shows quick login for Shop 3 (910283751)");
+
+      // 4.2 Quick Login with Shop 2 (839910244 - Hanoi Streetwear Co.)
+      const loginRes = await request("/api/v2/shop/auth_partner/login", {
+        method: "POST",
+        body: {
+          partner_id: String(PARTNER_ID),
+          redirect_uri: redirectUri,
+          auto_select_shop_id: "839910244"
+        }
+      });
+      assert(loginRes.status === 302, "Quick login returns HTTP 302 redirect");
+      const setCookie = loginRes.headers.get("set-cookie") || "";
+      assert(setCookie.includes("shopee_seller_id="), "Sets shopee_seller_id session cookie");
+
+      // Extract cookie value
+      const cookieMatch = setCookie.match(/shopee_seller_id=([^;]+)/);
+      const sellerCookie = cookieMatch ? cookieMatch[1] : "";
+
+      // 4.3 Authenticated OAuth Consent Screen displays selected Shop 2
+      const consentRes = await request(`/api/v2/shop/auth_partner?partner_id=${PARTNER_ID}&redirect_uri=${encodeURIComponent(redirectUri)}`, {
+        headers: { Cookie: `shopee_seller_id=${sellerCookie}` }
+      });
+      assert(consentRes.status === 200, "Authenticated request returns HTTP 200 Consent Screen");
+      assert(consentRes.text.includes("Hanoi Streetwear Co."), "Consent screen displays Shop 2 name");
+      assert(consentRes.text.includes("839910244"), "Consent screen displays Shop 2 ID 839910244");
+      assert(consentRes.text.includes("hanoiseller"), "Consent screen displays seller username");
+      assert(consentRes.text.includes("Đổi tài khoản Shop khác"), "Consent screen provides switch account option");
+
+      // 4.4 Confirm Authorization for Shop 2
+      const confirmRes = await request("/api/v2/shop/auth_partner/confirm", {
+        method: "POST",
+        body: {
+          partner_id: String(PARTNER_ID),
+          redirect_uri: redirectUri,
+          shop_id: "839910244"
+        }
+      });
+      assert(confirmRes.status === 302, "Confirm authorization returns HTTP 302 redirect");
+      const confirmLocation = confirmRes.headers.get("location") || "";
+      const confirmUrl = new URL(confirmLocation);
+      const shop2Code = confirmUrl.searchParams.get("code") || "";
+      const shop2Id = confirmUrl.searchParams.get("shop_id");
+      assert(shop2Code.length === 32, "Shop 2 authorization code is 32-character hex");
+      assert(shop2Id === "839910244", "Shop 2 returned shop_id is 839910244");
+
+      // 4.5 Cancel Authorization returns access_denied
+      const cancelRes = await request(`/api/v2/shop/auth_partner?partner_id=${PARTNER_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&action=cancel`);
+      assert(cancelRes.status === 302, "Cancel authorization returns HTTP 302 redirect");
+      const cancelLocation = cancelRes.headers.get("location") || "";
+      assert(cancelLocation.includes("error=access_denied"), "Cancel redirect carries error=access_denied");
     }
 
     // ------------------------------------------------------------------------
@@ -251,7 +309,7 @@ async function runTests() {
     }
 
     console.log("\n=======================================================");
-    console.log("   🎉 ALL 25 TEST ASSERTIONS PASSED WITH 100% SUCCESS  ");
+    console.log("   🎉 ALL 42 TEST ASSERTIONS PASSED WITH 100% SUCCESS  ");
     console.log("=======================================================\n");
 
   } catch (err) {
