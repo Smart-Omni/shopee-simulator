@@ -728,8 +728,12 @@ simulatorRouter.get("/api/v2/simulator/shop/detail", async (req: Request, res: R
       include: {
         products: {
           where: { itemStatus: "NORMAL" },
-          include: { models: true },
-          take: 20
+          include: {
+            models: true,
+            category: true
+          },
+          orderBy: { itemId: "desc" },
+          take: 500
         }
       }
     });
@@ -797,6 +801,31 @@ simulatorRouter.get("/api/v2/simulator/shop/detail", async (req: Request, res: R
       expiresAt: v.endTime.toISOString().split("T")[0]
     }));
 
+    const metricsMap = await getExtraInfoForItems(shop.products.map((p) => p.itemId));
+
+    const mappedProducts = shop.products.map((p) => {
+      const metric = metricsMap.get(p.itemId.toString());
+      const catName = p.category?.categoryName || "";
+      return {
+        item_id: Number(p.itemId),
+        item_name: p.itemName,
+        category_id: Number(p.categoryId),
+        category_name: catName,
+        category: catName,
+        original_price: Number(p.originalPrice),
+        current_price: Number(p.originalPrice),
+        images: p.imagesJson,
+        seller_stock: p.models.reduce((sum, m) => sum + m.sellerStock, 0),
+        sales: metric?.sale || 0,
+        sale: metric?.sale || 0,
+        sold: metric?.sale || 0,
+        rating_star: metric?.rating_star,
+        comment_count: metric?.comment_count || 0,
+        views: metric?.views || 0,
+        likes: metric?.likes || 0
+      };
+    });
+
     res.json(createShopeeSuccessResponse({
       shop: {
         shop_id: Number(shop.shopId),
@@ -814,14 +843,8 @@ simulatorRouter.get("/api/v2/simulator/shop/detail", async (req: Request, res: R
         story: `${shop.shopName} provides authentic, premium merchandise with full manufacturer warranty and instant Shopee delivery.`,
         has_campaign: vouchers.length > 0 || activeDiscounts.length > 0,
         vouchers,
-        products: shop.products.map((p) => ({
-          item_id: Number(p.itemId),
-          item_name: p.itemName,
-          original_price: Number(p.originalPrice),
-          current_price: Number(p.originalPrice),
-          images: p.imagesJson,
-          seller_stock: p.models.reduce((sum, m) => sum + m.sellerStock, 0)
-        }))
+        products: mappedProducts,
+        total_products: mappedProducts.length
       }
     }));
   } catch (error: any) {
