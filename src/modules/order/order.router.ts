@@ -704,14 +704,24 @@ export async function createSingleOrderRecord(body: any): Promise<{ success: boo
       actualShippingFee = quote.actualFee;
       shopeeShippingRebate = LogisticsEngine.calculateFreeshipRebate(itemsSubtotal, actualShippingFee);
       const netFee = Math.max(0, actualShippingFee - shopeeShippingRebate);
-      buyerPaidShippingFee = shipping_fee !== undefined ? Number(shipping_fee) : netFee;
+      if (shipping_fee !== undefined && shipping_fee !== null) {
+        buyerPaidShippingFee = Math.min(Number(shipping_fee), netFee);
+      } else {
+        buyerPaidShippingFee = netFee;
+      }
       if (!finalShippingCarrier) {
         finalShippingCarrier = quote.carrierName;
       }
     } else {
       chosenChannelId = 30001;
-      buyerPaidShippingFee = shipping_fee !== undefined ? Number(shipping_fee) : 15000;
-      actualShippingFee = buyerPaidShippingFee;
+      actualShippingFee = 15000;
+      shopeeShippingRebate = LogisticsEngine.calculateFreeshipRebate(itemsSubtotal, actualShippingFee);
+      const netFee = Math.max(0, actualShippingFee - shopeeShippingRebate);
+      if (shipping_fee !== undefined && shipping_fee !== null) {
+        buyerPaidShippingFee = Math.min(Number(shipping_fee), netFee);
+      } else {
+        buyerPaidShippingFee = netFee;
+      }
       if (!finalShippingCarrier) {
         finalShippingCarrier = "Shopee Xpress";
       }
