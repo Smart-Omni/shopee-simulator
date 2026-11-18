@@ -321,6 +321,7 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
       has_model: p.hasModel,
       images: p.imagesJson,
       tier_variation: p.tierVariationJson,
+      seller_stock: (p.models || []).reduce((acc: number, m: any) => acc + (m.sellerStock || 0), 0),
       models: (p.models || []).map((m: any) => {
         let mPromoPrice: number | null = null;
         if (discItem && discItem.models) {
@@ -453,6 +454,8 @@ simulatorRouter.get("/api/v2/simulator/product/detail", async (req: Request, res
         images: p.imagesJson,
         has_model: p.hasModel,
         tier_variation: p.tierVariationJson,
+        seller_stock: (p.models || []).reduce((acc: number, m: any) => acc + (m.sellerStock || 0), 0),
+        stock: (p.models || []).reduce((acc: number, m: any) => acc + (m.sellerStock || 0), 0),
         category: {
           category_id: Number(p.categoryId),
           category_name: p.category?.categoryName || "General"
@@ -810,17 +813,32 @@ simulatorRouter.get("/api/v2/simulator/shop/detail", async (req: Request, res: R
 // 5. QUICK UPDATE STOCK
 // ============================================================================
 simulatorRouter.post("/api/v2/simulator/product/quick_update_stock", async (req: Request, res: Response): Promise<void> => {
-  const { model_id, item_id, stock } = req.body || {};
+  const { model_id, item_id } = req.body || {};
+  const stockVal = req.body?.stock !== undefined ? req.body.stock : req.body?.normal_stock;
 
-  if (!model_id || stock === undefined) {
-    res.json(createShopeeErrorResponse("error_param", "model_id and stock are required"));
+  if (stockVal === undefined) {
+    res.json(createShopeeErrorResponse("error_param", "stock or normal_stock is required"));
     return;
   }
 
-  const modelId = BigInt(model_id);
+  let targetModelId = model_id ? BigInt(model_id) : null;
+  if (!targetModelId && item_id) {
+    const firstModel = await prisma.productModel.findFirst({
+      where: { itemId: BigInt(item_id) }
+    });
+    if (firstModel) {
+      targetModelId = firstModel.modelId;
+    }
+  }
+
+  if (!targetModelId) {
+    res.json(createShopeeErrorResponse("error_param", "model_id or valid item_id is required"));
+    return;
+  }
+
   const updatedModel = await prisma.productModel.update({
-    where: { modelId },
-    data: { sellerStock: Number(stock) },
+    where: { modelId: targetModelId },
+    data: { sellerStock: Number(stockVal) },
     include: { product: true }
   });
 
@@ -838,7 +856,7 @@ simulatorRouter.post("/api/v2/simulator/product/quick_update_stock", async (req:
         data: {
           item_id: Number(updatedModel.itemId),
           model_id: Number(updatedModel.modelId),
-          stock: Number(stock)
+          stock: Number(stockVal)
         }
       }
     }).catch(err => console.warn("[Simulator] Stock push failed:", err.message));
