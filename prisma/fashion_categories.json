@@ -1,0 +1,1037 @@
+[
+  {
+    "categoryId": 100011,
+    "parentId": 0,
+    "categoryName": "Thời Trang Nam",
+    "hasChildren": true,
+    "level": 1,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100017,
+    "parentId": 0,
+    "categoryName": "Thời Trang Nữ",
+    "hasChildren": true,
+    "level": 1,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100047,
+    "parentId": 100011,
+    "categoryName": "Quần jean",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100048,
+    "parentId": 100011,
+    "categoryName": "Hoodie & Áo nỉ",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100049,
+    "parentId": 100011,
+    "categoryName": "Áo len",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100050,
+    "parentId": 100011,
+    "categoryName": "Áo khoác",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100051,
+    "parentId": 100011,
+    "categoryName": "Com lê",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100052,
+    "parentId": 100011,
+    "categoryName": "Quần dài",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100053,
+    "parentId": 100011,
+    "categoryName": "Quần đùi",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100054,
+    "parentId": 100011,
+    "categoryName": "Áo",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100055,
+    "parentId": 100011,
+    "categoryName": "Đồ lót",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100056,
+    "parentId": 100011,
+    "categoryName": "Đồ ngủ",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100057,
+    "parentId": 100011,
+    "categoryName": "Bộ",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100058,
+    "parentId": 100011,
+    "categoryName": "Trang phục truyền thống",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100059,
+    "parentId": 100011,
+    "categoryName": "Đồ hóa trang",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100060,
+    "parentId": 100011,
+    "categoryName": "Trang phục ngành nghề",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100062,
+    "parentId": 100011,
+    "categoryName": "Vớ/ Tất",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100099,
+    "parentId": 100017,
+    "categoryName": "Áo",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100100,
+    "parentId": 100017,
+    "categoryName": "Quần",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100101,
+    "parentId": 100017,
+    "categoryName": "Quần đùi",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100102,
+    "parentId": 100017,
+    "categoryName": "Váy",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100103,
+    "parentId": 100017,
+    "categoryName": "Quần jeans",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100104,
+    "parentId": 100017,
+    "categoryName": "Đầm",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100105,
+    "parentId": 100017,
+    "categoryName": "Váy cưới",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100106,
+    "parentId": 100017,
+    "categoryName": "Đồ liền thân",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100107,
+    "parentId": 100017,
+    "categoryName": "Áo khoác",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100108,
+    "parentId": 100017,
+    "categoryName": "Áo len",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100109,
+    "parentId": 100017,
+    "categoryName": "Hoodie và Áo nỉ",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100110,
+    "parentId": 100017,
+    "categoryName": "Bộ",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100111,
+    "parentId": 100017,
+    "categoryName": "Đồ lót",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100112,
+    "parentId": 100017,
+    "categoryName": "Đồ ngủ",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100113,
+    "parentId": 100017,
+    "categoryName": "Đồ Bầu",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100114,
+    "parentId": 100017,
+    "categoryName": "Đồ truyền thống",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100115,
+    "parentId": 100017,
+    "categoryName": "Đồ hóa trang",
+    "hasChildren": false,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100117,
+    "parentId": 100017,
+    "categoryName": "Vải",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100118,
+    "parentId": 100017,
+    "categoryName": "Vớ/ Tất",
+    "hasChildren": true,
+    "level": 2,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100226,
+    "parentId": 100048,
+    "categoryName": "Áo hoodie",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100227,
+    "parentId": 100048,
+    "categoryName": "Áo nỉ",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100229,
+    "parentId": 100050,
+    "categoryName": "Áo khoác mùa đông & Áo choàng",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100230,
+    "parentId": 100050,
+    "categoryName": "Áo khoác",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100231,
+    "parentId": 100050,
+    "categoryName": "Áo khoác vest",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100233,
+    "parentId": 100051,
+    "categoryName": "Bộ Com lê",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100234,
+    "parentId": 100051,
+    "categoryName": "Áo Khoác & Blazer",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100235,
+    "parentId": 100051,
+    "categoryName": "Quần âu",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100236,
+    "parentId": 100051,
+    "categoryName": "Áo vest & Gi lê",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100238,
+    "parentId": 100052,
+    "categoryName": "Quần túi hộp",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100239,
+    "parentId": 100052,
+    "categoryName": "Quần jogger",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100240,
+    "parentId": 100052,
+    "categoryName": "Quần dài",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100242,
+    "parentId": 100054,
+    "categoryName": "Áo sơ mi",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100243,
+    "parentId": 100054,
+    "categoryName": "Áo polo",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100244,
+    "parentId": 100054,
+    "categoryName": "Áo thun",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100245,
+    "parentId": 100054,
+    "categoryName": "Áo ba lỗ",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100247,
+    "parentId": 100055,
+    "categoryName": "Quần lót",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100248,
+    "parentId": 100055,
+    "categoryName": "Áo lót",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100249,
+    "parentId": 100055,
+    "categoryName": "Đồ lót giữ nhiệt",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100251,
+    "parentId": 100058,
+    "categoryName": "Áo",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100252,
+    "parentId": 100058,
+    "categoryName": "Quần",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100253,
+    "parentId": 100058,
+    "categoryName": "Bộ",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100011,
+    "rootName": "Thời Trang Nam"
+  },
+  {
+    "categoryId": 100350,
+    "parentId": 100099,
+    "categoryName": "Áo hai dây và ba lỗ",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100351,
+    "parentId": 100099,
+    "categoryName": "Áo ống",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100352,
+    "parentId": 100099,
+    "categoryName": "Áo thun",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100353,
+    "parentId": 100099,
+    "categoryName": "Áo sơ mi",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100354,
+    "parentId": 100099,
+    "categoryName": "Áo polo",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100355,
+    "parentId": 100099,
+    "categoryName": "Áo liền thân",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100357,
+    "parentId": 100100,
+    "categoryName": "Quần legging",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100358,
+    "parentId": 100100,
+    "categoryName": "Quần dài",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100360,
+    "parentId": 100101,
+    "categoryName": "Quần đùi",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100361,
+    "parentId": 100101,
+    "categoryName": "Quần váy",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100363,
+    "parentId": 100106,
+    "categoryName": "Đồ bay (Jumpsuits)",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100364,
+    "parentId": 100106,
+    "categoryName": "Đồ bay ngắn (playsuits)",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100365,
+    "parentId": 100106,
+    "categoryName": "Quần yếm",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100367,
+    "parentId": 100107,
+    "categoryName": "Áo khoác mùa đông",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100368,
+    "parentId": 100107,
+    "categoryName": "Áo choàng",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100369,
+    "parentId": 100107,
+    "categoryName": "Áo blazer",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100370,
+    "parentId": 100107,
+    "categoryName": "Áo khoác ngoài",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100371,
+    "parentId": 100107,
+    "categoryName": "Áo vest",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100373,
+    "parentId": 100109,
+    "categoryName": "Áo khoác nỉ",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100374,
+    "parentId": 100109,
+    "categoryName": "Áo hoodies",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100376,
+    "parentId": 100110,
+    "categoryName": "Bộ đồ đôi",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100377,
+    "parentId": 100110,
+    "categoryName": "Bộ đồ gia đình",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100378,
+    "parentId": 100110,
+    "categoryName": "Đồ lẻ",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100380,
+    "parentId": 100111,
+    "categoryName": "Bộ đồ lót",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100381,
+    "parentId": 100111,
+    "categoryName": "Áo ngực",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100382,
+    "parentId": 100111,
+    "categoryName": "Quần lót",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100383,
+    "parentId": 100111,
+    "categoryName": "Đồ lót giữ nhiệt",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100384,
+    "parentId": 100111,
+    "categoryName": "Phụ kiện đồ lót",
+    "hasChildren": true,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100385,
+    "parentId": 100111,
+    "categoryName": "Đồ định hình",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100386,
+    "parentId": 100111,
+    "categoryName": "Đồ lót bảo hộ",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100387,
+    "parentId": 100111,
+    "categoryName": "Đồ lót gợi cảm",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100389,
+    "parentId": 100112,
+    "categoryName": "Pyjama",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100390,
+    "parentId": 100112,
+    "categoryName": "Váy ngủ",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100391,
+    "parentId": 100112,
+    "categoryName": "Áo choàng ngủ, Áo khoác kimono",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100393,
+    "parentId": 100113,
+    "categoryName": "Áo ngực cho con bú",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100394,
+    "parentId": 100113,
+    "categoryName": "Đầm bầu",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100395,
+    "parentId": 100113,
+    "categoryName": "Áo bầu",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100396,
+    "parentId": 100113,
+    "categoryName": "Đồ mặc cho con bú",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100397,
+    "parentId": 100113,
+    "categoryName": "Bộ đồ bầu",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100398,
+    "parentId": 100113,
+    "categoryName": "Quần bầu, Váy bầu",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100400,
+    "parentId": 100114,
+    "categoryName": "Áo",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100401,
+    "parentId": 100114,
+    "categoryName": "Quần và chân váy",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100402,
+    "parentId": 100114,
+    "categoryName": "Bộ",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100403,
+    "parentId": 100114,
+    "categoryName": "Đầm",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100404,
+    "parentId": 100114,
+    "categoryName": "Khác",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100407,
+    "parentId": 100117,
+    "categoryName": "Vải cotton",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100408,
+    "parentId": 100117,
+    "categoryName": "Vải len",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100409,
+    "parentId": 100117,
+    "categoryName": "Vải nhung, lụa, satin",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100410,
+    "parentId": 100117,
+    "categoryName": "Vải da",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100411,
+    "parentId": 100117,
+    "categoryName": "Vải nylon",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100412,
+    "parentId": 100117,
+    "categoryName": "Vải denim",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100413,
+    "parentId": 100117,
+    "categoryName": "Vải canvas",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100417,
+    "parentId": 100118,
+    "categoryName": "Tất",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100418,
+    "parentId": 100118,
+    "categoryName": "Quần tất",
+    "hasChildren": false,
+    "level": 3,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100523,
+    "parentId": 100384,
+    "categoryName": "Dây áo lót",
+    "hasChildren": false,
+    "level": 4,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100524,
+    "parentId": 100384,
+    "categoryName": "Miếng mút rời",
+    "hasChildren": false,
+    "level": 4,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  },
+  {
+    "categoryId": 100525,
+    "parentId": 100384,
+    "categoryName": "Miếng dán ngực",
+    "hasChildren": false,
+    "level": 4,
+    "rootId": 100017,
+    "rootName": "Thời Trang Nữ"
+  }
+]

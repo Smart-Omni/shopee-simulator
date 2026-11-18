@@ -67,7 +67,12 @@ class StorageServiceManager implements IStorageProvider {
   }
 
   async uploadFile(file: Express.Multer.File, options?: { folderId?: string }): Promise<UploadResult> {
-    return this.activeProvider.uploadFile(file, options);
+    try {
+      return await this.activeProvider.uploadFile(file, options);
+    } catch (err: any) {
+      console.error(`[StorageService] Failed to upload media to cloud (${this.providerType}):`, err.message);
+      throw new Error(`Failed to upload media to cloud storage: ${err.message}`);
+    }
   }
 
   async deleteFile(fileId: string): Promise<boolean> {
