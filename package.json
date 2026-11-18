@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "seed:fashion": "ts-node scripts/seed-fashion-categories.ts",
     "test:phase1": "ts-node test/phase1_auth.spec.ts",
     "test:phase2": "ts-node test/phase2_shop.spec.ts",
     "test:phase3": "ts-node test/phase3_product.spec.ts",

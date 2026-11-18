@@ -21,7 +21,8 @@ export class LocalStorageProvider implements IStorageProvider {
     await fs.promises.writeFile(destinationPath, file.buffer);
 
     const port = process.env.PORT || 8080;
-    const url = `http://localhost:${port}/uploads/${uniqueName}`;
+    const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`;
+    const url = `${baseUrl.replace(/\/+$/, "")}/uploads/${uniqueName}`;
 
     return {
       url,

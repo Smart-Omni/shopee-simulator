@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import * as crypto from "crypto";
+import { officialFashionCategories, officialFashionAttributes } from "./fashion-seed.data";
 
 const prisma = new PrismaClient();
 
@@ -287,7 +288,9 @@ async function main() {
     { categoryId: BigInt(620001), parentId: BigInt(620000), categoryName: "Cà Phê & Trà Thượng Hạng", hasChildren: false },
   ];
 
-  for (const c of treeCategoriesData) {
+  const allCategoriesData = [...treeCategoriesData, ...officialFashionCategories];
+
+  for (const c of allCategoriesData) {
     await prisma.category.upsert({
       where: { categoryId: c.categoryId },
       update: {
@@ -1355,7 +1358,9 @@ async function main() {
     },
   ];
 
-  for (const attr of categoryAttributesData) {
+  const allCategoryAttributesData = [...categoryAttributesData, ...officialFashionAttributes];
+
+  for (const attr of allCategoryAttributesData) {
     await prisma.categoryAttribute.upsert({
       where: { attributeId: attr.attributeId },
       update: {
@@ -1375,7 +1380,7 @@ async function main() {
       },
     });
   }
-  console.log(`✓ Ensured Shopee 3-Level Category Tree & Rich Attributes (${treeCategoriesData.length} categories, ${categoryAttributesData.length} attributes)`);
+  console.log(`✓ Ensured Shopee Category Tree & Rich Attributes (${allCategoriesData.length} categories, ${allCategoryAttributesData.length} attributes)`);
 
   // 5. Seed Diverse Product Catalog
   const productsToSeed = [
