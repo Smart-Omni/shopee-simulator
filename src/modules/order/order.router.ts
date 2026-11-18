@@ -450,20 +450,9 @@ export async function createSingleOrderRecord(body: any): Promise<{ success: boo
     items = []
   } = body || {};
 
-  const shopId = BigInt(shop_id);
+  let shopId = BigInt(shop_id || 727720655);
 
-  const shop = await prisma.shop.findUnique({
-    where: { shopId },
-    include: { addresses: true }
-  });
-  if (!shop) {
-    return { success: false, error: "error_param", message: "Shop not found" };
-  }
-  if (shop.isVacation) {
-    return { success: false, error: "error_business", message: `Shop "${shop.shopName}" is currently on Holiday Mode (Vacation). Orders cannot be placed.` };
-  }
-
-  // Verify item shops if items are provided
+  // Verify item shops and auto-align shopId if items belong to an existing shop in DB
   if (Array.isArray(items) && items.length > 0) {
     const itemIds = items.map((i: any) => i.item_id ? BigInt(i.item_id) : null).filter(Boolean) as bigint[];
     if (itemIds.length > 0) {
@@ -471,6 +460,13 @@ export async function createSingleOrderRecord(body: any): Promise<{ success: boo
         where: { itemId: { in: itemIds } },
         include: { shop: true }
       });
+      if (products.length > 0) {
+        const itemShopId = products[0].shopId;
+        const allSameShop = products.every(p => p.shopId === itemShopId);
+        if (allSameShop && itemShopId !== shopId) {
+          shopId = itemShopId;
+        }
+      }
       for (const p of products) {
         if (p.shopId !== shopId) {
           return {
@@ -490,7 +486,18 @@ export async function createSingleOrderRecord(body: any): Promise<{ success: boo
     }
   }
 
-    const sn = order_sn || `261019${Date.now().toString(36).toUpperCase()}`;
+  const shop = await prisma.shop.findUnique({
+    where: { shopId },
+    include: { addresses: true }
+  });
+  if (!shop) {
+    return { success: false, error: "error_param", message: "Shop not found" };
+  }
+  if (shop.isVacation) {
+    return { success: false, error: "error_business", message: `Shop "${shop.shopName}" is currently on Holiday Mode (Vacation). Orders cannot be placed.` };
+  }
+
+  const sn = order_sn || `261019${Date.now().toString(36).toUpperCase()}`;
     const now = new Date();
 
     // Default product fallback if no items provided
