@@ -9,7 +9,7 @@ import { normalizeReturnReason } from "../returns/returns.constants";
 import { calculateReverseShippingFee } from "../payment/payment.router";
 import { storageService } from "../../common/storage/storage.service";
 import * as crypto from "crypto";
-import { getItemExtraInfo, parseItemIds } from "../product/product-metrics.service";
+import { getItemExtraInfo, getExtraInfoForItems, parseItemIds } from "../product/product-metrics.service";
 
 export const simulatorRouter = Router();
 
@@ -267,8 +267,11 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
     }
   }
 
+  const metricsMap = await getExtraInfoForItems(products.map((p: any) => p.itemId));
+
   const mappedProducts = products.map((p: any) => {
     const discItem = discountItemMap.get(p.itemId.toString());
+    const metric = metricsMap.get(p.itemId.toString());
     let hasDiscount = false;
     let promoPrice: number | null = null;
     let discountPct: number | null = null;
@@ -322,6 +325,13 @@ simulatorRouter.get("/api/v2/simulator/products", async (req: Request, res: Resp
       images: p.imagesJson,
       tier_variation: p.tierVariationJson,
       seller_stock: (p.models || []).reduce((acc: number, m: any) => acc + (m.sellerStock || 0), 0),
+      sales: metric?.sale ?? 0,
+      sale: metric?.sale ?? 0,
+      sold: metric?.sale ?? 0,
+      views: metric?.views ?? p.viewCount,
+      likes: metric?.likes ?? 0,
+      rating_star: metric?.rating_star ?? 0,
+      comment_count: metric?.comment_count ?? 0,
       models: (p.models || []).map((m: any) => {
         let mPromoPrice: number | null = null;
         if (discItem && discItem.models) {
@@ -428,6 +438,9 @@ simulatorRouter.get("/api/v2/simulator/product/detail", async (req: Request, res
       ? allComments.reduce((acc, c) => acc + c.ratingStar, 0) / allComments.length
       : 5.0;
 
+    const metricMap = await getExtraInfoForItems([p.itemId]);
+    const metric = metricMap.get(p.itemId.toString());
+
     res.json(createShopeeSuccessResponse({
       product: {
         item_id: Number(p.itemId),
@@ -456,6 +469,13 @@ simulatorRouter.get("/api/v2/simulator/product/detail", async (req: Request, res
         tier_variation: p.tierVariationJson,
         seller_stock: (p.models || []).reduce((acc: number, m: any) => acc + (m.sellerStock || 0), 0),
         stock: (p.models || []).reduce((acc: number, m: any) => acc + (m.sellerStock || 0), 0),
+        sales: metric?.sale ?? 0,
+        sale: metric?.sale ?? 0,
+        sold: metric?.sale ?? 0,
+        views: metric?.views ?? p.viewCount,
+        likes: metric?.likes ?? 0,
+        rating_star: metric?.rating_star ?? (allComments.length > 0 ? Number(avgRating.toFixed(2)) : 0),
+        comment_count: metric?.comment_count ?? totalComments,
         category: {
           category_id: Number(p.categoryId),
           category_name: p.category?.categoryName || "General"

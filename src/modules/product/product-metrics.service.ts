@@ -58,6 +58,57 @@ export async function getItemExtraInfo(shopId: bigint, itemIds: bigint[]): Promi
   });
 }
 
+export async function getExtraInfoForItems(itemIds: bigint[]): Promise<Map<string, ItemExtraInfo>> {
+  if (!itemIds.length) return new Map();
+  const products = await prisma.product.findMany({
+    where: { itemId: { in: itemIds } },
+    select: { itemId: true, viewCount: true }
+  });
+  const ownedIds = products.map((product) => product.itemId);
+  const [orderItems, comments, likes] = await Promise.all([
+    prisma.orderItem.findMany({
+      where: { itemId: { in: ownedIds }, order: { orderStatus: OrderStatus.COMPLETED } },
+      select: { itemId: true, quantityPurchased: true }
+    }),
+    prisma.productComment.findMany({
+      where: { itemId: { in: ownedIds } },
+      select: { itemId: true, ratingStar: true }
+    }),
+    prisma.productLike.groupBy({
+      by: ["itemId"], where: { itemId: { in: ownedIds } }, _count: { _all: true }
+    })
+  ]);
+
+  const sales = new Map<string, number>();
+  for (const row of orderItems) {
+    const key = row.itemId.toString();
+    sales.set(key, (sales.get(key) || 0) + row.quantityPurchased);
+  }
+  const reviewStats = new Map<string, { count: number; stars: number }>();
+  for (const row of comments) {
+    const key = row.itemId.toString();
+    const current = reviewStats.get(key) || { count: 0, stars: 0 };
+    current.count += 1;
+    current.stars += row.ratingStar;
+    reviewStats.set(key, current);
+  }
+  const likeCounts = new Map(likes.map((row) => [row.itemId.toString(), row._count._all]));
+  const result = new Map<string, ItemExtraInfo>();
+  for (const product of products) {
+    const key = product.itemId.toString();
+    const review = reviewStats.get(key);
+    result.set(key, {
+      item_id: Number(product.itemId),
+      sale: sales.get(key) || 0,
+      views: product.viewCount,
+      likes: likeCounts.get(key) || 0,
+      rating_star: review ? Number((review.stars / review.count).toFixed(2)) : 0,
+      comment_count: review?.count || 0
+    });
+  }
+  return result;
+}
+
 export function parseItemIds(value: unknown): bigint[] | null {
   let parts: unknown[];
   if (Array.isArray(value)) {
