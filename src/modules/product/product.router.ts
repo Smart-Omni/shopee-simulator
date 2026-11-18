@@ -669,7 +669,13 @@ productRouter.post("/api/v2/product/update_stock", shopeeAuthGuard, async (req: 
     const locationId = sellerStockArr[0]?.location_id || "VN_LOCAL";
 
     if (modelIdNum === 0) {
-      // Product without variants
+      // Product without variants: update default model
+      if (product.models && product.models.length > 0) {
+        await prisma.productModel.update({
+          where: { modelId: product.models[0].modelId },
+          data: { sellerStock: targetStock }
+        });
+      }
       successList.push({
         model_id: 0,
         location_id: locationId,
