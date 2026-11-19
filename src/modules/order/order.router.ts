@@ -5,6 +5,7 @@ import { shopeeAuthGuard } from "../../common/middleware/auth-guard";
 import { OrderStatus, PromotionStatus } from "@prisma/client";
 import { WebhookService } from "../webhook/webhook.service";
 import { LogisticsEngine } from "../logistics/logistics.engine";
+import { extractProductImage } from "../../common/utils/product-image";
 
 export const orderRouter = Router();
 
@@ -101,7 +102,15 @@ orderRouter.get("/api/v2/order/get_order_detail", shopeeAuthGuard, async (req: R
       orderSn: { in: orderSnStrings }
     },
     include: {
-      items: true,
+      items: {
+        include: {
+          product: {
+            select: {
+              imagesJson: true
+            }
+          }
+        }
+      },
       packages: {
         include: {
           packageItems: {
@@ -153,19 +162,24 @@ orderRouter.get("/api/v2/order/get_order_detail", shopeeAuthGuard, async (req: R
         region: "VN",
         zipcode: o.recipientZipcode
       },
-      item_list: o.items.map((it) => ({
-        item_id: Number(it.itemId),
-        item_name: it.itemName,
-        item_sku: it.modelSku || "",
-        model_id: it.modelId ? Number(it.modelId) : 0,
-        model_name: it.modelName || "",
-        model_sku: it.modelSku || "",
-        model_quantity_purchased: it.quantityPurchased,
-        model_original_price: Number(it.itemPrice),
-        model_discounted_price: Number(it.itemPrice),
-        order_item_id: Number(it.orderItemId),
-        weight: 0.5
-      })),
+      item_list: o.items.map((it: any) => {
+        const imageUrl = extractProductImage(it.product);
+        return {
+          item_id: Number(it.itemId),
+          item_name: it.itemName,
+          item_sku: it.modelSku || "",
+          model_id: it.modelId ? Number(it.modelId) : 0,
+          model_name: it.modelName || "",
+          model_sku: it.modelSku || "",
+          model_quantity_purchased: it.quantityPurchased,
+          model_original_price: Number(it.itemPrice),
+          model_discounted_price: Number(it.itemPrice),
+          order_item_id: Number(it.orderItemId),
+          image_info: { image_url: imageUrl },
+          image_url: imageUrl,
+          weight: 0.5
+        };
+      }),
       package_list: o.packages.map((pkg) => ({
         package_number: pkg.packageNumber,
         logistics_status: pkg.logisticsStatus,

@@ -10,6 +10,7 @@ import { calculateReverseShippingFee } from "../payment/payment.router";
 import { storageService } from "../../common/storage/storage.service";
 import * as crypto from "crypto";
 import { getItemExtraInfo, getExtraInfoForItems, parseItemIds } from "../product/product-metrics.service";
+import { extractProductImage } from "../../common/utils/product-image";
 
 export const simulatorRouter = Router();
 
@@ -934,7 +935,15 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
     where: whereClause,
     include: {
       shop: true,
-      items: true,
+      items: {
+        include: {
+          product: {
+            select: {
+              imagesJson: true
+            }
+          }
+        }
+      },
       packages: true,
       comments: true,
       returns: true
@@ -988,14 +997,19 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
         negotiation_status: r.negotiationStatus || "TERMINATED",
         created_at: r.createdAt.toISOString()
       })),
-      items: (o.items || []).map((i: any) => ({
-        order_item_id: Number(i.orderItemId),
-        item_id: Number(i.itemId),
-        item_name: i.itemName,
-        model_name: i.modelName,
-        item_price: Number(i.itemPrice),
-        quantity: i.quantityPurchased
-      })),
+      items: (o.items || []).map((i: any) => {
+        const imageUrl = extractProductImage(i.product);
+        return {
+          order_item_id: Number(i.orderItemId),
+          item_id: Number(i.itemId),
+          item_name: i.itemName,
+          model_name: i.modelName,
+          item_price: Number(i.itemPrice),
+          quantity: i.quantityPurchased,
+          image: imageUrl,
+          image_url: imageUrl
+        };
+      }),
       packages: (o.packages || []).map((p: any) => ({
         package_number: p.packageNumber,
         tracking_number: p.trackingNumber,
@@ -1211,7 +1225,15 @@ simulatorRouter.get("/api/v2/simulator/order/download_awb", async (req: Request,
   const order = await prisma.order.findUnique({
     where: { orderSn },
     include: {
-      items: true,
+      items: {
+        include: {
+          product: {
+            select: {
+              imagesJson: true
+            }
+          }
+        }
+      },
       packages: true,
       shop: true
     }
@@ -1641,7 +1663,15 @@ simulatorRouter.get("/api/v2/simulator/order/detail", async (req: Request, res: 
   const order = await prisma.order.findUnique({
     where: { orderSn },
     include: {
-      items: true,
+      items: {
+        include: {
+          product: {
+            select: {
+              imagesJson: true
+            }
+          }
+        }
+      },
       packages: true,
       shop: true
     }
@@ -1708,15 +1738,20 @@ simulatorRouter.get("/api/v2/simulator/order/detail", async (req: Request, res: 
       logistics_status: pkg.logisticsStatus,
       document_status: pkg.documentStatus
     } : null,
-    items: order.items.map(i => ({
-      order_item_id: Number(i.orderItemId),
-      item_id: Number(i.itemId),
-      item_name: i.itemName,
-      model_name: i.modelName,
-      unit_price: Number(i.itemPrice),
-      quantity: i.quantityPurchased,
-      subtotal: Number(i.itemPrice) * i.quantityPurchased
-    })),
+    items: order.items.map(i => {
+      const imageUrl = extractProductImage(i.product);
+      return {
+        order_item_id: Number(i.orderItemId),
+        item_id: Number(i.itemId),
+        item_name: i.itemName,
+        model_name: i.modelName,
+        unit_price: Number(i.itemPrice),
+        quantity: i.quantityPurchased,
+        subtotal: Number(i.itemPrice) * i.quantityPurchased,
+        image: imageUrl,
+        image_url: imageUrl
+      };
+    }),
     timeline
   }));
 });
