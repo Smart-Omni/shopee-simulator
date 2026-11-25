@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, OrderStatus } from "@prisma/client";
 import * as crypto from "crypto";
 import { officialFashionCategories, officialFashionAttributes } from "./fashion-seed.data";
 
@@ -2148,6 +2148,385 @@ async function main() {
     });
   }
   console.log(`✓ Seeded Shop Chat settings, auto-reply defaults and 13 quick messages for all shops`);
+
+  // 11. Seed Full Order Lifecycle Datasets for 8 Order Statuses (SmartOmni Flagship 727720655)
+  const flagshipShopId = BigInt(727720655);
+  const sampleProducts = await prisma.product.findMany({
+    where: { shopId: flagshipShopId },
+    take: 3
+  });
+
+  if (sampleProducts.length > 0) {
+    const p1 = sampleProducts[0];
+    const p2 = sampleProducts[1] || sampleProducts[0];
+
+    const lifecycleOrders = [
+      // 1. UNPAID
+      {
+        orderSn: "2211171UNPAID01",
+        orderStatus: OrderStatus.UNPAID,
+        buyerUsername: "cjw26izcw7",
+        totalAmount: 490000,
+        carrier: "Shopee Xpress",
+        paymentMethod: "Ví ShopeePay",
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "2211172UNPAID02",
+        orderStatus: OrderStatus.UNPAID,
+        buyerUsername: "f4e604vilg",
+        totalAmount: 199000,
+        carrier: "SPX Express",
+        paymentMethod: "Thanh toán khi nhận hàng (COD)",
+        item: p2,
+        qty: 1
+      },
+      // 2. READY_TO_SHIP (Chờ lấy hàng - Chưa xử lý)
+      // Exactly 6 orders for Shopee Xpress so carrier pill shows 'Shopee Xpress ( 6 )'
+      {
+        orderSn: "2211179US96RG5",
+        orderStatus: OrderStatus.READY_TO_SHIP,
+        buyerUsername: "cjw26izcw7",
+        totalAmount: 1000,
+        carrier: "Shopee Xpress",
+        paymentMethod: "Ví ShopeePay",
+        shipByDate: new Date(Date.now() + 2 * 86400000), // In 2 days
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "2211168V2WWD56",
+        orderStatus: OrderStatus.READY_TO_SHIP,
+        buyerUsername: "f4e6o4vilg",
+        totalAmount: 1000,
+        carrier: "Shopee Xpress",
+        paymentMethod: "Ví ShopeePay",
+        shipByDate: new Date(Date.now() + 1 * 86400000), // Tomorrow
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "2211167A8LKQ91",
+        orderStatus: OrderStatus.READY_TO_SHIP,
+        buyerUsername: "duongthithu_2000",
+        totalAmount: 790000,
+        carrier: "Shopee Xpress",
+        paymentMethod: "Ví ShopeePay",
+        shipByDate: new Date(Date.now() + 3 * 86400000),
+        item: p2,
+        qty: 1
+      },
+      {
+        orderSn: "2211166M9XTR22",
+        orderStatus: OrderStatus.READY_TO_SHIP,
+        buyerUsername: "minhtran_99",
+        totalAmount: 490000,
+        carrier: "Shopee Xpress",
+        paymentMethod: "Ví ShopeePay",
+        shipByDate: new Date(Date.now() + 2 * 86400000),
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "2211165K8YQW33",
+        orderStatus: OrderStatus.READY_TO_SHIP,
+        buyerUsername: "hoangnam_dn",
+        totalAmount: 250000,
+        carrier: "Shopee Xpress",
+        paymentMethod: "Ví ShopeePay",
+        shipByDate: new Date(Date.now() + 2 * 86400000),
+        item: p2,
+        qty: 1
+      },
+      {
+        orderSn: "2211164J7ZPZ44",
+        orderStatus: OrderStatus.READY_TO_SHIP,
+        buyerUsername: "quynhanh_hn",
+        totalAmount: 980000,
+        carrier: "Shopee Xpress",
+        paymentMethod: "Thẻ Tín dụng/Ghi nợ",
+        shipByDate: new Date(Date.now() + 1 * 86400000),
+        item: p1,
+        qty: 2
+      },
+      // 2 orders for Giao Hàng Nhanh
+      {
+        orderSn: "2211163H6YNY55",
+        orderStatus: OrderStatus.READY_TO_SHIP,
+        buyerUsername: "thanhson_hp",
+        totalAmount: 350000,
+        carrier: "Giao Hàng Nhanh",
+        paymentMethod: "Thanh toán khi nhận hàng (COD)",
+        shipByDate: new Date(Date.now() + 2 * 86400000),
+        item: p2,
+        qty: 1
+      },
+      {
+        orderSn: "2211162G5XMX66",
+        orderStatus: OrderStatus.READY_TO_SHIP,
+        buyerUsername: "vanhau_bd",
+        totalAmount: 420000,
+        carrier: "Giao Hàng Nhanh",
+        paymentMethod: "Ví ShopeePay",
+        shipByDate: new Date(Date.now() + 2 * 86400000),
+        item: p1,
+        qty: 1
+      },
+      // 1 order for Viettel Post
+      {
+        orderSn: "2211161F4WLW77",
+        orderStatus: OrderStatus.READY_TO_SHIP,
+        buyerUsername: "bichngoc_vt",
+        totalAmount: 199000,
+        carrier: "Viettel Post",
+        paymentMethod: "Ví ShopeePay",
+        shipByDate: new Date(Date.now() + 3 * 86400000),
+        item: p2,
+        qty: 1
+      },
+      // 3. PROCESSED (Chờ lấy hàng - Đã xử lý) - Reference Screenshot 2 orders
+      {
+        orderSn: "220609CRQXEFHP",
+        orderStatus: OrderStatus.PROCESSED,
+        buyerUsername: "tldinhquyen",
+        totalAmount: 1890000,
+        carrier: "Shopee Xpress",
+        trackingNumber: "SPXVN024484739856",
+        paymentMethod: "Ví ShopeePay",
+        shipByDate: new Date(Date.now() + 2 * 86400000),
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "220609CS06KGEA",
+        orderStatus: OrderStatus.PROCESSED,
+        buyerUsername: "wop47jngad",
+        totalAmount: 1890000,
+        carrier: "Shopee Xpress",
+        trackingNumber: "SPXVN020050046906",
+        paymentMethod: "Thẻ Tín dụng/Ghi nợ",
+        shipByDate: new Date(Date.now() + 2 * 86400000),
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "2211155P98JK22",
+        orderStatus: OrderStatus.PROCESSED,
+        buyerUsername: "lananh_tech",
+        totalAmount: 490000,
+        carrier: "Shopee Xpress",
+        trackingNumber: "SPXVN2211155001",
+        paymentMethod: "Ví ShopeePay",
+        shipByDate: new Date(Date.now() + 2 * 86400000),
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "2211154K77QM33",
+        orderStatus: OrderStatus.PROCESSED,
+        buyerUsername: "hoanghai_88",
+        totalAmount: 980000,
+        carrier: "Shopee Xpress",
+        trackingNumber: "SPXVN2211154002",
+        paymentMethod: "Thẻ Tín dụng/Ghi nợ",
+        shipByDate: new Date(Date.now() + 2 * 86400000),
+        item: p1,
+        qty: 2
+      },
+      // 4. SHIPPED (Đang giao)
+      {
+        orderSn: "2211142S66VN44",
+        orderStatus: OrderStatus.SHIPPED,
+        buyerUsername: "phuongnam_vn",
+        totalAmount: 199000,
+        carrier: "SPX Express",
+        trackingNumber: "SPXVN2211142003",
+        paymentMethod: "Ví ShopeePay",
+        item: p2,
+        qty: 1
+      },
+      {
+        orderSn: "2211141S55SG55",
+        orderStatus: OrderStatus.SHIPPED,
+        buyerUsername: "vietanh_sg",
+        totalAmount: 790000,
+        carrier: "Shopee Xpress",
+        trackingNumber: "SPXVN2211141004",
+        paymentMethod: "Ví ShopeePay",
+        item: p2,
+        qty: 1
+      },
+      // 5. COMPLETED (Đã giao)
+      {
+        orderSn: "2211130C44HN66",
+        orderStatus: OrderStatus.COMPLETED,
+        buyerUsername: "thanhmai_hn",
+        totalAmount: 490000,
+        carrier: "SPX Express",
+        trackingNumber: "SPXVN2211130005",
+        paymentMethod: "Ví ShopeePay",
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "2211129C33DN77",
+        orderStatus: OrderStatus.COMPLETED,
+        buyerUsername: "quocbao_dn",
+        totalAmount: 199000,
+        carrier: "Shopee Xpress",
+        trackingNumber: "SPXVN2211129006",
+        paymentMethod: "Ví ShopeePay",
+        item: p2,
+        qty: 1
+      },
+      // 6. CANCELLED / IN_CANCEL (Đơn Huỷ)
+      {
+        orderSn: "2211120X22CN88",
+        orderStatus: OrderStatus.CANCELLED,
+        buyerUsername: "lethanh_ct",
+        totalAmount: 490000,
+        carrier: "SPX Express",
+        cancelBy: "BUYER",
+        cancelReason: "Đổi ý không mua nữa",
+        paymentMethod: "Ví ShopeePay",
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "2211119I11CN99",
+        orderStatus: OrderStatus.IN_CANCEL,
+        buyerUsername: "ngocthao_bd",
+        totalAmount: 790000,
+        carrier: "Shopee Xpress",
+        cancelBy: "BUYER",
+        buyerCancelReason: "Muốn thay đổi địa chỉ nhận hàng",
+        paymentMethod: "Ví ShopeePay",
+        item: p2,
+        qty: 1
+      },
+      // 7. TO_RETURN (Trả hàng/Hoàn tiền)
+      {
+        orderSn: "2211108R99RT01",
+        orderStatus: OrderStatus.TO_RETURN,
+        buyerUsername: "truonggiang_vt",
+        totalAmount: 490000,
+        carrier: "SPX Express",
+        paymentMethod: "Ví ShopeePay",
+        item: p1,
+        qty: 1,
+        returnSn: "RET2211108001"
+      },
+      {
+        orderSn: "2211107R88RT02",
+        orderStatus: OrderStatus.TO_RETURN,
+        buyerUsername: "honganh_hp",
+        totalAmount: 199000,
+        carrier: "Shopee Xpress",
+        paymentMethod: "Ví ShopeePay",
+        item: p2,
+        qty: 1,
+        returnSn: "RET2211107002"
+      },
+      // 8. DELIVERY_FAILED (Giao không thành công)
+      {
+        orderSn: "2211096F77FL01",
+        orderStatus: OrderStatus.DELIVERY_FAILED,
+        buyerUsername: "hoangminh_qn",
+        totalAmount: 490000,
+        carrier: "SPX Express",
+        trackingNumber: "SPXVN2211096007",
+        paymentMethod: "Thanh toán khi nhận hàng (COD)",
+        note: "Giao không thành công 3 lần - Khách không bắt máy",
+        item: p1,
+        qty: 1
+      },
+      {
+        orderSn: "2211095F66FL02",
+        orderStatus: OrderStatus.DELIVERY_FAILED,
+        buyerUsername: "thuytrang_nt",
+        totalAmount: 790000,
+        carrier: "Người bán tự vận chuyển",
+        paymentMethod: "Ví ShopeePay",
+        note: "Địa chỉ nhận hàng không chính xác, liên hệ bất thành",
+        item: p2,
+        qty: 1
+      }
+    ];
+
+    for (const ord of lifecycleOrders) {
+      await prisma.order.upsert({
+        where: { orderSn: ord.orderSn },
+        update: {
+          orderStatus: ord.orderStatus,
+          totalAmount: ord.totalAmount,
+          shippingCarrier: ord.carrier,
+          paymentMethod: ord.paymentMethod,
+          buyerUsername: ord.buyerUsername,
+          recipientName: ord.buyerUsername,
+          cancelBy: (ord as any).cancelBy || null,
+          cancelReason: (ord as any).cancelReason || null,
+          buyerCancelReason: (ord as any).buyerCancelReason || null,
+          note: (ord as any).note || null,
+          shipByDate: (ord as any).shipByDate || null,
+        },
+        create: {
+          orderSn: ord.orderSn,
+          shopId: flagshipShopId,
+          orderStatus: ord.orderStatus,
+          totalAmount: ord.totalAmount,
+          shippingCarrier: ord.carrier,
+          paymentMethod: ord.paymentMethod,
+          buyerUsername: ord.buyerUsername,
+          recipientName: ord.buyerUsername,
+          cancelBy: (ord as any).cancelBy || null,
+          cancelReason: (ord as any).cancelReason || null,
+          buyerCancelReason: (ord as any).buyerCancelReason || null,
+          note: (ord as any).note || null,
+          shipByDate: (ord as any).shipByDate || null,
+          items: {
+            create: {
+              itemId: ord.item.itemId,
+              itemName: ord.item.itemName,
+              modelName: "Standard",
+              modelSku: ord.item.itemSku,
+              itemPrice: ord.totalAmount,
+              quantityPurchased: ord.qty
+            }
+          },
+          packages: (ord as any).trackingNumber
+            ? {
+                create: {
+                  packageNumber: `PKG-${ord.orderSn}`,
+                  trackingNumber: (ord as any).trackingNumber,
+                  shippingCarrier: ord.carrier,
+                  logisticsStatus: ord.orderStatus === OrderStatus.DELIVERY_FAILED ? "LOGISTICS_DELIVERY_FAILED" : "LOGISTICS_REQUEST_CREATED",
+                  documentStatus: "READY"
+                }
+              }
+            : undefined
+        }
+      });
+
+      if ((ord as any).returnSn) {
+        await prisma.return.upsert({
+          where: { returnSn: (ord as any).returnSn },
+          update: {},
+          create: {
+            returnSn: (ord as any).returnSn,
+            orderSn: ord.orderSn,
+            shopId: flagshipShopId,
+            refundAmount: ord.totalAmount,
+            currency: "VND",
+            status: "REQUESTED",
+            reason: "WRONG_ITEM",
+            textReason: "Sản phẩm không đúng với mô tả trên gian hàng"
+          }
+        });
+      }
+    }
+    console.log(`✓ Seeded 16 comprehensive lifecycle orders covering all 8 statuses for SmartOmni Flagship`);
+  }
 
   console.log("Database seeding completed successfully!");
 }

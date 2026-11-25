@@ -218,6 +218,7 @@ enum OrderStatus {
   IN_CANCEL
   CANCELLED
   TO_RETURN
+  DELIVERY_FAILED
 }
 
 model Order {

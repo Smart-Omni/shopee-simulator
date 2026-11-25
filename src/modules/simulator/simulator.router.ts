@@ -3,7 +3,7 @@ import multer from "multer";
 import { prisma } from "../../common/prisma";
 import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../common/utils/envelope";
 import { WebhookService } from "../webhook/webhook.service";
-import { generateShopeeAwbPdf } from "../../common/utils/pdf";
+import { generateShopeeAwbPdf, generateMultiPageShopeePdf, generateShopeeHandoverManifestPdf } from "../../common/utils/pdf";
 import { OrderStatus, PromotionStatus } from "@prisma/client";
 import { normalizeReturnReason } from "../returns/returns.constants";
 import { calculateReverseShippingFee } from "../payment/payment.router";
@@ -918,7 +918,15 @@ simulatorRouter.post("/api/v2/simulator/product/quick_update_stock", async (req:
 simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Response): Promise<void> => {
   const shopIdStr = req.query.shop_id as string | undefined;
   const buyerIdStr = req.query.buyer_id as string | undefined;
-  const statusFilter = req.query.status as string | undefined;
+  const statusFilter = (req.query.status || req.query.order_status) as string | undefined;
+  const subStatus = req.query.sub_status as string | undefined;
+  const carrierFilter = (req.query.carrier || req.query.shipping_carrier) as string | undefined;
+  const keyword = (req.query.keyword || req.query.query) as string | undefined;
+  const searchType = req.query.search_type as string | undefined;
+  const dateFrom = (req.query.date_from || req.query.time_from) as string | undefined;
+  const dateTo = (req.query.date_to || req.query.time_to) as string | undefined;
+  const sortBy = req.query.sort_by as string | undefined;
+  const pageSize = Math.min(parseInt((req.query.page_size as string) || "200", 10), 500);
 
   const whereClause: any = {};
   if (shopIdStr && shopIdStr.toUpperCase() !== "ALL") {
@@ -927,30 +935,129 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
   if (buyerIdStr && buyerIdStr.toUpperCase() !== "ALL") {
     whereClause.buyerUserId = BigInt(buyerIdStr);
   }
-  if (statusFilter && statusFilter.toUpperCase() !== "ALL") {
-    whereClause.orderStatus = statusFilter as OrderStatus;
+
+  // Sub-status overrides
+  if (subStatus === "unprocessed") {
+    whereClause.orderStatus = OrderStatus.READY_TO_SHIP;
+  } else if (subStatus === "processed") {
+    whereClause.orderStatus = OrderStatus.PROCESSED;
+  } else if (statusFilter && statusFilter.toUpperCase() !== "ALL") {
+    const rawStatuses = statusFilter.split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+    if (rawStatuses.length === 1) {
+      whereClause.orderStatus = rawStatuses[0] as OrderStatus;
+    } else if (rawStatuses.length > 1) {
+      whereClause.orderStatus = { in: rawStatuses as OrderStatus[] };
+    }
   }
 
-  const orders = await prisma.order.findMany({
-    where: whereClause,
-    include: {
-      shop: true,
-      items: {
-        include: {
-          product: {
-            select: {
-              imagesJson: true
+  // Shipping carrier filter
+  if (carrierFilter && carrierFilter.toUpperCase() !== "ALL") {
+    whereClause.shippingCarrier = carrierFilter;
+  }
+
+  // Date range filter
+  if (dateFrom || dateTo) {
+    whereClause.createdAt = {};
+    if (dateFrom) {
+      const parsedFrom = /^\d+$/.test(dateFrom) ? new Date(parseInt(dateFrom, 10) * 1000) : new Date(dateFrom);
+      if (!isNaN(parsedFrom.getTime())) {
+        whereClause.createdAt.gte = parsedFrom;
+      }
+    }
+    if (dateTo) {
+      const parsedTo = /^\d+$/.test(dateTo) ? new Date(parseInt(dateTo, 10) * 1000) : new Date(dateTo);
+      if (!isNaN(parsedTo.getTime())) {
+        whereClause.createdAt.lte = parsedTo;
+      }
+    }
+  }
+
+  // Keyword search filter
+  if (keyword && keyword.trim()) {
+    const kw = keyword.trim();
+    if (searchType === "order_sn") {
+      whereClause.orderSn = { contains: kw, mode: "insensitive" };
+    } else if (searchType === "buyer") {
+      whereClause.OR = [
+        { buyerUsername: { contains: kw, mode: "insensitive" } },
+        { recipientName: { contains: kw, mode: "insensitive" } }
+      ];
+    } else if (searchType === "product") {
+      whereClause.items = {
+        some: {
+          itemName: { contains: kw, mode: "insensitive" }
+        }
+      };
+    } else {
+      whereClause.OR = [
+        { orderSn: { contains: kw, mode: "insensitive" } },
+        { buyerUsername: { contains: kw, mode: "insensitive" } },
+        { recipientName: { contains: kw, mode: "insensitive" } },
+        { items: { some: { itemName: { contains: kw, mode: "insensitive" } } } }
+      ];
+    }
+  }
+
+  // Sorting
+  let orderByClause: any = { createdAt: "desc" };
+  if (sortBy === "created_asc" || sortBy === "create_time_asc") {
+    orderByClause = { createdAt: "asc" };
+  } else if (sortBy === "deadline_asc" || sortBy === "ship_by_date_asc") {
+    orderByClause = { shipByDate: "asc" };
+  }
+
+  const [orders, allShopOrders] = await Promise.all([
+    prisma.order.findMany({
+      where: whereClause,
+      include: {
+        shop: true,
+        items: {
+          include: {
+            product: {
+              select: {
+                imagesJson: true
+              }
             }
           }
-        }
+        },
+        packages: true,
+        comments: true,
+        returns: true
       },
-      packages: true,
-      comments: true,
-      returns: true
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100
-  });
+      orderBy: orderByClause,
+      take: pageSize
+    }),
+    prisma.order.findMany({
+      where: shopIdStr && shopIdStr.toUpperCase() !== "ALL" ? { shopId: BigInt(shopIdStr) } : {},
+      select: { orderStatus: true, shippingCarrier: true }
+    })
+  ]);
+
+  const carrierCounts: Record<string, number> = {};
+  const carrierCountsReady: Record<string, number> = {};
+  const carrierCountsProcessed: Record<string, number> = {};
+  for (const o of allShopOrders) {
+    const carrier = o.shippingCarrier || "Shopee Xpress";
+    carrierCounts[carrier] = (carrierCounts[carrier] || 0) + 1;
+    if (o.orderStatus === OrderStatus.READY_TO_SHIP) {
+      carrierCountsReady[carrier] = (carrierCountsReady[carrier] || 0) + 1;
+    } else if (o.orderStatus === OrderStatus.PROCESSED) {
+      carrierCountsProcessed[carrier] = (carrierCountsProcessed[carrier] || 0) + 1;
+    }
+  }
+
+  const tabCounts = {
+    all: allShopOrders.length,
+    unpaid: allShopOrders.filter(o => o.orderStatus === OrderStatus.UNPAID).length,
+    to_ship: allShopOrders.filter(o => o.orderStatus === OrderStatus.READY_TO_SHIP || o.orderStatus === OrderStatus.PROCESSED).length,
+    to_ship_unprocessed: allShopOrders.filter(o => o.orderStatus === OrderStatus.READY_TO_SHIP).length,
+    to_ship_processed: allShopOrders.filter(o => o.orderStatus === OrderStatus.PROCESSED).length,
+    shipping: allShopOrders.filter(o => o.orderStatus === OrderStatus.SHIPPED || o.orderStatus === OrderStatus.TO_CONFIRM_RECEIVE).length,
+    completed: allShopOrders.filter(o => o.orderStatus === OrderStatus.COMPLETED).length,
+    cancelled: allShopOrders.filter(o => o.orderStatus === OrderStatus.CANCELLED || o.orderStatus === OrderStatus.IN_CANCEL).length,
+    returns: allShopOrders.filter(o => o.orderStatus === OrderStatus.TO_RETURN).length,
+    failed_delivery: allShopOrders.filter(o => o.orderStatus === OrderStatus.DELIVERY_FAILED).length
+  };
 
   res.json(createShopeeSuccessResponse({
     orders: orders.map((o: any) => ({
@@ -1016,7 +1123,11 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
         logistics_status: p.logisticsStatus,
         document_status: p.documentStatus
       }))
-    }))
+    })),
+    tab_counts: tabCounts,
+    carrier_counts: carrierCounts,
+    carrier_counts_ready: carrierCountsReady,
+    carrier_counts_processed: carrierCountsProcessed
   }));
 });
 
@@ -1256,6 +1367,286 @@ simulatorRouter.get("/api/v2/simulator/order/download_awb", async (req: Request,
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="AWB_${orderSn}.pdf"`);
+  res.setHeader("Content-Length", pdfBuffer.length);
+  res.send(pdfBuffer);
+});
+
+// ============================================================================
+// 10A. SIMULATOR BATCH SHIP ORDERS (MASS SHIP)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/batch_ship", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn_list, shipping_type = "pickup", pickup_time_id, address_id } = req.body || {};
+
+  if (!Array.isArray(order_sn_list) || order_sn_list.length === 0) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn_list must be a non-empty array"));
+    return;
+  }
+
+  const successList: any[] = [];
+  const failList: any[] = [];
+  const now = new Date();
+
+  for (const orderSn of order_sn_list) {
+    try {
+      const order = await prisma.order.findUnique({
+        where: { orderSn },
+        include: { shop: true, packages: true }
+      });
+
+      if (!order) {
+        failList.push({ order_sn: orderSn, reason: "Order not found" });
+        continue;
+      }
+
+      const carrier = order.shippingCarrier || "Shopee Xpress";
+      let prefix = "SPXVN";
+      if (/viettel/i.test(carrier)) prefix = "VTP";
+      else if (/giao h[aà]ng nhanh|ghn/i.test(carrier)) prefix = "GHN";
+      else if (/giao h[aà]ng ti[eế]t ki[eệ]m|ghtk/i.test(carrier)) prefix = "GHTK";
+      else if (/j&t/i.test(carrier)) prefix = "JNT";
+      else if (/ninja/i.test(carrier)) prefix = "NJV";
+
+      const randomSuffix = Math.floor(100000000 + Math.random() * 900000000);
+      const trackingNumber = `${prefix}${randomSuffix}`;
+
+      // Update order status to PROCESSED
+      await prisma.order.update({
+        where: { orderSn },
+        data: {
+          orderStatus: OrderStatus.PROCESSED,
+          updatedAt: now
+        }
+      });
+
+      // Update or create package
+      if (order.packages.length > 0) {
+        for (const pkg of order.packages) {
+          await prisma.orderPackage.update({
+            where: { packageNumber: pkg.packageNumber },
+            data: {
+              trackingNumber,
+              logisticsStatus: "LOGISTICS_REQUEST_CREATED",
+              shippingType: shipping_type,
+              documentStatus: "READY"
+            }
+          });
+        }
+      } else {
+        await prisma.orderPackage.create({
+          data: {
+            orderSn,
+            packageNumber: `PKG-${orderSn}`,
+            trackingNumber,
+            logisticsStatus: "LOGISTICS_REQUEST_CREATED",
+            shippingType: shipping_type,
+            documentStatus: "READY"
+          }
+        });
+      }
+
+      // Webhook dispatch Code 3 and Code 4
+      WebhookService.dispatch({
+        partnerId: order.shop.partnerId,
+        pushCode: 3,
+        shopId: order.shopId,
+        ordersn: orderSn,
+        payload: {
+          shop_id: Number(order.shopId),
+          code: 3,
+          timestamp: Math.floor(now.getTime() / 1000),
+          data: {
+            ordersn: orderSn,
+            status: "PROCESSED",
+            update_time: Math.floor(now.getTime() / 1000)
+          }
+        }
+      }).catch(err => console.warn(`[Simulator] Batch ship status push failed for ${orderSn}:`, err.message));
+
+      WebhookService.dispatch({
+        partnerId: order.shop.partnerId,
+        pushCode: 4,
+        shopId: order.shopId,
+        ordersn: orderSn,
+        payload: {
+          shop_id: Number(order.shopId),
+          code: 4,
+          timestamp: Math.floor(now.getTime() / 1000),
+          data: {
+            ordersn: orderSn,
+            tracking_no: trackingNumber
+          }
+        }
+      }).catch(err => console.warn(`[Simulator] Batch tracking push failed for ${orderSn}:`, err.message));
+
+      successList.push({
+        order_sn: orderSn,
+        order_status: "PROCESSED",
+        tracking_number: trackingNumber,
+        shipping_type
+      });
+    } catch (e: any) {
+      failList.push({ order_sn: orderSn, reason: e.message });
+    }
+  }
+
+  res.json(createShopeeSuccessResponse({
+    total_processed: order_sn_list.length,
+    success_count: successList.length,
+    fail_count: failList.length,
+    success_list: successList,
+    fail_list: failList
+  }));
+});
+
+// ============================================================================
+// 10B. SIMULATOR BATCH GENERATE AWB
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/batch_generate_awb", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn_list, document_type = "shipping_label", print_format = "thermal" } = req.body || {};
+
+  if (!Array.isArray(order_sn_list) || order_sn_list.length === 0) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn_list must be a non-empty array"));
+    return;
+  }
+
+  const successList: string[] = [];
+  for (const orderSn of order_sn_list) {
+    const order = await prisma.order.findUnique({
+      where: { orderSn },
+      include: { shop: true, packages: true }
+    });
+
+    if (order) {
+      for (const pkg of order.packages) {
+        await prisma.orderPackage.update({
+          where: { packageNumber: pkg.packageNumber },
+          data: { documentStatus: "READY" }
+        });
+      }
+
+      WebhookService.dispatch({
+        partnerId: order.shop.partnerId,
+        pushCode: 15,
+        shopId: order.shopId,
+        ordersn: orderSn,
+        payload: {
+          shop_id: Number(order.shopId),
+          code: 15,
+          timestamp: Math.floor(Date.now() / 1000),
+          data: {
+            ordersn: orderSn,
+            status: "READY"
+          }
+        }
+      }).catch(err => console.warn(`[Simulator] Batch AWB push failed for ${orderSn}:`, err.message));
+
+      successList.push(orderSn);
+    }
+  }
+
+  const downloadUrl = `/api/v2/simulator/order/batch_download_awb?order_sn_list=${encodeURIComponent(successList.join(","))}&doc_type=${encodeURIComponent(document_type)}&print_format=${encodeURIComponent(print_format)}`;
+
+  res.json(createShopeeSuccessResponse({
+    total: order_sn_list.length,
+    success_count: successList.length,
+    success_list: successList,
+    download_url: downloadUrl
+  }));
+});
+
+// ============================================================================
+// 10C. SIMULATOR BATCH DOWNLOAD MULTI-PAGE AWBS
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/order/batch_download_awb", async (req: Request, res: Response): Promise<void> => {
+  const orderSnParam = req.query.order_sn_list as string;
+  const docType = (req.query.doc_type as string) || "shipping_label";
+  const printFormat = ((req.query.print_format as string) === "thermal" ? "thermal" : "normal") as "thermal" | "normal";
+
+  if (!orderSnParam) {
+    res.status(400).send("order_sn_list is required");
+    return;
+  }
+
+  const snList = orderSnParam.split(",").map(s => s.trim()).filter(Boolean);
+  if (snList.length === 0) {
+    res.status(400).send("No valid order_sn provided");
+    return;
+  }
+
+  const orders = await prisma.order.findMany({
+    where: { orderSn: { in: snList } },
+    include: {
+      packages: true,
+      items: true
+    }
+  });
+
+  const awbItems = orders.map(order => {
+    const trackingNumber = order.packages[0]?.trackingNumber || `SPXVN${Date.now()}`;
+    return {
+      orderSn: order.orderSn,
+      trackingNumber,
+      shippingCarrier: order.shippingCarrier || "Shopee Xpress",
+      recipientName: order.recipientName,
+      recipientAddress: `${order.recipientAddress}, ${order.recipientDistrict}, ${order.recipientCity}`,
+      packageNumber: order.packages[0]?.packageNumber || `PKG-${order.orderSn}`,
+      items: order.items.map(i => ({
+        itemName: i.itemName,
+        modelName: i.modelName || "",
+        quantity: i.quantityPurchased
+      }))
+    };
+  });
+
+  const pdfBuffer = generateMultiPageShopeePdf(awbItems, { printFormat, docType });
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="MassShip_${docType}_${Date.now()}.pdf"`);
+  res.setHeader("Content-Length", pdfBuffer.length);
+  res.send(pdfBuffer);
+});
+
+// ============================================================================
+// 10D. SIMULATOR BATCH DOWNLOAD HANDOVER MANIFEST
+// ============================================================================
+simulatorRouter.get("/api/v2/simulator/order/manifest", async (req: Request, res: Response): Promise<void> => {
+  const orderSnParam = req.query.order_sn_list as string;
+  const carrierParam = (req.query.carrier as string) || "Shopee Xpress";
+  const shopIdParam = req.query.shop_id as string;
+
+  if (!orderSnParam) {
+    res.status(400).send("order_sn_list is required");
+    return;
+  }
+
+  const snList = orderSnParam.split(",").map(s => s.trim()).filter(Boolean);
+  const orders = await prisma.order.findMany({
+    where: { orderSn: { in: snList } },
+    include: {
+      packages: true,
+      shop: true,
+      items: true
+    }
+  });
+
+  const shopName = orders[0]?.shop?.shopName || `Shop ${shopIdParam || ""}`;
+  const carrier = orders[0]?.shippingCarrier || carrierParam;
+
+  const manifestOrders = orders.map(o => ({
+    orderSn: o.orderSn,
+    trackingNumber: o.packages[0]?.trackingNumber || `SPXVN${Date.now()}`,
+    recipientName: o.recipientName,
+    itemsCount: o.items.reduce((sum, item) => sum + item.quantityPurchased, 0)
+  }));
+
+  const pdfBuffer = generateShopeeHandoverManifestPdf({
+    shopName,
+    shippingCarrier: carrier,
+    orders: manifestOrders
+  });
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="Handover_Manifest_${Date.now()}.pdf"`);
   res.setHeader("Content-Length", pdfBuffer.length);
   res.send(pdfBuffer);
 });
