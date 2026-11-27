@@ -916,6 +916,20 @@ simulatorRouter.post("/api/v2/simulator/product/quick_update_stock", async (req:
 // 6. GET ALL ORDERS FOR SIMULATOR UI
 // ============================================================================
 simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Response): Promise<void> => {
+  // Auto-cancel IN_CANCEL orders where seller did not respond within 24h
+  const cancelCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  await prisma.order.updateMany({
+    where: {
+      orderStatus: OrderStatus.IN_CANCEL,
+      updatedAt: { lt: cancelCutoff }
+    },
+    data: {
+      orderStatus: OrderStatus.CANCELLED,
+      cancelBy: "SYSTEM",
+      cancelReason: "Tự động hủy do Người bán không phản hồi yêu cầu hủy trong 24h"
+    }
+  });
+
   const shopIdStr = req.query.shop_id as string | undefined;
   const buyerIdStr = req.query.buyer_id as string | undefined;
   const statusFilter = (req.query.status || req.query.order_status) as string | undefined;
@@ -1081,6 +1095,11 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
       recipient_address: `${o.recipientAddress}, ${o.recipientDistrict}, ${o.recipientCity}`,
       cancel_by: o.cancelBy,
       cancel_reason: o.cancelReason,
+      buyer_cancel_reason: o.buyerCancelReason || null,
+      cancel_respond_by:
+        o.orderStatus === OrderStatus.IN_CANCEL
+          ? Math.floor(o.updatedAt.getTime() / 1000) + 86400
+          : null,
       ship_by_date: o.shipByDate ? Math.floor(o.shipByDate.getTime() / 1000) : null,
       pay_time: o.payTime ? Math.floor(o.payTime.getTime() / 1000) : null,
       create_time: Math.floor(o.createdAt.getTime() / 1000),
@@ -2380,7 +2399,8 @@ simulatorRouter.post("/api/v2/simulator/order/buyer_cancel", async (req: Request
 // 18. BUYER REQUESTS CANCELLATION: PROCESSED -> IN_CANCEL
 // ============================================================================
 simulatorRouter.post("/api/v2/simulator/order/buyer_request_cancel", async (req: Request, res: Response): Promise<void> => {
-  const { order_sn, reason = "Changed mind / wrong address" } = req.body || {};
+  const { order_sn, cancel_reason, reason } = req.body || {};
+  const finalReason = (cancel_reason || reason || "Changed mind / wrong address").trim();
 
   if (!order_sn) {
     res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
@@ -2407,7 +2427,7 @@ simulatorRouter.post("/api/v2/simulator/order/buyer_request_cancel", async (req:
     where: { orderSn: order_sn },
     data: {
       orderStatus: OrderStatus.IN_CANCEL,
-      buyerCancelReason: reason,
+      buyerCancelReason: finalReason,
       updatedAt: now
     }
   });
@@ -2432,7 +2452,8 @@ simulatorRouter.post("/api/v2/simulator/order/buyer_request_cancel", async (req:
 
   res.json(createShopeeSuccessResponse({
     order_sn,
-    order_status: "IN_CANCEL"
+    order_status: "IN_CANCEL",
+    cancel_respond_by: Math.floor(now.getTime() / 1000) + 86400
   }));
 });
 
@@ -2532,6 +2553,86 @@ simulatorRouter.post("/api/v2/simulator/order/handle_cancellation", async (req: 
   } else {
     res.json(createShopeeErrorResponse("error_param", "Invalid operation. Must be ACCEPT or REJECT"));
   }
+});
+
+// ============================================================================
+// 19b. SELLER INITIATED ORDER CANCELLATION (UNPAID / READY_TO_SHIP / PROCESSED before handover)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/seller_cancel", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn, cancel_reason } = req.body || {};
+
+  if (!order_sn || !cancel_reason) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn and cancel_reason are required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { shop: true, packages: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  const isHandedOver = order.packages.some((p) => p.logisticsStatus === "LOGISTICS_HANDED_OVER");
+  if (
+    !["UNPAID", "READY_TO_SHIP", "PROCESSED"].includes(order.orderStatus) ||
+    isHandedOver
+  ) {
+    res.json(
+      createShopeeErrorResponse(
+        "error_business",
+        "Chỉ có thể hủy đơn hàng ở trạng thái Chờ xác nhận hoặc Chờ lấy hàng trước khi bàn giao cho ĐVVC."
+      )
+    );
+    return;
+  }
+
+  const reasonLabels: Record<string, string> = {
+    OUT_OF_STOCK: "Hết hàng",
+    UNDELIVERABLE_AREA: "Không thể giao hàng cho khu vực này",
+    CUSTOMER_REQUEST: "Theo yêu cầu của Người mua"
+  };
+  const resolvedReason = reasonLabels[String(cancel_reason)] || String(cancel_reason);
+  const now = new Date();
+
+  await prisma.order.update({
+    where: { orderSn: order_sn },
+    data: {
+      orderStatus: OrderStatus.CANCELLED,
+      cancelBy: "SELLER",
+      cancelReason: resolvedReason,
+      updatedAt: now
+    }
+  });
+
+  WebhookService.dispatch({
+    partnerId: order.shop.partnerId,
+    pushCode: 3,
+    shopId: order.shopId,
+    ordersn: order_sn,
+    payload: {
+      shop_id: Number(order.shopId),
+      code: 3,
+      timestamp: Math.floor(now.getTime() / 1000),
+      data: {
+        ordersn: order_sn,
+        status: "CANCELLED",
+        update_time: Math.floor(now.getTime() / 1000)
+      }
+    }
+  }).catch((err) => console.warn("[Simulator] Seller cancel push failed:", err.message));
+
+  res.json(
+    createShopeeSuccessResponse({
+      order_sn,
+      order_status: "CANCELLED",
+      cancel_by: "SELLER",
+      cancel_reason: resolvedReason
+    })
+  );
 });
 
 // ============================================================================
