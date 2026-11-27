@@ -9,9 +9,31 @@ export interface AwbItemParams {
   trackingNumber: string;
   shippingCarrier: string;
   recipientName: string;
+  recipientPhone?: string;
   recipientAddress: string;
   packageNumber?: string;
   items?: Array<{ itemName: string; modelName?: string; quantity: number }>;
+}
+
+function maskPhone(phone?: string): string {
+  if (!phone) return "";
+  const str = String(phone).trim();
+  if (str.length <= 4) return "*****";
+  if (str.length <= 7) return `${str.slice(0, 2)}*****${str.slice(-2)}`;
+  return `${str.slice(0, 3)}*****${str.slice(-2)}`;
+}
+
+function maskAddress(address: string): string {
+  if (!address || address === "N/A") return address;
+  const str = String(address).trim();
+  const parts = str.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const first = parts[0];
+    const maskedFirst = first.length > 3 ? `${first.slice(0, 3)}*****` : "*****";
+    return `${maskedFirst}, ${parts.slice(1).join(", ")}`;
+  }
+  if (str.length <= 8) return "*****";
+  return `${str.slice(0, 4)}*****${str.slice(-4)}`;
 }
 
 export interface HandoverManifestParams {
@@ -189,9 +211,13 @@ function buildNormalStreamContent(item: AwbItemParams, docTypeLabel: string): st
     trackingNumber,
     shippingCarrier,
     recipientName,
+    recipientPhone,
     recipientAddress,
     packageNumber = "PKG-STANDARD"
   } = item;
+
+  const maskedPhone = maskPhone(recipientPhone);
+  const maskedAddress = maskAddress(recipientAddress);
 
   const streamLines = [
     "BT",
@@ -212,9 +238,9 @@ function buildNormalStreamContent(item: AwbItemParams, docTypeLabel: string): st
     "(THONG TIN NGUOI NHAN:) Tj",
     "/F1 11 Tf",
     "0 -20 Td",
-    `(${escapePdfText("Ten: " + recipientName)}) Tj`,
+    `(${escapePdfText("Ten: " + recipientName + (maskedPhone ? " | SDT: " + maskedPhone : ""))}) Tj`,
     "0 -20 Td",
-    `(${escapePdfText("Dia chi: " + recipientAddress)}) Tj`,
+    `(${escapePdfText("Dia chi: " + maskedAddress)}) Tj`,
     "0 -35 Td",
     "/F1 10 Tf",
     "(========================================================================) Tj",
@@ -235,8 +261,12 @@ function buildThermalStreamContent(item: AwbItemParams, docTypeLabel: string): s
     trackingNumber,
     shippingCarrier,
     recipientName,
+    recipientPhone,
     recipientAddress
   } = item;
+
+  const maskedPhone = maskPhone(recipientPhone);
+  const maskedAddress = maskAddress(recipientAddress);
 
   const streamLines = [
     "BT",
@@ -252,9 +282,9 @@ function buildThermalStreamContent(item: AwbItemParams, docTypeLabel: string): s
     `(${escapePdfText("DON HANG: " + orderSn)}) Tj`,
     "0 -22 Td",
     "/F1 9 Tf",
-    `(${escapePdfText("Nguoi nhan: " + recipientName)}) Tj`,
+    `(${escapePdfText("Nguoi nhan: " + recipientName + (maskedPhone ? " (" + maskedPhone + ")" : ""))}) Tj`,
     "0 -15 Td",
-    `(${escapePdfText("Dia chi: " + recipientAddress.slice(0, 36))}) Tj`,
+    `(${escapePdfText("Dia chi: " + maskedAddress.slice(0, 36))}) Tj`,
     "0 -25 Td",
     "/F1 9 Tf",
     "(---------------------------------------------------) Tj",
