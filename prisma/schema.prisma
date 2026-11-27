@@ -349,6 +349,10 @@ model Return {
   dueDate               DateTime?    @map("due_date")
   reverseShippingFee    Decimal      @default(0) @map("reverse_shipping_fee") @db.Decimal(15, 2)
   disputeDueDate        DateTime?    @map("dispute_due_date")
+  buyerReturnDueDate    DateTime?    @map("buyer_return_due_date")
+  expectedReturnDate    DateTime?    @map("expected_return_date")
+  reverseDeliveredAt    DateTime?    @map("reverse_delivered_at")
+  isNfrExempt           Boolean      @default(false) @map("is_nfr_exempt")
 
   // Negotiation State
   negotiationStatus     String?      @map("negotiation_status") // PENDING_RESPOND, PENDING_BUYER_RESPOND, TERMINATED

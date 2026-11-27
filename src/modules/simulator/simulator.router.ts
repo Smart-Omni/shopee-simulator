@@ -5,7 +5,13 @@ import { createShopeeSuccessResponse, createShopeeErrorResponse } from "../../co
 import { WebhookService } from "../webhook/webhook.service";
 import { generateShopeeAwbPdf, generateMultiPageShopeePdf, generateShopeeHandoverManifestPdf } from "../../common/utils/pdf";
 import { OrderStatus, PromotionStatus } from "@prisma/client";
-import { normalizeReturnReason } from "../returns/returns.constants";
+import {
+  normalizeReturnReason,
+  RETURN_WINDOW_DAYS,
+  BUYER_SHIP_WINDOW_DAYS,
+  SELLER_DISPUTE_WINDOW_DAYS,
+  isChangeOfMindRestricted
+} from "../returns/returns.constants";
 import { calculateReverseShippingFee } from "../payment/payment.router";
 import { storageService } from "../../common/storage/storage.service";
 import * as crypto from "crypto";
@@ -1121,6 +1127,8 @@ simulatorRouter.get("/api/v2/simulator/orders", async (req: Request, res: Respon
         text_reason: r.textReason || "",
         offer_amount: r.offerAmount ? Number(r.offerAmount) : null,
         negotiation_status: r.negotiationStatus || "TERMINATED",
+        needs_logistics: r.needsLogistics,
+        reverse_tracking_number: r.reverseTrackingNumber || "",
         created_at: r.createdAt.toISOString()
       })),
       items: (o.items || []).map((i: any) => {
@@ -3880,7 +3888,16 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", upload.any(), as
 
     const order = await prisma.order.findUnique({
       where: { orderSn: order_sn },
-      include: { items: true, shop: true }
+      include: {
+        items: {
+          include: {
+            product: {
+              include: { category: true }
+            }
+          }
+        },
+        shop: true
+      }
     });
 
     if (!order) {
@@ -3907,6 +3924,15 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", upload.any(), as
       return;
     }
 
+    // Article 563: 15-day return window from delivery/completion
+    if (order.orderStatus === OrderStatus.COMPLETED && order.completedAt) {
+      const elapsedMs = Date.now() - order.completedAt.getTime();
+      if (elapsedMs > RETURN_WINDOW_DAYS * 86400 * 1000) {
+        res.json(createShopeeErrorResponse("return.window_expired", `Đã quá thời hạn ${RETURN_WINDOW_DAYS} ngày kể từ khi giao hàng thành công để yêu cầu Trả hàng/Hoàn tiền.`));
+        return;
+      }
+    }
+
     const maxRefund = Number(order.totalAmount);
     const requestedRefund = refund_amount !== undefined ? parseFloat(String(refund_amount)) : maxRefund;
 
@@ -3916,6 +3942,25 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", upload.any(), as
     }
 
     const normalizedReason = normalizeReturnReason(reason);
+    const isNfrExempt = normalizedReason === "CHANGE_OF_MIND";
+
+    // Article 563: Category restriction check for CHANGE_OF_MIND
+    if (isNfrExempt && !req.body?.bypass_category_check) {
+      const catNames = (order.items || [])
+        .map((it: any) => it.product?.category?.displayName || it.product?.category?.originalName || "")
+        .filter(Boolean);
+      const check = isChangeOfMindRestricted(catNames);
+      if (check.restricted) {
+        res.json(
+          createShopeeErrorResponse(
+            "return.change_of_mind_restricted",
+            `Sản phẩm thuộc danh mục hạn chế ("${check.matchedCategory}") không áp dụng trả hàng với lý do Đổi ý.`
+          )
+        );
+        return;
+      }
+    }
+
     const valType = validation_type === "seller_validation" ? "seller_validation" : "warehouse_validation";
     // Shopee-First flow starts in JUDGING; Seller-First starts in REQUESTED
     const initialStatus = valType === "seller_validation" ? "REQUESTED" : "JUDGING";
@@ -3924,6 +3969,7 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", upload.any(), as
 
     const returnSn = "RET" + Date.now().toString().slice(-8) + Math.floor(100 + Math.random() * 900);
     const dueDate = new Date(Date.now() + 48 * 3600 * 1000); // 48h SLA
+    const buyerReturnDueDate = needsLogistics ? new Date(Date.now() + BUYER_SHIP_WINDOW_DAYS * 86400 * 1000) : null;
 
     // Handle proof media: files and URLs
     const finalProofUrls: string[] = [];
@@ -3967,6 +4013,8 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", upload.any(), as
         solution: sol,
         needsLogistics,
         dueDate,
+        buyerReturnDueDate,
+        isNfrExempt,
         proofImages: images
       }
     });
@@ -4040,7 +4088,9 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_request", upload.any(), as
       status: initialStatus,
       refund_amount: requestedRefund,
       validation_type: valType,
-      due_date: Math.floor(dueDate.getTime() / 1000)
+      due_date: Math.floor(dueDate.getTime() / 1000),
+      buyer_return_due_date: buyerReturnDueDate ? Math.floor(buyerReturnDueDate.getTime() / 1000) : null,
+      is_nfr_exempt: isNfrExempt
     }));
   } catch (err: any) {
     res.json(createShopeeErrorResponse("server_error", err.message || "Failed to submit return request"));
@@ -4066,13 +4116,20 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_ship", async (req: Request
       return;
     }
 
-    const track = tracking_number || `SPX-RET-${Math.floor(100000 + Math.random() * 900000)}`;
+    if (r.buyerReturnDueDate && new Date() > r.buyerReturnDueDate) {
+      res.json(createShopeeErrorResponse("return.ship_window_expired", `Đã quá thời hạn ${BUYER_SHIP_WINDOW_DAYS} ngày để Người mua gửi trả hàng.`));
+      return;
+    }
+
+    const track = tracking_number || r.reverseTrackingNumber || `SPX-RET-${Math.floor(100000 + Math.random() * 900000)}`;
     const oldStatus = r.status;
+    const expectedReturnDate = new Date(Date.now() + 3 * 86400 * 1000);
 
     const updated = await prisma.return.update({
       where: { returnSn: return_sn },
       data: {
         reverseTrackingNumber: track,
+        expectedReturnDate,
         status: "PROCESSING"
       }
     });
@@ -4090,6 +4147,7 @@ simulatorRouter.post("/api/v2/simulator/returns/buyer_ship", async (req: Request
     res.json(createShopeeSuccessResponse({
       return_sn: updated.returnSn,
       tracking_number: track,
+      expected_return_date: Math.floor(expectedReturnDate.getTime() / 1000),
       status: "PROCESSING"
     }));
   } catch (err: any) {
@@ -4375,6 +4433,21 @@ simulatorRouter.post("/api/v2/simulator/returns/seller_dispute", upload.any(), a
       return;
     }
 
+    if (r.disputeDueDate && new Date() > r.disputeDueDate) {
+      res.json(createShopeeErrorResponse("return.dispute_expired", "Đã quá thời hạn 2 ngày để gửi khiếu nại cho yêu cầu này."));
+      return;
+    }
+
+    if (
+      r.status === "PROCESSING" &&
+      !r.reverseDeliveredAt &&
+      r.expectedReturnDate &&
+      new Date() < r.expectedReturnDate
+    ) {
+      res.json(createShopeeErrorResponse("return.cannot_dispute_before_delivery", "Chỉ có thể khiếu nại sau khi nhận hàng hoàn hoặc sau ngày nhận hàng hoàn dự kiến."));
+      return;
+    }
+
     const isCompensationDispute = r.status === "ACCEPTED";
     const newStatus = isCompensationDispute ? "ACCEPTED" : "SELLER_DISPUTE";
     const compensationStatus = isCompensationDispute ? "COMPENSATION_REQUESTED" : r.compensationStatus;
@@ -4581,7 +4654,9 @@ simulatorRouter.post("/api/v2/simulator/returns/seller_cancel_dispute", async (r
 // 17.4 Shopee Admin reviews claim (Flow 1 triage in JUDGING)
 simulatorRouter.post("/api/v2/simulator/admin/returns/review", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { return_sn, action, notes } = req.body; // action: "APPROVE_RETURN" | "REQUEST_SELLER_PROOF" | "REJECT"
+    const { return_sn, action: rawAction, notes, reason } = req.body;
+    const action = rawAction === "APPROVE" ? "APPROVE_RETURN_REFUND" : rawAction;
+    const reviewNotes = notes || reason;
 
     if (!return_sn || !action) {
       res.json(createShopeeErrorResponse("error_param", "return_sn and action are required"));
@@ -4627,26 +4702,28 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/review", async (req: Reque
         needsLogistics: false,
         reverseShippingFee: 0,
         disputeDueDate,
-        rulingNotes: notes || "Shopee approved instant refund (Hoàn tiền ngay - không trả hàng)"
+        rulingNotes: reviewNotes || "Shopee approved instant refund (Hoàn tiền ngay - không trả hàng)"
       };
     } else if (action === "APPROVE_RETURN_REFUND" || action === "APPROVE_RETURN") {
-      // "Trả hàng & hoàn tiền": parcel must be shipped back by buyer
+      // "Trả hàng & hoàn tiền": parcel must be shipped back by buyer within 6 days
       newStatus = "PROCESSING";
       const carrierPrefix = r.order.shippingCarrier ? r.order.shippingCarrier.slice(0, 3).toUpperCase() : "SPX";
       const reverseTracking = "RET-" + carrierPrefix + Date.now().toString().slice(-8);
+      const buyerReturnDueDate = new Date(Date.now() + BUYER_SHIP_WINDOW_DAYS * 86400 * 1000);
 
       updateData = {
         status: "PROCESSING",
         solution: "RETURN_REFUND",
         needsLogistics: true,
         reverseTrackingNumber: reverseTracking,
-        rulingNotes: notes || "Shopee approved return & refund (Chờ người mua gửi trả hàng)"
+        buyerReturnDueDate,
+        rulingNotes: reviewNotes || "Shopee approved return & refund (Chờ người mua gửi trả hàng)"
       };
     } else if (action === "REQUEST_SELLER_PROOF") {
       sellerProofStatus = "PENDING";
       updateData = {
         sellerProofStatus: "PENDING",
-        rulingNotes: notes || "Shopee requested proof from seller"
+        rulingNotes: reviewNotes || "Shopee requested proof from seller"
       };
     } else if (action === "REJECT") {
       newStatus = "CLOSED";
@@ -4656,7 +4733,7 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/review", async (req: Reque
       });
       updateData = {
         status: "CLOSED",
-        rulingNotes: notes || `Shopee Admin rejected return: ${notes || "Claim rejected"}`
+        rulingNotes: reviewNotes || "Shopee Admin rejected return: Claim rejected"
       };
     } else {
       res.json(createShopeeErrorResponse("error_param", "Invalid action. Use APPROVE_REFUND_ONLY, APPROVE_RETURN_REFUND, APPROVE_RETURN, REQUEST_SELLER_PROOF, or REJECT"));
@@ -4689,10 +4766,53 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/review", async (req: Reque
   }
 });
 
+// 17.4b Simulate reverse carrier delivering return parcel to seller (opens 2-day dispute window)
+simulatorRouter.post("/api/v2/simulator/admin/returns/reverse_deliver", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { return_sn } = req.body;
+    if (!return_sn) {
+      res.json(createShopeeErrorResponse("error_param", "return_sn is required"));
+      return;
+    }
+
+    const r = await prisma.return.findUnique({
+      where: { returnSn: return_sn },
+      include: { shop: true }
+    });
+
+    if (!r) {
+      res.json(createShopeeErrorResponse("return.not_found", "Return request not found"));
+      return;
+    }
+
+    const now = new Date();
+    const disputeDueDate = new Date(now.getTime() + SELLER_DISPUTE_WINDOW_DAYS * 86400 * 1000);
+
+    const updated = await prisma.return.update({
+      where: { returnSn: return_sn },
+      data: {
+        reverseDeliveredAt: now,
+        disputeDueDate
+      }
+    });
+
+    res.json(createShopeeSuccessResponse({
+      return_sn: updated.returnSn,
+      status: updated.status,
+      reverse_delivered_at: Math.floor(now.getTime() / 1000),
+      dispute_due_date: Math.floor(disputeDueDate.getTime() / 1000)
+    }));
+  } catch (err: any) {
+    res.json(createShopeeErrorResponse("server_error", err.message || "Failed to simulate reverse delivery"));
+  }
+});
+
 // 17.5 Shopee Warehouse inbound & inspection
 simulatorRouter.post("/api/v2/simulator/admin/returns/warehouse_inbound", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { return_sn, inspection_result } = req.body; // "PASS" or "FAIL"
+    const { return_sn, inspection_result, result, notes, inspection_notes } = req.body; // "PASS" or "FAIL"
+    const finalResult = inspection_result || result;
+    const finalNotes = notes || inspection_notes;
     if (!return_sn) {
       res.json(createShopeeErrorResponse("error_param", "return_sn is required"));
       return;
@@ -4708,10 +4828,12 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/warehouse_inbound", async 
       return;
     }
 
-    const isPass = inspection_result !== "FAIL";
+    const isPass = finalResult !== "FAIL";
     const newStatus = isPass ? "ACCEPTED" : "SELLER_DISPUTE";
     const oldStatus = r.status;
     let revFee = 0;
+    const now = new Date();
+    const disputeDueDate = new Date(now.getTime() + SELLER_DISPUTE_WINDOW_DAYS * 86400 * 1000);
 
     if (isPass) {
       const isFullRefund = Number(r.refundAmount) >= Number(r.order.totalAmount);
@@ -4743,7 +4865,9 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/warehouse_inbound", async 
       data: {
         status: newStatus,
         reverseShippingFee: revFee,
-        rulingNotes: `Warehouse inspection: ${isPass ? 'PASSED - item verified' : 'FAILED - item damaged/incorrect'}`
+        reverseDeliveredAt: r.reverseDeliveredAt || now,
+        disputeDueDate: r.disputeDueDate || disputeDueDate,
+        rulingNotes: finalNotes || `Warehouse inspection: ${isPass ? 'PASSED - item verified' : 'FAILED - item damaged/incorrect'}`
       }
     });
 
@@ -4770,7 +4894,9 @@ simulatorRouter.post("/api/v2/simulator/admin/returns/warehouse_inbound", async 
 // 17.6 Shopee Admin Dispute Arbitration
 simulatorRouter.post("/api/v2/simulator/admin/returns/arbitrate_dispute", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { return_sn, ruling, notes } = req.body; // "BUYER_WIN" | "SELLER_WIN" | "PLATFORM_COMPENSATE"
+    const { return_sn, ruling: rawRuling, verdict, notes: rawNotes, ruling_notes } = req.body;
+    const ruling = rawRuling || verdict;
+    const notes = rawNotes || ruling_notes;
 
     if (!return_sn || !ruling) {
       res.json(createShopeeErrorResponse("error_param", "return_sn and ruling are required"));
@@ -4889,9 +5015,14 @@ simulatorRouter.get("/api/v2/simulator/returns", async (req: Request, res: Respo
       reverse_tracking_number: r.reverseTrackingNumber || "",
       due_date: r.dueDate ? Math.floor(r.dueDate.getTime() / 1000) : null,
       dispute_due_date: r.disputeDueDate ? Math.floor(r.disputeDueDate.getTime() / 1000) : null,
+      buyer_return_due_date: r.buyerReturnDueDate ? Math.floor(r.buyerReturnDueDate.getTime() / 1000) : null,
+      expected_return_date: r.expectedReturnDate ? Math.floor(r.expectedReturnDate.getTime() / 1000) : null,
+      reverse_delivered_at: r.reverseDeliveredAt ? Math.floor(r.reverseDeliveredAt.getTime() / 1000) : null,
+      is_nfr_exempt: r.isNfrExempt,
       reverse_shipping_fee: Number(r.reverseShippingFee || 0),
       negotiation_status: r.negotiationStatus || "TERMINATED",
       offer_amount: r.offerAmount ? Number(r.offerAmount) : null,
+      offer_reason: r.offerReason || "",
       seller_proof_status: r.sellerProofStatus,
       dispute_reason: r.disputeReason || "",
       dispute_reason_id: r.disputeReasonId,
