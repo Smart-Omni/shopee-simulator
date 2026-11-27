@@ -4998,6 +4998,19 @@ simulatorRouter.get("/api/v2/simulator/returns", async (req: Request, res: Respo
       orderBy: { createdAt: "desc" }
     });
 
+    const uniqueItemIds = Array.from(
+      new Set(returns.flatMap(r => r.items.map(it => it.itemId)))
+    );
+    const products = uniqueItemIds.length > 0
+      ? await prisma.product.findMany({
+          where: { itemId: { in: uniqueItemIds } },
+          select: { itemId: true, imagesJson: true }
+        })
+      : [];
+    const imageByItemId = new Map<string, string | null>(
+      products.map(p => [p.itemId.toString(), extractProductImage(p)])
+    );
+
     const formatted = returns.map(r => ({
       return_sn: r.returnSn,
       order_sn: r.orderSn,
@@ -5037,6 +5050,7 @@ simulatorRouter.get("/api/v2/simulator/returns", async (req: Request, res: Respo
         model_id: Number(it.modelId),
         item_name: it.itemName,
         model_name: it.modelName || "",
+        image: imageByItemId.get(it.itemId.toString()) || null,
         quantity: it.quantity,
         item_price: Number(it.itemPrice),
         refund_amount: Number(it.refundAmount)
