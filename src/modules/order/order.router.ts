@@ -128,7 +128,7 @@ orderRouter.get("/api/v2/order/get_order_detail", shopeeAuthGuard, async (req: R
       order_sn: o.orderSn,
       region: "VN",
       currency: o.currency,
-      cod: false,
+      cod: /\bcod\b|cash on delivery|thanh toán khi nhận hàng/i.test(o.paymentMethod || ""),
       total_amount: Number(o.totalAmount),
       order_status: o.orderStatus,
       shipping_carrier: o.shippingCarrier,
@@ -460,6 +460,7 @@ export async function createSingleOrderRecord(body: any): Promise<{ success: boo
     recipient_address = "123 Le Loi, District 1, Ho Chi Minh City",
     buyer_user_id,
     buyer_username,
+    payment_method = "ShopeePay",
     voucher_code,
     items = []
   } = body || {};
@@ -772,7 +773,7 @@ export async function createSingleOrderRecord(body: any): Promise<{ success: boo
         escrowReleaseTime: (order_status as OrderStatus) === OrderStatus.COMPLETED ? new Date() : null,
         completedAt: (order_status as OrderStatus) === OrderStatus.COMPLETED ? new Date() : null,
         currency: "VND",
-        paymentMethod: "ShopeePay",
+        paymentMethod: payment_method || "ShopeePay",
         payTime: new Date(),
         shipByDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
       }
@@ -851,6 +852,7 @@ export async function createSingleOrderRecord(body: any): Promise<{ success: boo
         shopee_shipping_rebate: shopeeShippingRebate,
         total_amount: Number(order.totalAmount),
         escrow_amount: Number(order.escrowAmount || 0),
+        payment_method: order.paymentMethod,
         shop_id: Number(order.shopId)
       }
     };
