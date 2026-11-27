@@ -1362,6 +1362,7 @@ simulatorRouter.get("/api/v2/simulator/order/download_awb", async (req: Request,
     trackingNumber,
     shippingCarrier: order.shippingCarrier || "Shopee Xpress",
     recipientName: order.recipientName,
+    recipientPhone: order.recipientPhone,
     recipientAddress: `${order.recipientAddress}, ${order.recipientDistrict}, ${order.recipientCity}`
   });
 
@@ -1588,6 +1589,7 @@ simulatorRouter.get("/api/v2/simulator/order/batch_download_awb", async (req: Re
       trackingNumber,
       shippingCarrier: order.shippingCarrier || "Shopee Xpress",
       recipientName: order.recipientName,
+      recipientPhone: order.recipientPhone,
       recipientAddress: `${order.recipientAddress}, ${order.recipientDistrict}, ${order.recipientCity}`,
       packageNumber: order.packages[0]?.packageNumber || `PKG-${order.orderSn}`,
       items: order.items.map(i => ({
