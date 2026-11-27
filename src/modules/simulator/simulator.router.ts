@@ -2105,35 +2105,68 @@ simulatorRouter.get("/api/v2/simulator/order/detail", async (req: Request, res: 
   const pkg = order.packages[0];
 
   // Visual tracking timeline state
-  const timeline = [
-    {
-      title: "Order Placed",
-      status: "DONE",
-      time: order.createdAt.toISOString()
-    },
-    {
-      title: "Payment Confirmed",
-      status: order.orderStatus !== OrderStatus.UNPAID ? "DONE" : "PENDING",
-      time: order.orderStatus !== OrderStatus.UNPAID ? order.updatedAt.toISOString() : null
-    },
-    {
-      title: "Logistics Arranged",
-      status: ["PROCESSED", "SHIPPED", "TO_CONFIRM_RECEIVE", "COMPLETED"].includes(order.orderStatus) ? "DONE" : "PENDING",
-      tracking: pkg?.trackingNumber || null
-    },
-    {
-      title: "Courier Picked Up (In Transit)",
-      status: ["SHIPPED", "TO_CONFIRM_RECEIVE", "COMPLETED"].includes(order.orderStatus) ? "DONE" : "PENDING"
-    },
-    {
-      title: "Delivered & Completed",
-      status: order.orderStatus === OrderStatus.COMPLETED ? "DONE" : "PENDING"
-    }
-  ];
+  let timeline: Array<{ title: string; status: string; time?: string | null; tracking?: string | null }>;
+  if (order.orderStatus === OrderStatus.CANCELLED) {
+    timeline = [
+      { title: "Order Placed", status: "DONE", time: order.createdAt.toISOString() },
+      ...(order.payTime
+        ? [{ title: "Payment Confirmed", status: "DONE", time: order.payTime.toISOString() }]
+        : []),
+      { title: "Order Cancelled", status: "CANCELLED", time: order.updatedAt.toISOString() }
+    ];
+  } else if (order.orderStatus === OrderStatus.IN_CANCEL) {
+    timeline = [
+      { title: "Order Placed", status: "DONE", time: order.createdAt.toISOString() },
+      {
+        title: "Payment Confirmed",
+        status: "DONE",
+        time: (order.payTime || order.createdAt).toISOString()
+      },
+      { title: "Cancellation Requested", status: "PENDING", time: order.updatedAt.toISOString() }
+    ];
+  } else {
+    const logisticsArranged = ["PROCESSED", "SHIPPED", "TO_CONFIRM_RECEIVE", "COMPLETED", "TO_RETURN"].includes(order.orderStatus);
+    const inTransit = ["SHIPPED", "TO_CONFIRM_RECEIVE", "COMPLETED", "TO_RETURN"].includes(order.orderStatus);
+    const delivered = ["COMPLETED", "TO_RETURN"].includes(order.orderStatus);
+    timeline = [
+      {
+        title: "Order Placed",
+        status: "DONE",
+        time: order.createdAt.toISOString()
+      },
+      {
+        title: "Payment Confirmed",
+        status: order.orderStatus !== OrderStatus.UNPAID ? "DONE" : "PENDING",
+        time: order.orderStatus !== OrderStatus.UNPAID ? (order.payTime || order.updatedAt).toISOString() : null
+      },
+      {
+        title: "Logistics Arranged",
+        status: logisticsArranged ? "DONE" : "PENDING",
+        tracking: pkg?.trackingNumber || null
+      },
+      {
+        title: "Courier Picked Up (In Transit)",
+        status: inTransit ? "DONE" : "PENDING"
+      },
+      {
+        title: "Delivered & Completed",
+        status: delivered ? "DONE" : "PENDING",
+        time: delivered && order.completedAt ? order.completedAt.toISOString() : null
+      },
+      ...(order.orderStatus === OrderStatus.TO_RETURN
+        ? [{ title: "Return / Refund", status: "DONE", time: order.updatedAt.toISOString() }]
+        : [])
+    ];
+  }
 
   res.json(createShopeeSuccessResponse({
     order_sn: order.orderSn,
     order_status: order.orderStatus,
+    cancel_by: order.cancelBy,
+    cancel_reason: order.cancelReason,
+    buyer_cancel_reason: order.buyerCancelReason,
+    pay_time: order.payTime ? Math.floor(order.payTime.getTime() / 1000) : null,
+    completed_at: order.completedAt ? order.completedAt.toISOString() : null,
     shop_id: Number(order.shopId),
     shop_name: order.shop.shopName,
     shipping_carrier: order.shippingCarrier,
