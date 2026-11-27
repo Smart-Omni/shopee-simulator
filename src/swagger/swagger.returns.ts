@@ -650,6 +650,59 @@ export const returnsSwaggerPaths: Record<string, any> = {
       }
     }
   },
+  "/api/v2/returns/convert_image": {
+    post: {
+      tags: ["Returns & Disputes"],
+      summary: "Convert Return Proof Image to URL",
+      description: "Uploads a proof image (.jpg, .jpeg, .png within 10MB) for a return and returns its hosted url and thumbnail.",
+      parameters: [
+        { name: "partner_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "timestamp", in: "query", required: true, schema: { type: "integer" } },
+        { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+        { name: "shop_id", in: "query", required: true, schema: { type: "integer" } },
+        { name: "sign", in: "query", required: true, schema: { type: "string" } }
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          "multipart/form-data": {
+            schema: {
+              type: "object",
+              required: ["return_sn", "upload_image"],
+              properties: {
+                return_sn: { type: "string" },
+                upload_image: { type: "string", format: "binary" }
+              }
+            }
+          }
+        }
+      },
+      responses: {
+        200: {
+          description: "Image converted to URL",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  request_id: { type: "string" },
+                  error: { type: "string" },
+                  message: { type: "string" },
+                  response: {
+                    type: "object",
+                    properties: {
+                      url: { type: "string" },
+                      thumbnail: { type: "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   "/api/v2/returns/upload_proof": {
     post: {
       tags: ["Returns & Disputes"],

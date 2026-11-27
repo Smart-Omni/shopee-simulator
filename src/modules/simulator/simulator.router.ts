@@ -2148,6 +2148,52 @@ simulatorRouter.get("/api/v2/simulator/order/detail", async (req: Request, res: 
 });
 
 // ============================================================================
+// 14b. SELLER HANDOVER (GIAO HÀNG): PROCESSED -> LOGISTICS_HANDED_OVER (stays in Chờ lấy hàng)
+// ============================================================================
+simulatorRouter.post("/api/v2/simulator/order/handover", async (req: Request, res: Response): Promise<void> => {
+  const { order_sn } = req.body || {};
+
+  if (!order_sn) {
+    res.json(createShopeeErrorResponse("error_param", "order_sn is required"));
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderSn: order_sn },
+    include: { packages: true }
+  });
+
+  if (!order) {
+    res.json(createShopeeErrorResponse("error_param", "Order not found"));
+    return;
+  }
+
+  if (order.orderStatus !== OrderStatus.PROCESSED) {
+    res.json(createShopeeErrorResponse("error_business", "Vui lòng bấm 'Chuẩn bị hàng' trước khi bàn giao đơn hàng."));
+    return;
+  }
+
+  const now = new Date();
+  await prisma.order.update({
+    where: { orderSn: order_sn },
+    data: { updatedAt: now }
+  });
+
+  for (const pkg of order.packages) {
+    await prisma.orderPackage.update({
+      where: { packageNumber: pkg.packageNumber },
+      data: { logisticsStatus: "LOGISTICS_HANDED_OVER" }
+    });
+  }
+
+  res.json(createShopeeSuccessResponse({
+    order_sn,
+    order_status: order.orderStatus,
+    logistics_status: "LOGISTICS_HANDED_OVER"
+  }));
+});
+
+// ============================================================================
 // 15. SIMULATE COURIER PICKUP: PROCESSED -> SHIPPED
 // ============================================================================
 simulatorRouter.post("/api/v2/simulator/order/carrier_pickup", async (req: Request, res: Response): Promise<void> => {
