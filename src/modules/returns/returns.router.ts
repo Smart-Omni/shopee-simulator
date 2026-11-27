@@ -109,7 +109,11 @@ async function handleGetReturnList(req: Request, res: Response): Promise<void> {
     seller_proof_status: r.sellerProofStatus,
     seller_compensation_status: r.compensationStatus,
     reverse_shipping_fee: Number(r.reverseShippingFee || 0),
-    dispute_due_date: r.disputeDueDate ? Math.floor(r.disputeDueDate.getTime() / 1000) : null
+    dispute_due_date: r.disputeDueDate ? Math.floor(r.disputeDueDate.getTime() / 1000) : null,
+    buyer_return_due_date: r.buyerReturnDueDate ? Math.floor(r.buyerReturnDueDate.getTime() / 1000) : null,
+    expected_return_date: r.expectedReturnDate ? Math.floor(r.expectedReturnDate.getTime() / 1000) : null,
+    reverse_delivered_at: r.reverseDeliveredAt ? Math.floor(r.reverseDeliveredAt.getTime() / 1000) : null,
+    is_nfr_exempt: r.isNfrExempt
   }));
 
   const more = (pageNo * pageSize) < totalCount;
@@ -199,6 +203,10 @@ async function handleGetReturnDetail(req: Request, res: Response): Promise<void>
     compensation_status: r.compensationStatus,
     reverse_shipping_fee: Number(r.reverseShippingFee || 0),
     dispute_due_date: r.disputeDueDate ? Math.floor(r.disputeDueDate.getTime() / 1000) : null,
+    buyer_return_due_date: r.buyerReturnDueDate ? Math.floor(r.buyerReturnDueDate.getTime() / 1000) : null,
+    expected_return_date: r.expectedReturnDate ? Math.floor(r.expectedReturnDate.getTime() / 1000) : null,
+    reverse_delivered_at: r.reverseDeliveredAt ? Math.floor(r.reverseDeliveredAt.getTime() / 1000) : null,
+    is_nfr_exempt: r.isNfrExempt,
     amount_before_discount: Number(r.order.totalAmount),
     user,
     item: items,
@@ -459,6 +467,23 @@ returnsRouter.post("/api/v2/returns/dispute", shopeeAuthGuard, async (req: Reque
   // Official Shopee Rule: dispute supported in REQUESTED, PROCESSING, or ACCEPTED
   if (r.status !== "REQUESTED" && r.status !== "PROCESSING" && r.status !== "ACCEPTED") {
     res.json(createShopeeErrorResponse("return.invalid_status", `Cannot dispute return in ${r.status} status`));
+    return;
+  }
+
+  // Enforce 2-day dispute window if disputeDueDate is set
+  if (r.disputeDueDate && new Date() > r.disputeDueDate) {
+    res.json(createShopeeErrorResponse("return.dispute_expired", "Đã quá thời hạn 2 ngày để gửi khiếu nại cho yêu cầu này."));
+    return;
+  }
+
+  // For PROCESSING returns with expectedReturnDate, require delivery or past expected date
+  if (
+    r.status === "PROCESSING" &&
+    !r.reverseDeliveredAt &&
+    r.expectedReturnDate &&
+    new Date() < r.expectedReturnDate
+  ) {
+    res.json(createShopeeErrorResponse("return.cannot_dispute_before_delivery", "Chỉ có thể khiếu nại sau khi nhận hàng hoàn hoặc sau ngày nhận hàng hoàn dự kiến."));
     return;
   }
 

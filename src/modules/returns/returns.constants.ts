@@ -138,6 +138,66 @@ export function normalizeReturnReason(rawReason: string): string {
   return "DAMAGED_FAULTY";
 }
 
+export const RETURN_WINDOW_DAYS = 15;
+export const BUYER_SHIP_WINDOW_DAYS = 6;
+export const SELLER_DISPUTE_WINDOW_DAYS = 2;
+
+export const CHANGE_OF_MIND_RESTRICTED_KEYWORDS = [
+  "điện thoại",
+  "máy tính",
+  "laptop",
+  "điện gia dụng",
+  "camera",
+  "máy ảnh",
+  "trò chơi điện tử",
+  "thiết bị y tế",
+  "khẩu trang",
+  "găng tay",
+  "đồ lót",
+  "nội y",
+  "đồ bơi",
+  "vớ",
+  "tất",
+  "thuốc",
+  "thực phẩm",
+  "tươi sống",
+  "đông lạnh",
+  "bánh tươi",
+  "hoa tươi",
+  "cây cảnh",
+  "vàng",
+  "trang sức vàng",
+  "sim",
+  "thẻ cào",
+  "voucher",
+  "dịch vụ",
+  "quà tặng",
+  "electronics",
+  "mobile",
+  "computer",
+  "underwear",
+  "lingerie",
+  "swimwear",
+  "food",
+  "perishable",
+  "voucher",
+  "digital",
+  "gold"
+];
+
+export function isChangeOfMindRestricted(categoryNames: string[]): { restricted: boolean; matchedCategory?: string } {
+  for (const rawName of categoryNames) {
+    const lower = (rawName || "").toLowerCase();
+    if (!lower) continue;
+    for (const kw of CHANGE_OF_MIND_RESTRICTED_KEYWORDS) {
+      if (lower.includes(kw)) {
+        return { restricted: true, matchedCategory: rawName };
+      }
+    }
+  }
+  return { restricted: false };
+}
+
 export const VALID_RETURN_REASONS = [
   "NOT_RECEIVED",
   "DAMAGED_FAULTY",
