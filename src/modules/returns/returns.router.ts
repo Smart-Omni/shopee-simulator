@@ -661,15 +661,72 @@ returnsRouter.get("/api/v2/returns/get_available_solutions", shopeeAuthGuard, ha
 returnsRouter.post("/api/v2/returns/get_available_solutions", shopeeAuthGuard, handleGetAvailableSolutions);
 
 // ============================================================================
-// 10. UPLOAD & QUERY PROOF: /api/v2/returns/upload_proof & query_proof
+// 10. CONVERT IMAGE, UPLOAD & QUERY PROOF: /api/v2/returns/*
 // ============================================================================
+returnsRouter.post("/api/v2/returns/convert_image", shopeeAuthGuard, upload.any(), async (req: Request, res: Response): Promise<void> => {
+  const shopIdStr = req.query.shop_id as string;
+  const shopId = BigInt(shopIdStr);
+  const returnSn = (req.body?.return_sn || req.query?.return_sn) as string | undefined;
+
+  const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+  const file = uploadedFiles.find((f) => f.fieldname === "upload_image") || uploadedFiles[0];
+
+  if (!returnSn || !file) {
+    res.json(createShopeeErrorResponse("error_param", "return_sn and upload_image are required"));
+    return;
+  }
+
+  const allowedExt = /\.(jpe?g|png)$/i;
+  const allowedMime = /^image\/(jpeg|jpg|png)$/i;
+  if (!allowedExt.test(file.originalname || "") && !allowedMime.test(file.mimetype || "")) {
+    res.json(createShopeeErrorResponse("format.unsupport", "The Image Format Not Support. Only .jpg, .jpeg, .png are supported."));
+    return;
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    res.json(createShopeeErrorResponse("error_param", "Image size must not exceed 10MB"));
+    return;
+  }
+
+  const r = await prisma.return.findFirst({
+    where: { returnSn, shopId }
+  });
+
+  if (!r) {
+    res.json(createShopeeErrorResponse("error_param", "The information you queried is not found."));
+    return;
+  }
+
+  try {
+    const uploadRes = await storageService.uploadFile(file);
+    res.json(createShopeeSuccessResponse({
+      url: uploadRes.url,
+      thumbnail: uploadRes.url
+    }));
+  } catch (e: any) {
+    res.json(createShopeeErrorResponse("image.upload.fail", e.message || "image upload fail"));
+  }
+});
+
 returnsRouter.post("/api/v2/returns/upload_proof", shopeeAuthGuard, upload.any(), async (req: Request, res: Response): Promise<void> => {
   const shopIdStr = req.query.shop_id as string;
   const shopId = BigInt(shopIdStr);
 
   const returnSn = req.body?.return_sn;
   const rawUrlList = req.body?.image_url_list || (req.body?.url ? [req.body.url] : []);
-  const imageUrlList = Array.isArray(rawUrlList) ? [...rawUrlList] : rawUrlList ? [rawUrlList] : [];
+  const imageUrlList: string[] = Array.isArray(rawUrlList) ? [...rawUrlList] : rawUrlList ? [rawUrlList] : [];
+
+  // Support official Shopee `photo: [{ url, thumbnail }]` parameter
+  if (Array.isArray(req.body?.photo)) {
+    for (const p of req.body.photo) {
+      if (typeof p === "string" && p.trim()) {
+        imageUrlList.push(p.trim());
+      } else if (p && typeof p.url === "string" && p.url.trim()) {
+        imageUrlList.push(p.url.trim());
+      }
+    }
+  }
+
   const comment = req.body?.comment || req.body?.description || "";
 
   // Process uploaded files if any
@@ -742,8 +799,20 @@ async function handleQueryProof(req: Request, res: Response): Promise<void> {
     orderBy: { createdAt: "desc" }
   });
 
+  const videoRegex = /\.(mp4|mov|webm|avi|mkv)(\?.*)?$/i;
+  const image = proofs
+    .filter((p) => !videoRegex.test(p.imageUrl))
+    .map((p) => ({ url: p.imageUrl, thumbnail: p.imageUrl }));
+  const video = proofs
+    .filter((p) => videoRegex.test(p.imageUrl))
+    .map((p) => ({ url: p.imageUrl, thumbnail: p.imageUrl }));
+  const description = proofs.find((p) => p.comment)?.comment || "";
+
   res.json(createShopeeSuccessResponse({
     return_sn: returnSn,
+    image,
+    video,
+    description,
     proof_list: proofs.map(p => ({
       uploader_type: p.uploaderType,
       image_url: p.imageUrl,
