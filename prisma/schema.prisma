@@ -61,6 +61,8 @@ model Shop {
   comments              ProductComment[]
   chatMessages          ChatMessage[]
   chatSetting           ShopChatSetting?
+  penaltyPoints         ShopPenaltyPoint[]
+  punishments           ShopPunishment[]
 
   @@map("shops")
 }
@@ -686,6 +688,43 @@ model BuyerAddress {
 
   @@index([buyerId])
   @@map("buyer_addresses")
+}
+
+// ----------------------------------------------------
+// 9. ACCOUNT HEALTH (PENALTY POINTS & PUNISHMENTS)
+// ----------------------------------------------------
+model ShopPenaltyPoint {
+  id               BigInt   @id @default(autoincrement())
+  shopId           BigInt   @map("shop_id")
+  referenceId      BigInt   @unique @map("reference_id")
+  violationType    Int      @map("violation_type")
+  originalPointNum Int      @map("original_point_num")
+  latestPointNum   Int      @map("latest_point_num")
+  issueTime        DateTime @default(now()) @map("issue_time")
+
+  shop             Shop     @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+
+  @@index([shopId, issueTime])
+  @@map("shop_penalty_points")
+}
+
+model ShopPunishment {
+  id             BigInt   @id @default(autoincrement())
+  shopId         BigInt   @map("shop_id")
+  referenceId    BigInt   @unique @map("reference_id")
+  punishmentType Int      @map("punishment_type")
+  reason         Int
+  status         Int      @default(1) // 1: Ongoing, 2: Ended
+  issueTime      DateTime @default(now()) @map("issue_time")
+  startTime      DateTime @map("start_time")
+  endTime        DateTime @map("end_time")
+  listingLimit   Int?     @map("listing_limit")
+  orderLimit     String?  @map("order_limit")
+
+  shop           Shop     @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+
+  @@index([shopId, status, issueTime])
+  @@map("shop_punishments")
 }
 
 

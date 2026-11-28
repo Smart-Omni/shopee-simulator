@@ -7,6 +7,7 @@ import { returnsSwaggerPaths } from "./swagger.returns";
 import { chatSwaggerPaths } from "./swagger.chat";
 import { adminSwaggerPaths } from "./swagger.admin";
 import { buyerSwaggerPaths } from "./swagger.buyer";
+import { accountHealthSwaggerPaths } from "./swagger.accountHealth";
 
 export const swaggerDocument = {
   openapi: "3.0.0",
@@ -34,9 +35,11 @@ export const swaggerDocument = {
     { name: "Reviews", description: "Customer ratings, comments, and seller replies" },
     { name: "Live Chat", description: "Real-time Buyer-Seller messaging and conversation threads" },
     { name: "Webhook & Push", description: "Outbound push webhooks, event delivery logs, and retry" },
+    { name: "Account Health", description: "Shop performance, penalty points, punishments, late orders, and metric source details" },
     { name: "Simulator Control", description: "Direct endpoints for tests to trigger buyer actions and inject faults" }
   ],
   paths: {
+    ...accountHealthSwaggerPaths,
     "/auth": {
       get: {
         tags: ["Public & Auth"],
