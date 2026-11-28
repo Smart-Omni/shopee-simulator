@@ -151,6 +151,7 @@ orderRouter.get("/api/v2/order/get_order_detail", shopeeAuthGuard, async (req: R
       cancel_by: o.cancelBy || null,
       cancel_reason: o.cancelReason || null,
       buyer_cancel_reason: o.buyerCancelReason || null,
+      pickup_done_time: o.packages?.[0]?.pickupTime ? Math.floor(o.packages[0].pickupTime.getTime() / 1000) : 0,
       pay_time: o.payTime ? Math.floor(o.payTime.getTime() / 1000) : Math.floor(o.createdAt.getTime() / 1000),
       recipient_address: {
         name: o.recipientName,
